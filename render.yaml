@@ -1,0 +1,36 @@
+# Render Blueprint — in the Render dashboard choose New > Blueprint and pick
+# this repo; Render reads this file. Secrets are marked sync:false so Render
+# prompts you to type them in rather than keeping them in git.
+services:
+  - type: web
+    name: kerala-marine-supply
+    runtime: node
+    region: singapore # closest Render region to Kerala
+    # NOTE ON PLAN: "free" instances spin down after 15 minutes idle, and the
+    # next visitor waits ~50s for the cold start. Custom domains work fine on
+    # free, but for a live business domain that first impression is rough.
+    # Change to "starter" ($7/mo) to keep it always on.
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    # Only the apex is listed on purpose. Render automatically adds the
+    # matching www subdomain and redirects it here, which gives one canonical
+    # hostname. Listing both would serve the site at both addresses instead.
+    domains:
+      - keralamarinesupply.in
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_STORAGE_BUCKET
+        sync: false
+      - key: ADMIN_USER
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false

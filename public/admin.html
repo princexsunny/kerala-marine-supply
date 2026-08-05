@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Kerala Marine Supply</title>
+<link rel="stylesheet" href="_ds/modernist-815fd27c-87e0-489b-a8ca-b1cd2abbfc98/styles.css">
+<style>
+  body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)}
+  a{color:var(--color-accent-700);text-decoration:none}
+  a:hover{color:var(--color-accent-600)}
+  .pad{max-width:1100px;margin:0 auto;padding:0 40px}
+  section{padding:44px 0;border-bottom:2px solid var(--color-divider)}
+  h2{font-size:26px;font-weight:800;letter-spacing:-0.02em;margin:0 0 8px}
+  .eyebrow{font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--color-accent-700);font-weight:600;margin-bottom:16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--color-divider)}
+  .slot{background:var(--color-bg);padding:20px 22px;display:flex;gap:18px;align-items:flex-start}
+  .thumb{width:100px;height:74px;flex:none;background:var(--color-surface);background-size:cover;background-position:center;border:1px solid var(--color-neutral-300)}
+  .slot .lbl{font-family:var(--font-heading);font-weight:800;font-size:14px}
+  .slot .hint{margin:4px 0 10px;font-size:12px;color:var(--color-neutral-700)}
+  .note{font-size:13px;color:var(--color-neutral-800);margin-top:14px}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th,td{padding:10px 12px;border-bottom:1px solid var(--color-divider);text-align:left;font-size:13px;vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--color-neutral-700)}
+  .msg{max-width:260px;white-space:pre-wrap}
+  .drop{border:2px dashed var(--color-neutral-400);padding:28px 22px;text-align:left;background:var(--color-surface)}
+  .drop.over{border-color:var(--color-accent);background:var(--color-accent-100)}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px}
+  select,input[type=file]{font:inherit;font-size:13px}
+  select{padding:10px 12px;border:2px solid var(--color-divider);background:var(--color-bg);color:var(--color-text)}
+  .dot{width:8px;height:8px;display:inline-block;border-radius:50%;margin-right:6px}
+  @media(max-width:700px){.grid2{grid-template-columns:1fr}.pad{padding:0 20px}}
+</style>
+</head>
+<body>
+
+<div style="background:var(--color-text);color:var(--color-neutral-300)">
+  <div class="pad" style="display:flex;justify-content:space-between;gap:24px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;line-height:34px">
+    <span>Admin · Kerala Marine Supply</span>
+    <a href="index.html" style="color:var(--color-neutral-300)">← Back to the website</a>
+  </div>
+</div>
+<header style="border-bottom:2px solid var(--color-divider)">
+  <div class="pad" style="display:flex;align-items:center;justify-content:space-between;height:64px">
+    <span style="font-family:var(--font-heading);font-weight:800;font-size:16px">SITE ADMIN</span>
+    <span id="serverStatus" style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-neutral-700)">Checking server…</span>
+  </div>
+</header>
+
+<main class="pad">
+
+  <section>
+    <div class="eyebrow">Step 1 · Photographs</div>
+    <h2>Website photos</h2>
+    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Choose a picture for each slot, then save. JPEG, PNG, WebP or GIF.</p>
+    <div class="grid2" id="slotGrid"></div>
+    <div class="row">
+      <button class="btn btn-primary" id="savePhotos">Save photos</button>
+      <button class="btn btn-ghost" id="clearPhotos">Clear choices</button>
+      <span class="note" id="photoNote"></span>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Step 2 · Documents</div>
+    <h2>Document library</h2>
+    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Licences, LOIs, quotations, the investor one-pager. Up to 200 MB, stored on the server.</p>
+    <div id="drop" class="drop">
+      <div style="font-family:var(--font-heading);font-weight:800;font-size:16px;margin-bottom:6px">Drag files here</div>
+      <p style="margin:0 0 14px;font-size:13px;color:var(--color-neutral-700)">or choose them below</p>
+      <input type="file" id="docFile" multiple>
+    </div>
+    <div class="row">
+      <select id="docCategory">
+        <option>Licences</option>
+        <option>Agreements &amp; LOIs</option>
+        <option>Quotations</option>
+        <option>Investor</option>
+        <option>Photos &amp; plans</option>
+        <option>Other</option>
+      </select>
+      <button class="btn btn-primary" id="uploadDoc">Upload to this category</button>
+      <button class="btn btn-ghost" id="refreshDocs">Refresh list</button>
+      <span class="note" id="docNote"></span>
+    </div>
+    <table>
+      <thead><tr><th>Document</th><th>Category</th><th>Type</th><th>Size</th><th style="text-align:right">Link</th></tr></thead>
+      <tbody id="docRows"></tbody>
+    </table>
+    <p class="note" id="docsEmpty"></p>
+  </section>
+
+  <section style="border-bottom:none">
+    <div class="eyebrow">Step 3 · Job applications</div>
+    <h2>Applications received</h2>
+    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Everyone who has applied via the careers page.</p>
+    <div class="row"><button class="btn btn-ghost" id="refreshApps">Refresh list</button><span class="note" id="appNote"></span></div>
+    <table>
+      <thead><tr><th>Received</th><th>Name</th><th>Phone</th><th>Email</th><th>Role</th><th>Note</th><th style="text-align:right">Resume</th></tr></thead>
+      <tbody id="appRows"></tbody>
+    </table>
+    <p class="note" id="appsEmpty"></p>
+  </section>
+
+</main>
+
+<script>
+(function(){
+  var SLOTS = [
+    { key: 'hero',   label: 'Hero photograph', hint: 'Beside the headline — a boat, the yard or the harbour.' },
+    { key: 'photo1', label: 'Strip 1', hint: 'The boat yard at Chirayinkeezhu.' },
+    { key: 'photo2', label: 'Strip 2', hint: 'Nets, gear or the net-sewing machine.' },
+    { key: 'photo3', label: 'Strip 3', hint: 'The crew, or a boat at the harbour.' },
+    { key: 'founder',label: 'Founder portrait', hint: 'Prince, in the founder section.' },
+  ];
+  var photos = {}; // key -> dataURL chosen (not yet saved / just saved)
+
+  var slotGrid = document.getElementById('slotGrid');
+  SLOTS.forEach(function(s){
+    var div = document.createElement('div');
+    div.className = 'slot';
+    div.innerHTML =
+      '<div class="thumb" id="thumb-'+s.key+'"></div>' +
+      '<div style="min-width:0">' +
+        '<div class="lbl">'+s.label+'</div>' +
+        '<p class="hint">'+s.hint+'</p>' +
+        '<input type="file" accept="image/*" data-slot="'+s.key+'">' +
+      '</div>';
+    slotGrid.appendChild(div);
+  });
+  slotGrid.addEventListener('change', function(e){
+    var input = e.target;
+    if(!input.dataset || !input.dataset.slot) return;
+    var file = input.files && input.files[0];
+    if(!file) return;
+    if(!/^image\/(jpeg|png|webp|gif)$/.test(file.type)){
+      setNote('photoNote', 'That file is not a JPEG, PNG, WebP or GIF.');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(){
+      photos[input.dataset.slot] = reader.result;
+      document.getElementById('thumb-'+input.dataset.slot).style.backgroundImage = 'url('+reader.result+')';
+      setNote('photoNote', '');
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('clearPhotos').addEventListener('click', function(){
+    photos = {};
+    SLOTS.forEach(function(s){ document.getElementById('thumb-'+s.key).style.backgroundImage = 'none'; });
+    setNote('photoNote', 'Choices cleared.');
+  });
+  document.getElementById('savePhotos').addEventListener('click', function(){
+    var keys = Object.keys(photos);
+    if(!keys.length){ setNote('photoNote', 'Choose at least one picture first.'); return; }
+    setNote('photoNote', 'Saving…');
+    api('PUT', '/api/media', photos)
+      .then(function(){ setNote('photoNote', keys.length + ' photo(s) saved to the server.'); })
+      .catch(function(err){ setNote('photoNote', err.message); });
+  });
+
+  // ---- Documents ----
+  var queue = [];
+  var drop = document.getElementById('drop');
+  ['dragover','dragenter'].forEach(function(evt){
+    drop.addEventListener(evt, function(e){ e.preventDefault(); drop.classList.add('over'); });
+  });
+  ['dragleave','dragend'].forEach(function(evt){
+    drop.addEventListener(evt, function(){ drop.classList.remove('over'); });
+  });
+  drop.addEventListener('drop', function(e){
+    e.preventDefault();
+    drop.classList.remove('over');
+    queue = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+    setNote('docNote', queue.length ? queue.length + ' file(s) ready — pick a category and upload.' : 'Nothing was dropped.');
+  });
+  document.getElementById('docFile').addEventListener('change', function(e){
+    queue = Array.from(e.target.files || []);
+    setNote('docNote', queue.length ? queue.length + ' file(s) ready.' : '');
+  });
+  document.getElementById('uploadDoc').addEventListener('click', function(){
+    if(!queue.length){ setNote('docNote', 'Drop or choose a file first.'); return; }
+    var category = document.getElementById('docCategory').value;
+    uploadNext(0);
+    function uploadNext(i){
+      if(i >= queue.length){
+        setNote('docNote', queue.length + ' file(s) uploaded to ' + category + '.');
+        queue = [];
+        loadDocs();
+        return;
+      }
+      var f = queue[i];
+      setNote('docNote', 'Uploading ' + (i+1) + ' of ' + queue.length + ' — ' + f.name + '…');
+      var fd = new FormData();
+      fd.append('category', category);
+      fd.append('file', f);
+      fetch('/api/documents', { method:'POST', body: fd })
+        .then(function(r){ if(!r.ok) return r.json().then(function(b){ throw new Error(b.error||'Upload failed'); }); return r.json(); })
+        .then(function(){ uploadNext(i+1); })
+        .catch(function(err){ setNote('docNote', f.name + ': ' + err.message); });
+    }
+  });
+  document.getElementById('refreshDocs').addEventListener('click', loadDocs);
+
+  function loadDocs(){
+    api('GET', '/api/documents').then(function(list){
+      var rows = document.getElementById('docRows');
+      rows.innerHTML = '';
+      (list||[]).forEach(function(d){
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td style="font-weight:600">'+esc(d.name)+'</td><td>'+esc(d.category)+'</td>' +
+          '<td>'+esc(d.type||'—')+'</td><td>'+fmtSize(d.size)+'</td>' +
+          '<td style="text-align:right"><a href="'+d.url+'" target="_blank" rel="noopener">Open ↗</a></td>';
+        rows.appendChild(tr);
+      });
+      document.getElementById('docsEmpty').textContent = (list && list.length) ? '' : 'No documents uploaded yet.';
+    }).catch(function(err){ setNote('docNote', err.message); });
+  }
+
+  // ---- Applications ----
+  document.getElementById('refreshApps').addEventListener('click', loadApps);
+  function loadApps(){
+    setNote('appNote', 'Loading…');
+    api('GET', '/api/applications').then(function(list){
+      setNote('appNote', '');
+      var rows = document.getElementById('appRows');
+      rows.innerHTML = '';
+      (list||[]).forEach(function(a){
+        var when = a.createdAt ? new Date(a.createdAt).toLocaleString() : '—';
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td>'+when+'</td><td style="font-weight:600">'+esc(a.name)+'</td><td>'+esc(a.phone)+'</td>' +
+          '<td>'+esc(a.email||'')+'</td><td>'+esc(a.role)+'</td><td class="msg">'+esc(a.message||'')+'</td>' +
+          '<td style="text-align:right"><a href="'+a.resumeUrl+'" target="_blank" rel="noopener">'+esc(a.resumeName||'Open')+'</a></td>';
+        rows.appendChild(tr);
+      });
+      document.getElementById('appsEmpty').textContent = (list && list.length) ? '' : 'No applications yet.';
+    }).catch(function(err){ setNote('appNote', err.message); });
+  }
+
+  // ---- Shared helpers ----
+  function api(method, url, body){
+    var opts = { method: method, headers: {} };
+    if(body !== undefined){ opts.headers['Content-Type']='application/json'; opts.body = JSON.stringify(body); }
+    return fetch(url, opts).then(function(r){
+      if(!r.ok) return r.json().catch(function(){return {};}).then(function(b){ throw new Error(b.error || ('Server error ' + r.status)); });
+      return r.json();
+    });
+  }
+  function setNote(id, text){ document.getElementById(id).textContent = text; }
+  function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+  function fmtSize(n){
+    if(n==null) return '—';
+    if(n < 1024) return n + ' B';
+    if(n < 1048576) return (n/1024).toFixed(0) + ' KB';
+    return (n/1048576).toFixed(1) + ' MB';
+  }
+
+  fetch('/api/health').then(function(r){return r.json();}).then(function(d){
+    var el = document.getElementById('serverStatus');
+    el.innerHTML = '<span class="dot" style="background:'+(d.ok?'#1a8f5a':'var(--color-accent)')+'"></span>' + (d.ok?'Server connected':'Server offline — check Firebase config');
+  }).catch(function(){
+    document.getElementById('serverStatus').textContent = 'Server offline';
+  });
+
+  loadDocs();
+  loadApps();
+})();
+</script>
+</body>
+</html>

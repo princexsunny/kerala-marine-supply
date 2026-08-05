@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0d0d0d">
+<meta name="description" content="Apply for a job at Kerala Marine Supply — boat yard, marine fuel pump, and boat manufacturing roles in Trivandrum.">
+<title>Apply — Kerala Marine Supply</title>
+<link rel="stylesheet" href="_ds/modernist-815fd27c-87e0-489b-a8ca-b1cd2abbfc98/styles.css">
+<style>
+  body{margin:0;min-height:100vh;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);display:flex;align-items:flex-start;justify-content:center;padding:56px 24px}
+  a{color:var(--color-accent-700);text-decoration:none}
+  a:hover{color:var(--color-accent-600)}
+  .box{width:100%;max-width:480px}
+  .logo{font-family:var(--font-heading);font-weight:800;font-size:16px;letter-spacing:-0.01em;margin-bottom:32px;display:flex;align-items:baseline;gap:10px}
+  .eyebrow{text-transform:uppercase;letter-spacing:0.2em;font-size:11px;color:var(--color-accent-700);font-weight:600;margin-bottom:16px}
+  h1{font-size:clamp(30px,6vw,42px);font-weight:800;letter-spacing:-0.03em;line-height:1;margin:0 0 12px}
+  .rolepill{display:inline-block;margin:0 0 28px;border:2px solid var(--color-divider);padding:8px 16px;font-size:13px;font-weight:600}
+  .rolepill span{color:var(--color-accent-700)}
+  .card{border:2px solid var(--color-divider);padding:28px 24px}
+  label{display:block;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-neutral-700);font-weight:600;margin:18px 0 6px}
+  label:first-child{margin-top:0}
+  .req{color:var(--color-accent-700)}
+  input,select,textarea{width:100%;padding:12px 14px;border:2px solid var(--color-divider);font-size:15px;background:var(--color-bg);color:var(--color-text);outline:none;font-family:inherit}
+  textarea{resize:vertical;min-height:70px}
+  input:focus,select:focus,textarea:focus{border-color:var(--color-accent)}
+  .file{border:2px dashed var(--color-neutral-400);padding:18px;text-align:center;cursor:pointer;background:var(--color-bg)}
+  .file:hover{border-color:var(--color-accent)}
+  .file input{display:none}
+  .file .ftxt{font-size:14px;color:var(--color-neutral-700)}
+  .file .fname{font-size:13px;color:var(--color-accent-700);font-weight:700;margin-top:6px;word-break:break-all}
+  .btn{width:100%;margin-top:24px;padding:15px;border:none;background:var(--color-accent);color:var(--color-neutral-100);font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;text-align:left;padding-left:20px}
+  .btn:hover{background:var(--color-accent-600)}
+  .err{display:none;margin-top:14px;color:var(--color-accent-700);font-size:14px}
+  .err.show{display:block}
+  .alt{margin-top:20px;font-size:13px;color:var(--color-neutral-700)}
+  .back{display:inline-block;margin-top:20px;font-size:13px;color:var(--color-neutral-700)}
+  .done{display:none}
+  .done.show{display:block}
+  .done .tick{width:56px;height:56px;background:var(--color-text);color:var(--color-bg);font-size:24px;display:flex;align-items:center;justify-content:center;margin-bottom:20px}
+  .done h2{font-size:26px;font-weight:800;margin:0 0 8px;letter-spacing:-0.02em}
+  .done p{color:var(--color-neutral-800);margin-bottom:18px;line-height:1.5}
+</style>
+</head>
+<body>
+  <div class="box">
+    <a href="index.html" class="logo" style="color:var(--color-text)">KERALA MARINE SUPPLY<span style="width:8px;height:8px;background:var(--color-accent);display:inline-block"></span></a>
+
+    <!-- FORM -->
+    <div id="formView">
+      <div class="eyebrow">Job application</div>
+      <h1>Apply to join us.</h1>
+      <div class="rolepill" id="rolePill">Role: <span id="roleName">General Application</span></div>
+      <div class="card">
+        <form id="f" autocomplete="off">
+          <label for="n">Full name <span class="req">*</span></label>
+          <input id="n" type="text" placeholder="Your name">
+          <label for="ph">Phone <span class="req">*</span></label>
+          <input id="ph" type="tel" placeholder="+91 ...">
+          <label for="e">Email</label>
+          <input id="e" type="email" placeholder="you@example.com (optional)">
+          <label for="role">Role applying for</label>
+          <input id="role" type="text" placeholder="Role">
+          <label>Resume / CV <span class="req">*</span></label>
+          <label class="file" for="cv">
+            <div class="ftxt">Tap to upload your resume (PDF, DOC, or image)</div>
+            <div class="fname" id="fname"></div>
+            <input id="cv" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+          </label>
+          <label for="msg">Short note (optional)</label>
+          <textarea id="msg" placeholder="Experience, availability, anything you'd like to add"></textarea>
+          <button class="btn" type="submit">Submit application →</button>
+          <div class="err" id="err"></div>
+        </form>
+      </div>
+      <div class="alt">Prefer email? Send your details to <a href="mailto:princexsunny@gmail.com?subject=Job%20Application%20-%20Kerala%20Marine%20Supply">princexsunny@gmail.com</a></div>
+      <a class="back" href="careers.html">← Back to all jobs</a>
+    </div>
+
+    <!-- SUCCESS -->
+    <div class="done" id="doneView">
+      <div class="tick">✓</div>
+      <h2>Application received.</h2>
+      <p>Thank you! Your application has been recorded. We'll review it and get back to you on the phone number you provided.</p>
+      <a class="btn" style="display:inline-block;text-decoration:none;width:auto;padding:14px 22px" href="careers.html">View more jobs</a>
+      <div style="margin-top:16px"><a class="back" href="index.html">← Back to website</a></div>
+    </div>
+  </div>
+
+<script src="api.js"></script>
+<script>
+  var MAX = 2*1024*1024; // 2 MB
+  var roleParam = new URLSearchParams(location.search).get('role') || '';
+  if(roleParam){
+    document.getElementById('roleName').textContent = roleParam;
+    document.getElementById('role').value = roleParam;
+  } else {
+    document.getElementById('rolePill').style.display='none';
+  }
+
+  var cvData=null, cvName='';
+  document.getElementById('cv').addEventListener('change',function(){
+    var file=this.files[0]; if(!file)return;
+    if(file.size>MAX){ showErr('Resume is larger than 2 MB. Please upload a smaller file.'); this.value=''; return; }
+    cvName=file.name; document.getElementById('fname').textContent='Selected: '+file.name;
+    var r=new FileReader(); r.onload=function(){ cvData=r.result; }; r.readAsDataURL(file);
+  });
+
+  function showErr(m){var e=document.getElementById('err'); e.textContent=m; e.classList.add('show');}
+
+  document.getElementById('f').addEventListener('submit',function(ev){
+    ev.preventDefault();
+    var name=document.getElementById('n').value.trim();
+    var phone=document.getElementById('ph').value.trim();
+    var email=document.getElementById('e').value.trim();
+    var role=document.getElementById('role').value.trim()||'General Application';
+    var msg=document.getElementById('msg').value.trim();
+    if(!name||!phone){ return showErr('Please enter your name and phone number.'); }
+    if(!cvData){ return showErr('Please upload your resume / CV.'); }
+    var app={ name:name, phone:phone, email:email, role:role, message:msg,
+              resumeName:cvName, resumeData:cvData, created:Date.now() };
+    try{
+      var list=JSON.parse(localStorage.getItem('km_applications')||'[]');
+      list.push(app);
+      localStorage.setItem('km_applications', JSON.stringify(list));
+      // Also send to the live server (Firebase) when available — so it's saved from any device.
+      try{ if(window.KMS){ KMS.applyJob(app).catch(function(){}); } }catch(e){}
+    }catch(e){
+      return showErr('Could not save (storage full or blocked). Please email your resume to princexsunny@gmail.com instead.');
+    }
+    document.getElementById('formView').style.display='none';
+    document.getElementById('doneView').classList.add('show');
+    window.scrollTo(0,0);
+  });
+</script>
+</body>
+</html>
