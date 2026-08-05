@@ -82,4 +82,44 @@ router.get('/documents', async (req, res) => {
   }
 });
 
+router.delete('/documents/:id', async (req, res) => {
+  try {
+    init();
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+
+  try {
+    const db = admin.firestore();
+    const bucket = admin.storage().bucket();
+    const ref = db.collection('documents').doc(req.params.id);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      return res.status(404).json({ error: 'That document no longer exists.' });
+    }
+
+    const data = snap.data();
+
+    // Delete the stored file first. If this fails the Firestore record is
+    // left alone, so the document still appears in the admin list and the
+    // delete can be retried — the alternative (record gone, file orphaned)
+    // would silently leak storage with no way to find it again.
+    if (data.storagePath) {
+      try {
+        await bucket.file(data.storagePath).delete();
+      } catch (e) {
+        // Already-missing file (404) is fine — the goal is that it's gone.
+        if (e.code !== 404) throw e;
+      }
+    }
+
+    await ref.delete();
+    res.json({ ok: true, deleted: data.name || req.params.id });
+  } catch (err) {
+    console.error('DELETE /api/documents failed:', err);
+    res.status(500).json({ error: 'Could not delete the document. Please try again.' });
+  }
+});
+
 module.exports = router;

@@ -23,6 +23,10 @@
   th,td{padding:10px 12px;border-bottom:1px solid var(--color-divider);text-align:left;font-size:13px;vertical-align:top}
   th{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--color-neutral-700)}
   .msg{max-width:260px;white-space:pre-wrap}
+  button.del{margin-left:14px;border:2px solid var(--color-divider);background:none;color:var(--color-accent-700);
+             font:inherit;font-size:12px;font-weight:600;padding:4px 10px;cursor:pointer}
+  button.del:hover:not(:disabled){border-color:var(--color-accent);background:var(--color-accent-100)}
+  button.del:disabled{opacity:.5;cursor:default}
   .drop{border:2px dashed var(--color-neutral-400);padding:28px 22px;text-align:left;background:var(--color-surface)}
   .drop.over{border-color:var(--color-accent);background:var(--color-accent-100)}
   .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px}
@@ -128,6 +132,42 @@
       '</div>';
     slotGrid.appendChild(div);
   });
+  // Photos straight off a phone or camera are often 5-10 MB, which is far
+  // more than a website needs and big enough to blow past the request size
+  // limit once base64 encoding adds ~37%. Downscale in the browser first:
+  // 2000px on the long edge is plenty for a full-width hero, and JPEG at 0.85
+  // takes a typical 8 MB PNG down to a few hundred KB.
+  var MAX_EDGE = 2000;
+  function shrinkImage(file){
+    return new Promise(function(resolve, reject){
+      // GIFs may be animated; a canvas re-encode would keep only the first
+      // frame, so pass them through untouched rather than silently break them.
+      if(file.type === 'image/gif'){
+        var fr = new FileReader();
+        fr.onload = function(){ resolve(fr.result); };
+        fr.onerror = reject;
+        fr.readAsDataURL(file);
+        return;
+      }
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function(){
+        var scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
+        var w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        // PNGs with transparency would get a black background as JPEG, so
+        // keep those as PNG; everything else becomes JPEG for the size win.
+        var type = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        resolve(canvas.toDataURL(type, 0.85));
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('Could not read that image.')); };
+      img.src = url;
+    });
+  }
+
   slotGrid.addEventListener('change', function(e){
     var input = e.target;
     if(!input.dataset || !input.dataset.slot) return;
@@ -137,13 +177,16 @@
       setNote('photoNote', 'That file is not a JPEG, PNG, WebP or GIF.');
       return;
     }
-    var reader = new FileReader();
-    reader.onload = function(){
-      photos[input.dataset.slot] = reader.result;
-      document.getElementById('thumb-'+input.dataset.slot).style.backgroundImage = 'url('+reader.result+')';
-      setNote('photoNote', '');
-    };
-    reader.readAsDataURL(file);
+    var key = input.dataset.slot;
+    setNote('photoNote', 'Processing ' + file.name + '…');
+    shrinkImage(file).then(function(dataUrl){
+      photos[key] = dataUrl;
+      document.getElementById('thumb-'+key).style.backgroundImage = 'url('+dataUrl+')';
+      var kb = Math.round(dataUrl.length * 0.75 / 1024);
+      setNote('photoNote', file.name + ' ready (' + kb + ' KB after resizing).');
+    }).catch(function(err){
+      setNote('photoNote', err.message);
+    });
   });
   document.getElementById('clearPhotos').addEventListener('click', function(){
     photos = {};
@@ -153,10 +196,21 @@
   document.getElementById('savePhotos').addEventListener('click', function(){
     var keys = Object.keys(photos);
     if(!keys.length){ setNote('photoNote', 'Choose at least one picture first.'); return; }
-    setNote('photoNote', 'Saving…');
-    api('PUT', '/api/media', photos)
-      .then(function(){ setNote('photoNote', keys.length + ' photo(s) saved to the server.'); })
-      .catch(function(err){ setNote('photoNote', err.message); });
+    // One request per photo rather than all in one body: a single oversized
+    // photo then can't fail the whole batch, and progress is visible.
+    var i = 0;
+    (function next(){
+      if(i >= keys.length){
+        setNote('photoNote', keys.length + ' photo(s) saved to the server.');
+        return;
+      }
+      var key = keys[i];
+      setNote('photoNote', 'Saving ' + (i+1) + ' of ' + keys.length + '…');
+      var one = {}; one[key] = photos[key];
+      api('PUT', '/api/media', one)
+        .then(function(){ i++; next(); })
+        .catch(function(err){ setNote('photoNote', key + ': ' + err.message); });
+    })();
   });
 
   // ---- Documents ----
@@ -210,12 +264,33 @@
         var tr = document.createElement('tr');
         tr.innerHTML = '<td style="font-weight:600">'+esc(d.name)+'</td><td>'+esc(d.category)+'</td>' +
           '<td>'+esc(d.type||'—')+'</td><td>'+fmtSize(d.size)+'</td>' +
-          '<td style="text-align:right"><a href="'+d.url+'" target="_blank" rel="noopener">Open ↗</a></td>';
+          '<td style="text-align:right;white-space:nowrap">' +
+            '<a href="'+d.url+'" target="_blank" rel="noopener">Open ↗</a>' +
+            '<button class="del" data-id="'+esc(d.id)+'" data-name="'+esc(d.name)+'">Delete</button>' +
+          '</td>';
         rows.appendChild(tr);
       });
       document.getElementById('docsEmpty').textContent = (list && list.length) ? '' : 'No documents uploaded yet.';
     }).catch(function(err){ setNote('docNote', err.message); });
   }
+
+  // Delegated so it keeps working after the table is re-rendered.
+  document.getElementById('docRows').addEventListener('click', function(e){
+    var btn = e.target.closest && e.target.closest('button.del');
+    if(!btn) return;
+    var id = btn.dataset.id, name = btn.dataset.name || 'this document';
+    // Deleting removes the stored file too and cannot be undone, so confirm.
+    if(!confirm('Delete "' + name + '"?\n\nThis permanently removes the file from storage and cannot be undone.')) return;
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+    api('DELETE', '/api/documents/' + encodeURIComponent(id))
+      .then(function(){ setNote('docNote', 'Deleted "' + name + '".'); loadDocs(); })
+      .catch(function(err){
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+        setNote('docNote', err.message);
+      });
+  });
 
   // ---- Applications ----
   document.getElementById('refreshApps').addEventListener('click', loadApps);

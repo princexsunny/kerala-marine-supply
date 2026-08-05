@@ -40,9 +40,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// Job applications carry a base64 resume (up to ~2MB source file, ~2.7MB
-// base64) as JSON — bump the default body-size limit to fit it.
-app.use(express.json({ limit: '6mb' }));
+// JSON bodies carry base64-encoded files: a resume (2MB cap) or a batch of
+// site photos. Base64 inflates by ~37%, so the limit must exceed the largest
+// expected file by a wide margin — an 8MB photo arrives as ~11MB of JSON.
+// The admin page also downscales images before sending, so real requests are
+// far smaller than this ceiling; it exists so an unresized upload fails with
+// a clear message instead of at the parser.
+app.use(express.json({ limit: '25mb' }));
 
 // Public API — anyone with the apply-page link can submit an application.
 app.use('/api', applyRoutes);
@@ -91,7 +95,23 @@ app.use((req, res) => {
 // instead of Express's default HTML error page.
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'That file is too large (200 MB maximum).' });
+    }
     return res.status(400).json({ error: err.message });
+  }
+  // Body-parser rejects oversized JSON before any route runs. Reporting it as
+  // a 500 (the old behaviour) made an ordinary "photo too big" look like a
+  // server crash — say what actually happened and how much was sent.
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+    const mb = (n) => (n / 1024 / 1024).toFixed(1) + ' MB';
+    console.warn('Rejected oversized body:', err.length, 'bytes (limit', err.limit + ')');
+    return res.status(413).json({
+      error:
+        'That upload is too large' +
+        (err.length ? ' (' + mb(err.length) + ' after encoding, limit ' + mb(err.limit) + ')' : '') +
+        '. Try a smaller image, or upload one photo at a time.',
+    });
   }
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Something went wrong.' });
