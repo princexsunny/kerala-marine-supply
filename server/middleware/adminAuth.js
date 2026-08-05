@@ -5,10 +5,15 @@
 // no sessions, cookies, or extra dependencies required.
 function adminAuth(req, res, next) {
   const user = process.env.ADMIN_USER || 'admin';
-  const pass = process.env.ADMIN_PASSWORD;
+  // ADMIN_TOKEN is the name the previous version of this project used. Falling
+  // back to it means an existing Render service keeps working after the
+  // upgrade without re-entering the secret; ADMIN_PASSWORD overrides it.
+  const pass = process.env.ADMIN_PASSWORD || process.env.ADMIN_TOKEN;
 
   if (!pass) {
-    return res.status(500).json({ error: 'ADMIN_PASSWORD is not set on the server (see .env.example).' });
+    return res.status(500).json({
+      error: 'No admin password is set on the server. Set ADMIN_PASSWORD (see .env.example).',
+    });
   }
 
   const header = req.headers.authorization || '';
