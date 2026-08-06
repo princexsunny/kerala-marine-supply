@@ -57,7 +57,7 @@ app.use('/api', authRoutes);
 // Public API — anyone with the apply-page link can submit an application.
 app.use('/api', applyRoutes);
 
-// Public health check — used by Admin.dc.html's "server connected" dot.
+// Public health check — used by admin.html's "server connected" dot.
 app.get('/api/health', (req, res) => res.json({ ok: isReady() }));
 
 // Admin-only API — site photos, document library, application review.
@@ -65,12 +65,20 @@ app.use('/api', adminAuth, mediaRoutes);
 app.use('/api', adminAuth, documentsRoutes);
 app.use('/api', adminAuth, applicationsRoutes);
 
-// Admin pages sit behind the same session as the admin API.
-app.get(['/admin.html', '/Admin.dc.html'], adminAuth, (req, res) => {
+// Admin.dc.html and admin-dashboard.html were removed — admin.html is the only
+// admin page now. Old bookmarks and stale tabs still point at those URLs, and a
+// 404 would look like the site is broken, so send them to the real page instead.
+// Permanent, because these two are never coming back.
+app.get(['/Admin.dc.html', '/admin-dashboard.html'], (req, res) =>
+  res.redirect(301, '/admin.html')
+);
+
+// The admin page sits behind the same session as the admin API.
+app.get('/admin.html', adminAuth, (req, res) => {
   // Never let a proxy or the browser cache a signed-in admin page — a later
   // signed-out visitor on the same machine could otherwise be served it.
   res.setHeader('Cache-Control', 'no-store, private');
-  res.sendFile(path.join(PUBLIC_DIR, req.path));
+  res.sendFile(path.join(PUBLIC_DIR, 'admin.html'));
 });
 
 // Already signed in? Skip the login form.

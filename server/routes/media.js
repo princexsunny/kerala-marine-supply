@@ -1,5 +1,5 @@
 // PUT /api/media — saves the website's editable photo slots (hero, photo1,
-// photo2, photo3, founder — see Admin.dc.html's SLOTS list). Body is a flat
+// photo2, photo3, founder — see admin.html's SLOTS list). Body is a flat
 // object of { slotKey: "data:image/...;base64,..." }. Each photo is stored
 // in Firebase Storage at a fixed path per slot (so re-saving a slot just
 // overwrites it) and the resulting URL is recorded in Firestore under

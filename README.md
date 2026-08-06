@@ -17,8 +17,8 @@ public/            static site — served as-is by Express
   index.html         home page (self-contained export)
   careers.html        job listings
   apply.html           application form → POSTs to /api/apply via api.js
-  admin.html            plain admin page: photos, documents, applications
-  Admin.dc.html          original design-tool source for the admin page (kept for reference/future edits in that tool — not required to run the site)
+  admin.html            the admin page: photos, documents, applications
+  login.html             admin sign-in form
   api.js                window.KMS.applyJob() — the glue apply.html calls
   image-slot.js, support.js, _ds/   design-tool runtime assets, kept as-is
 
@@ -139,5 +139,5 @@ When pasting `FIREBASE_PRIVATE_KEY` into Render's env var UI, keep the `\n` esca
 
 - **Resumes/documents/photos** are stored in Firebase Storage with long-lived signed URLs (valid to year 2500) — anyone with the link can view the file, but the paths aren't discoverable without going through the API.
 - **index.html** is a self-contained export (images and the page template are bundled inline) — no other file it depends on needs to be present for it to render.
-- **Admin.dc.html** is the source file as built in the design tool; `admin.html` is the plain, dependency-free version that actually ships and talks to the same API — use whichever you prefer, they're interchangeable.
+- **`admin.html` is the only admin page.** Two earlier ones (`Admin.dc.html`, a design-tool export that never rendered its data correctly, and `admin-dashboard.html`, a separate localStorage-only planner) were deleted because having three lookalike pages made it impossible to tell which one was actually working. Both old URLs 301 to `/admin.html` so old bookmarks still land somewhere sensible.
 - Document uploads are capped at 200 MB in the API; Render's free plan has 512 MB RAM, so very large uploads may need a paid plan.

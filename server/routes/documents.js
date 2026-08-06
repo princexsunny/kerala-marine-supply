@@ -1,5 +1,5 @@
 // POST /api/documents (multipart: category, file) and GET /api/documents —
-// the document library used by Admin.dc.html / admin.html (licences, LOIs,
+// the document library used by admin.html (licences, LOIs,
 // quotations, investor deck, etc.). Files go to Firebase Storage, metadata
 // to Firestore collection "documents".
 const express = require('express');
