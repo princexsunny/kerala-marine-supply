@@ -308,12 +308,32 @@
         var tr = document.createElement('tr');
         tr.innerHTML = '<td>'+when+'</td><td style="font-weight:600">'+esc(a.name)+'</td><td>'+esc(a.phone)+'</td>' +
           '<td>'+esc(a.email||'')+'</td><td>'+esc(a.role)+'</td><td class="msg">'+esc(a.message||'')+'</td>' +
-          '<td style="text-align:right"><a href="'+a.resumeUrl+'" target="_blank" rel="noopener">'+esc(a.resumeName||'Open')+'</a></td>';
+          '<td style="text-align:right;white-space:nowrap">' +
+            '<a href="'+a.resumeUrl+'" target="_blank" rel="noopener">'+esc(a.resumeName||'Open')+'</a>' +
+            '<button class="del" data-id="'+esc(a.id)+'" data-name="'+esc(a.name)+'">Delete</button>' +
+          '</td>';
         rows.appendChild(tr);
       });
       document.getElementById('appsEmpty').textContent = (list && list.length) ? '' : 'No applications yet.';
     }).catch(function(err){ setNote('appNote', err.message); });
   }
+
+  // Delegated so it keeps working after the table is re-rendered.
+  document.getElementById('appRows').addEventListener('click', function(e){
+    var btn = e.target.closest && e.target.closest('button.del');
+    if(!btn) return;
+    var id = btn.dataset.id, name = btn.dataset.name || 'this application';
+    if(!confirm('Delete the application from "' + name + '"?\n\nThis permanently removes their resume from storage and cannot be undone.')) return;
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+    api('DELETE', '/api/applications/' + encodeURIComponent(id))
+      .then(function(){ setNote('appNote', 'Deleted "' + name + '".'); loadApps(); })
+      .catch(function(err){
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+        setNote('appNote', err.message);
+      });
+  });
 
   // ---- Shared helpers ----
   function api(method, url, body){

@@ -35,4 +35,43 @@ router.get('/applications', async (req, res) => {
   }
 });
 
+router.delete('/applications/:id', async (req, res) => {
+  try {
+    init();
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+
+  try {
+    const db = admin.firestore();
+    const bucket = admin.storage().bucket();
+    const ref = db.collection('applications').doc(req.params.id);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      return res.status(404).json({ error: 'That application no longer exists.' });
+    }
+
+    const data = snap.data();
+
+    // Delete the resume file first, same reasoning as document delete: if this
+    // fails, leave the Firestore record in place so the entry (and its resume)
+    // stays visible and the delete can be retried, instead of silently
+    // orphaning a file in Storage with no record pointing at it.
+    if (data.resumePath) {
+      try {
+        await bucket.file(data.resumePath).delete();
+      } catch (e) {
+        if (e.code !== 404) throw e;
+      }
+    }
+
+    await ref.delete();
+    res.json({ ok: true, deleted: data.name || req.params.id });
+  } catch (err) {
+    console.error('DELETE /api/applications failed:', err);
+    res.status(500).json({ error: 'Could not delete the application. Please try again.' });
+  }
+});
+
 module.exports = router;
