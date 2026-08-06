@@ -91,10 +91,16 @@
 <script src="api.js"></script>
 <script>
   var MAX = 2*1024*1024; // 2 MB
+  // Arriving from a role row on careers.html, e.g. apply.html?role=Marine%20Mechanic
   var roleParam = new URLSearchParams(location.search).get('role') || '';
   if(roleParam){
     document.getElementById('roleName').textContent = roleParam;
     document.getElementById('role').value = roleParam;
+    // The role is already answered, so put the cursor on the first thing they
+    // still have to fill in rather than making them hunt for it.
+    // preventScroll keeps the page at the top so the pill confirming which
+    // role they picked stays visible.
+    try { document.getElementById('n').focus({ preventScroll: true }); } catch(e){}
   } else {
     document.getElementById('rolePill').style.display='none';
   }
@@ -109,8 +115,11 @@
 
   function showErr(m){var e=document.getElementById('err'); e.textContent=m; e.classList.add('show');}
 
+  function clearErr(){ document.getElementById('err').classList.remove('show'); }
+
   document.getElementById('f').addEventListener('submit',function(ev){
     ev.preventDefault();
+    clearErr();
     var name=document.getElementById('n').value.trim();
     var phone=document.getElementById('ph').value.trim();
     var email=document.getElementById('e').value.trim();
@@ -120,18 +129,43 @@
     if(!cvData){ return showErr('Please upload your resume / CV.'); }
     var app={ name:name, phone:phone, email:email, role:role, message:msg,
               resumeName:cvName, resumeData:cvData, created:Date.now() };
+
+    // Keep a local copy first. It's a backup only — localStorage lives in this
+    // one browser and nobody at Kerala Marine Supply can see it, so it must
+    // never be mistaken for the application having been received.
     try{
       var list=JSON.parse(localStorage.getItem('km_applications')||'[]');
       list.push(app);
       localStorage.setItem('km_applications', JSON.stringify(list));
-      // Also send to the live server (Firebase) when available — so it's saved from any device.
-      try{ if(window.KMS){ KMS.applyJob(app).catch(function(){}); } }catch(e){}
-    }catch(e){
-      return showErr('Could not save (storage full or blocked). Please email your resume to princexsunny@gmail.com instead.');
+    }catch(e){ /* private mode / quota — the server send below is what counts */ }
+
+    var btn = this.querySelector('button[type=submit]');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+
+    function failed(reason){
+      btn.disabled = false;
+      btn.textContent = 'Submit application →';
+      showErr(reason + ' Please try again, or email your resume to princexsunny@gmail.com.');
     }
-    document.getElementById('formView').style.display='none';
-    document.getElementById('doneView').classList.add('show');
-    window.scrollTo(0,0);
+
+    if(!window.KMS){
+      // api.js didn't load, so there is no way to reach the server.
+      return failed('We could not reach the server.');
+    }
+
+    // Only confirm once the server has actually accepted it. The previous
+    // version showed "Application received" immediately and swallowed any
+    // server error, so a failed submission looked identical to a successful
+    // one — the applicant walked away believing they had applied while the
+    // application existed nowhere but their own browser.
+    KMS.applyJob(app).then(function(){
+      document.getElementById('formView').style.display='none';
+      document.getElementById('doneView').classList.add('show');
+      window.scrollTo(0,0);
+    }).catch(function(err){
+      failed(err && err.message ? err.message : 'Something went wrong sending your application.');
+    });
   });
 </script>
 </body>
