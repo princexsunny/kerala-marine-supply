@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Sign in — Kerala Marine Supply</title>
+<link rel="stylesheet" href="_ds/modernist-815fd27c-87e0-489b-a8ca-b1cd2abbfc98/styles.css">
+<style>
+  body{margin:0;min-height:100vh;background:var(--color-bg);color:var(--color-text);
+       font-family:var(--font-body);display:flex;align-items:center;justify-content:center;padding:40px 24px}
+  .box{width:100%;max-width:380px}
+  .logo{height:34px;width:auto;display:block;margin-bottom:34px}
+  .eyebrow{font-size:11px;letter-spacing:0.2em;text-transform:uppercase;
+           color:var(--color-accent-700);font-weight:600;margin-bottom:14px}
+  h1{font-size:clamp(28px,6vw,38px);font-weight:800;letter-spacing:-0.03em;line-height:1;margin:0 0 10px}
+  .sub{font-size:15px;line-height:1.5;color:var(--color-neutral-800);margin:0 0 28px}
+  .card{border:2px solid var(--color-divider);padding:24px 22px}
+  label{display:block;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;
+        color:var(--color-neutral-700);font-weight:600;margin-bottom:8px}
+  .pw{position:relative}
+  input{width:100%;padding:13px 46px 13px 14px;border:2px solid var(--color-divider);font-size:16px;
+        background:var(--color-bg);color:var(--color-text);outline:none;font-family:inherit;box-sizing:border-box}
+  input:focus{border-color:var(--color-accent)}
+  .peek{position:absolute;right:2px;top:2px;bottom:2px;width:42px;border:none;background:none;
+        cursor:pointer;color:var(--color-neutral-700);font-size:12px;font-weight:600;letter-spacing:.04em}
+  .peek:hover{color:var(--color-accent-700)}
+  button.go{width:100%;margin-top:18px;padding:14px;border:none;background:var(--color-accent);
+            color:#fff;font-size:14px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;
+            cursor:pointer;font-family:inherit}
+  button.go:hover:not(:disabled){background:var(--color-accent-600)}
+  button.go:disabled{opacity:.55;cursor:default}
+  .err{display:none;margin-top:14px;padding:10px 12px;border-left:3px solid var(--color-accent);
+       background:var(--color-accent-100);color:var(--color-accent-700);font-size:13px;line-height:1.45}
+  .err.show{display:block}
+  .back{display:inline-block;margin-top:22px;font-size:13px;color:var(--color-neutral-700);text-decoration:none}
+  .back:hover{color:var(--color-accent-700)}
+</style>
+</head>
+<body>
+  <div class="box">
+    <img src="/shalom-group-logo.png" alt="Shalom Group" class="logo">
+    <div class="eyebrow">Restricted area</div>
+    <h1>Sign in.</h1>
+    <p class="sub">This area manages website photos, documents and job applications.</p>
+
+    <div class="card">
+      <form id="f" autocomplete="off">
+        <label for="pw">Admin password</label>
+        <div class="pw">
+          <input id="pw" type="password" autocomplete="current-password" autofocus placeholder="Enter password">
+          <button type="button" class="peek" id="peek" aria-label="Show password">SHOW</button>
+        </div>
+        <button class="go" type="submit" id="go">Sign in</button>
+        <div class="err" id="err"></div>
+      </form>
+    </div>
+
+    <a class="back" href="/">← Back to the website</a>
+  </div>
+
+<script>
+(function(){
+  var form = document.getElementById('f');
+  var pw   = document.getElementById('pw');
+  var go   = document.getElementById('go');
+  var err  = document.getElementById('err');
+
+  document.getElementById('peek').addEventListener('click', function(){
+    var showing = pw.type === 'text';
+    pw.type = showing ? 'password' : 'text';
+    this.textContent = showing ? 'SHOW' : 'HIDE';
+    pw.focus();
+  });
+
+  function fail(msg){
+    err.textContent = msg;
+    err.classList.add('show');
+    go.disabled = false;
+    go.textContent = 'Sign in';
+    pw.select();
+  }
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    if(!pw.value){ return fail('Enter the password.'); }
+    err.classList.remove('show');
+    go.disabled = true;
+    go.textContent = 'Signing in…';
+
+    fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw.value })
+    }).then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(b){
+        if(!r.ok) throw new Error(b.error || 'Sign in failed.');
+        return b;
+      });
+    }).then(function(){
+      // Only follow a same-origin path, so a crafted ?next= can't bounce
+      // someone to another site straight after they authenticate.
+      var next = new URLSearchParams(location.search).get('next') || '/admin.html';
+      if(next.charAt(0) !== '/' || next.charAt(1) === '/') next = '/admin.html';
+      location.replace(next);
+    }).catch(function(e){ fail(e.message); });
+  });
+})();
+</script>
+</body>
+</html>

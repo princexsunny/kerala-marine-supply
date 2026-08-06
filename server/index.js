@@ -4,7 +4,9 @@ const path = require('path');
 const multer = require('multer');
 
 const adminAuth = require('./middleware/adminAuth');
+const session = require('./session');
 const { isReady } = require('./firebase');
+const authRoutes = require('./routes/auth');
 const applyRoutes = require('./routes/apply');
 const mediaRoutes = require('./routes/media');
 const documentsRoutes = require('./routes/documents');
@@ -48,6 +50,10 @@ app.use((req, res, next) => {
 // a clear message instead of at the parser.
 app.use(express.json({ limit: '25mb' }));
 
+// Login / logout / session status. Public by necessity — this is how you get
+// a session in the first place; /api/login does its own rate limiting.
+app.use('/api', authRoutes);
+
 // Public API — anyone with the apply-page link can submit an application.
 app.use('/api', applyRoutes);
 
@@ -59,9 +65,19 @@ app.use('/api', adminAuth, mediaRoutes);
 app.use('/api', adminAuth, documentsRoutes);
 app.use('/api', adminAuth, applicationsRoutes);
 
-// Admin pages require the same credentials as the admin API.
+// Admin pages sit behind the same session as the admin API.
 app.get(['/admin.html', '/Admin.dc.html'], adminAuth, (req, res) => {
+  // Never let a proxy or the browser cache a signed-in admin page — a later
+  // signed-out visitor on the same machine could otherwise be served it.
+  res.setHeader('Cache-Control', 'no-store, private');
   res.sendFile(path.join(PUBLIC_DIR, req.path));
+});
+
+// Already signed in? Skip the login form.
+app.get('/login.html', (req, res, next) => {
+  if (session.isLoggedIn(req)) return res.redirect(302, '/admin.html');
+  res.setHeader('Cache-Control', 'no-store, private');
+  next();
 });
 
 // Everything else (index.html, careers.html, apply.html, design-system

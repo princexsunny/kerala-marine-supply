@@ -46,8 +46,11 @@
 </div>
 <header style="border-bottom:2px solid var(--color-divider)">
   <div class="pad" style="display:flex;align-items:center;justify-content:space-between;height:64px">
-    <span style="font-family:var(--font-heading);font-weight:800;font-size:16px">SITE ADMIN</span>
-    <span id="serverStatus" style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-neutral-700)">Checking server…</span>
+    <span style="display:flex;align-items:center;gap:13px"><img src="shalom-group-logo.png" alt="Shalom Group" style="height:30px;width:auto;display:block;flex:none"><span style="width:1px;height:22px;background:var(--color-divider);display:inline-block;flex:none"></span><span style="font-family:var(--font-heading);font-weight:800;font-size:16px">SITE ADMIN</span></span>
+    <span style="display:flex;align-items:center;gap:18px">
+      <span id="serverStatus" style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-neutral-700)">Checking server…</span>
+      <button id="logout" class="btn btn-ghost" style="font-size:12px;padding:7px 14px">Sign out</button>
+    </span>
   </div>
 </header>
 
@@ -317,10 +320,23 @@
     var opts = { method: method, headers: {} };
     if(body !== undefined){ opts.headers['Content-Type']='application/json'; opts.body = JSON.stringify(body); }
     return fetch(url, opts).then(function(r){
+      // Session expired (or was cleared elsewhere) — fetch can't follow a
+      // redirect usefully, so bounce the whole page to the login form and
+      // come back to where we were.
+      if(r.status === 401){
+        location.replace('/login.html?next=' + encodeURIComponent(location.pathname));
+        throw new Error('Session expired — signing in again…');
+      }
       if(!r.ok) return r.json().catch(function(){return {};}).then(function(b){ throw new Error(b.error || ('Server error ' + r.status)); });
       return r.json();
     });
   }
+
+  document.getElementById('logout').addEventListener('click', function(){
+    fetch('/api/logout', { method: 'POST' })
+      .catch(function(){})
+      .then(function(){ location.replace('/login.html'); });
+  });
   function setNote(id, text){ document.getElementById(id).textContent = text; }
   function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
   function fmtSize(n){
