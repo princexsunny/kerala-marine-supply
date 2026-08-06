@@ -59,7 +59,7 @@
   <section>
     <div class="eyebrow">Step 1 · Photographs</div>
     <h2>Website photos</h2>
-    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Choose a picture for each slot, then save. JPEG, PNG, WebP or GIF.</p>
+    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Choose a picture for each slot, then save. These appear on the home page within a minute. JPEG, PNG, WebP or GIF.</p>
     <div class="grid2" id="slotGrid"></div>
     <div class="row">
       <button class="btn btn-primary" id="savePhotos">Save photos</button>
@@ -69,7 +69,20 @@
   </section>
 
   <section>
-    <div class="eyebrow">Step 2 · Documents</div>
+    <div class="eyebrow">Step 2 · Video</div>
+    <h2>Website video</h2>
+    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">One video for the home page — the boats, the yard, the crew at work. MP4 works best. Up to 150 MB.</p>
+    <div class="row">
+      <input type="file" id="videoFile" accept="video/mp4,video/webm,video/ogg,video/quicktime">
+      <button class="btn btn-primary" id="uploadVideo">Upload video</button>
+      <button class="btn btn-ghost" id="removeVideo">Remove video</button>
+      <span class="note" id="videoNote"></span>
+    </div>
+    <div id="videoPreview" style="margin-top:18px"></div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Step 3 · Documents</div>
     <h2>Document library</h2>
     <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Licences, LOIs, quotations, the investor one-pager. Up to 200 MB, stored on the server.</p>
     <div id="drop" class="drop">
@@ -98,7 +111,7 @@
   </section>
 
   <section style="border-bottom:none">
-    <div class="eyebrow">Step 3 · Job applications</div>
+    <div class="eyebrow">Step 4 · Job applications</div>
     <h2>Applications received</h2>
     <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Everyone who has applied via the careers page.</p>
     <div class="row"><button class="btn btn-ghost" id="refreshApps">Refresh list</button><span class="note" id="appNote"></span></div>
@@ -204,7 +217,7 @@
     var i = 0;
     (function next(){
       if(i >= keys.length){
-        setNote('photoNote', keys.length + ' photo(s) saved to the server.');
+        setNote('photoNote', keys.length + ' photo(s) saved — live on the home page within a minute.');
         return;
       }
       var key = keys[i];
@@ -214,6 +227,88 @@
         .then(function(){ i++; next(); })
         .catch(function(err){ setNote('photoNote', key + ': ' + err.message); });
     })();
+  });
+
+  // ---- Video ----
+  var MAX_VIDEO_MB = 150;
+
+  function loadVideo(){
+    // Public endpoint — returns every media slot, we only want the video here.
+    fetch('/api/media').then(function(r){ return r.json(); }).then(function(m){
+      var box = document.getElementById('videoPreview');
+      box.innerHTML = '';
+      if(!m || !m.video || !m.video.url){
+        setNote('videoNote', 'No video on the site yet.');
+        return;
+      }
+      setNote('videoNote', '');
+      var v = document.createElement('video');
+      v.src = m.video.url;
+      v.controls = true;
+      v.preload = 'metadata';
+      v.style.cssText = 'max-width:520px;width:100%;border:2px solid var(--color-divider);background:#000;display:block';
+      box.appendChild(v);
+      var cap = document.createElement('p');
+      cap.className = 'note';
+      cap.textContent = 'This is what visitors see on the home page.';
+      box.appendChild(cap);
+    }).catch(function(){ setNote('videoNote', 'Could not check the current video.'); });
+  }
+
+  document.getElementById('uploadVideo').addEventListener('click', function(){
+    var input = document.getElementById('videoFile');
+    var f = input.files && input.files[0];
+    if(!f){ setNote('videoNote', 'Choose a video file first.'); return; }
+    // Check the size here as well as on the server: a 300 MB upload would
+    // otherwise spend several minutes transferring before being rejected.
+    if(f.size > MAX_VIDEO_MB * 1024 * 1024){
+      setNote('videoNote', 'That video is ' + (f.size/1048576).toFixed(0) + ' MB — the limit is ' + MAX_VIDEO_MB + ' MB.');
+      return;
+    }
+    var btn = this;
+    btn.disabled = true;
+
+    // XMLHttpRequest rather than fetch: videos are large enough that a silent
+    // multi-minute wait looks like a hang, and only XHR reports upload progress.
+    var fd = new FormData();
+    fd.append('file', f);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/media/video');
+    xhr.upload.addEventListener('progress', function(e){
+      if(!e.lengthComputable) return;
+      setNote('videoNote', 'Uploading… ' + Math.round(e.loaded / e.total * 100) + '%');
+    });
+    xhr.addEventListener('load', function(){
+      btn.disabled = false;
+      if(xhr.status === 401){
+        location.replace('/login.html?next=' + encodeURIComponent(location.pathname));
+        return;
+      }
+      var body = {};
+      try { body = JSON.parse(xhr.responseText); } catch(e){}
+      if(xhr.status >= 200 && xhr.status < 300){
+        input.value = '';
+        setNote('videoNote', 'Video uploaded — it is live on the home page.');
+        loadVideo();
+      } else {
+        setNote('videoNote', body.error || ('Upload failed (' + xhr.status + ')'));
+      }
+    });
+    xhr.addEventListener('error', function(){
+      btn.disabled = false;
+      setNote('videoNote', 'The upload was interrupted. Check your connection and try again.');
+    });
+    setNote('videoNote', 'Uploading…');
+    xhr.send(fd);
+  });
+
+  document.getElementById('removeVideo').addEventListener('click', function(){
+    if(!confirm('Remove the video from the home page?\n\nThis permanently deletes it from storage and cannot be undone.')) return;
+    var btn = this;
+    btn.disabled = true;
+    api('DELETE', '/api/media/video')
+      .then(function(){ btn.disabled = false; setNote('videoNote', 'Video removed.'); loadVideo(); })
+      .catch(function(err){ btn.disabled = false; setNote('videoNote', err.message); });
   });
 
   // ---- Documents ----
@@ -373,6 +468,7 @@
     document.getElementById('serverStatus').textContent = 'Server offline';
   });
 
+  loadVideo();
   loadDocs();
   loadApps();
 })();

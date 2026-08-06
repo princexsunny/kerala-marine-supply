@@ -63,7 +63,6 @@ git push -u origin main
    | `FIREBASE_CLIENT_EMAIL` | the `firebase-adminsdk-...@...` address |
    | `FIREBASE_PRIVATE_KEY` | the long quoted key |
    | `FIREBASE_STORAGE_BUCKET` | `kerala-marine-supply.firebasestorage.app` |
-   | `ADMIN_USER` | `admin` |
    | `ADMIN_PASSWORD` | the generated password |
 
    **When pasting the private key, keep the `\n` sequences literal.** Don't let them become real line breaks — paste it exactly as it appears in `.env`, including the surrounding quotes.

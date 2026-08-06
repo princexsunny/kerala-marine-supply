@@ -8,7 +8,11 @@ const session = require('./session');
 const { isReady } = require('./firebase');
 const authRoutes = require('./routes/auth');
 const applyRoutes = require('./routes/apply');
-const mediaRoutes = require('./routes/media');
+const {
+  router: mediaRoutes,
+  publicRouter: mediaPublicRoutes,
+  MAX_VIDEO_BYTES,
+} = require('./routes/media');
 const documentsRoutes = require('./routes/documents');
 const applicationsRoutes = require('./routes/applications');
 
@@ -56,6 +60,12 @@ app.use('/api', authRoutes);
 
 // Public API — anyone with the apply-page link can submit an application.
 app.use('/api', applyRoutes);
+
+// Public read of the site's photos and video. This MUST be mounted before the
+// adminAuth block below, or the homepage would get a 401 for every visitor who
+// isn't signed in as admin — i.e. everyone. Only the read is public; uploading
+// and deleting media stays behind adminAuth.
+app.use('/api', mediaPublicRoutes);
 
 // Public health check — used by admin.html's "server connected" dot.
 app.get('/api/health', (req, res) => res.json({ ok: isReady() }));
@@ -120,7 +130,13 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(413).json({ error: 'That file is too large (200 MB maximum).' });
+      // Multer doesn't report which limit was hit, and the two upload routes
+      // have different ones — quoting a flat "200 MB" told video uploaders
+      // their 160 MB file was under the limit when it wasn't. Read the ceiling
+      // off the path instead so the number in the message is the real one.
+      const isVideo = req.path.indexOf('/media/video') !== -1;
+      const limitMb = isVideo ? Math.round(MAX_VIDEO_BYTES / 1024 / 1024) : 200;
+      return res.status(413).json({ error: `That file is too large (${limitMb} MB maximum).` });
     }
     return res.status(400).json({ error: err.message });
   }

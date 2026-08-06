@@ -30,7 +30,12 @@ services:
         sync: false
       - key: FIREBASE_STORAGE_BUCKET
         sync: false
-      - key: ADMIN_USER
-        sync: false
+      # ADMIN_USER is gone: the old HTTP Basic prompt wanted a username, the
+      # session login only asks for a password.
       - key: ADMIN_PASSWORD
+        sync: false
+      # Signs the session cookie. Optional — without it the secret is derived
+      # from ADMIN_PASSWORD, which means changing the password signs everyone
+      # out. Set it to any long random string to avoid that.
+      - key: SESSION_SECRET
         sync: false

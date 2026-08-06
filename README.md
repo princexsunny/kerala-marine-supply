@@ -17,21 +17,46 @@ public/            static site — served as-is by Express
   index.html         home page (self-contained export)
   careers.html        job listings
   apply.html           application form → POSTs to /api/apply via api.js
-  admin.html            the admin page: photos, documents, applications
+  admin.html            the admin page: photos, video, documents, applications
   login.html             admin sign-in form
   api.js                window.KMS.applyJob() — the glue apply.html calls
+  site-media.js          puts the admin's photos + video onto the home page
   image-slot.js, support.js, _ds/   design-tool runtime assets, kept as-is
 
 server/
   index.js            Express app, static file serving, route wiring
   firebase.js           Firebase Admin SDK init (Firestore + Storage)
-  middleware/adminAuth.js  HTTP Basic Auth for the admin surface
+  session.js             signed-cookie sessions for the admin login
+  middleware/adminAuth.js  session check for the admin surface
   routes/
+    auth.js              POST /api/login, /api/logout
     apply.js             POST /api/apply
-    media.js              PUT  /api/media       (site photos)
-    documents.js           POST/GET /api/documents (document library)
-    applications.js          GET  /api/applications  (admin review)
+    media.js              GET/PUT /api/media, POST/DELETE /api/media/video
+    documents.js           POST/GET/DELETE /api/documents (document library)
+    applications.js          GET/DELETE /api/applications  (admin review)
 ```
+
+### How admin photos reach the home page
+
+`index.html` was exported from a design tool, and its picture areas are
+`<image-slot>` custom elements that only ever read from a local
+`.image-slots.state.json` sidecar the tool wrote. That sidecar doesn't exist in
+production, so for a while photos saved in the admin went into Firebase and
+were never displayed anywhere — the admin appeared to work and the home page
+never changed.
+
+`site-media.js` is the bridge. It fetches `GET /api/media` and swaps each
+`<image-slot>` for a real `<img>`, and injects a `<video>` section after the
+photo strip when a video has been uploaded. Two things worth knowing if you
+touch it:
+
+- **`GET /api/media` must stay public** (mounted before `adminAuth` in
+  `server/index.js`). It's what ordinary visitors call; behind auth it would
+  401 for the entire audience.
+- The home page is a **self-unpacking bundle** — it rebuilds the DOM after
+  load, so the slots usually don't exist when the script first runs. That's why
+  `site-media.js` watches for them with a `MutationObserver` instead of
+  assuming `DOMContentLoaded` is late enough.
 
 ## API
 
@@ -39,12 +64,21 @@ server/
 |--------|-------------------|-------|---------------------------------------------|
 | GET    | /api/health        | none  | `{ ok: true/false }` — is Firebase configured |
 | POST   | /api/apply          | none  | Save a job application (name, phone, resume…) |
-| PUT    | /api/media           | admin | Save site photo slots (hero, photo1‑3, founder) |
-| POST   | /api/documents         | admin | Upload a document (multipart: category, file) |
-| GET    | /api/documents           | admin | List uploaded documents |
-| GET    | /api/applications          | admin | List job applications |
+| GET    | /api/media           | none  | Site photos + video, for the home page |
+| POST   | /api/login            | none  | Start an admin session (rate limited) |
+| POST   | /api/logout            | none  | End the admin session |
+| PUT    | /api/media              | admin | Save site photo slots (hero, photo1‑3, founder) |
+| POST   | /api/media/video         | admin | Replace the home-page video (multipart: file) |
+| DELETE | /api/media/video          | admin | Remove the home-page video |
+| POST   | /api/documents             | admin | Upload a document (multipart: category, file) |
+| GET    | /api/documents              | admin | List uploaded documents |
+| DELETE | /api/documents/:id           | admin | Delete a document and its stored file |
+| GET    | /api/applications             | admin | List job applications |
+| DELETE | /api/applications/:id          | admin | Delete an application and its resume |
 
-Admin routes (and `/admin.html`) are protected with HTTP Basic Auth using `ADMIN_USER` / `ADMIN_PASSWORD`.
+Admin routes (and `/admin.html`) require a signed-in session — see `server/session.js`. Sign in at `/login.html` with `ADMIN_PASSWORD`.
+
+Upload ceilings: photos 15 MB each (the admin downscales them in the browser first), video 150 MB, documents 200 MB. The video limit is deliberately below the others because the file is held in memory before going to Storage, and Render's free tier only has 512 MB of RAM.
 
 ## 1. Set up Firebase
 
@@ -84,7 +118,7 @@ FIREBASE_PROJECT_ID=...
 FIREBASE_CLIENT_EMAIL=...
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 FIREBASE_STORAGE_BUCKET=...
-ADMIN_USER=admin
+# ADMIN_USER is no longer used — the login page asks for a password only.
 ADMIN_PASSWORD=pick-a-real-password
 ```
 
@@ -106,7 +140,7 @@ Once it passes:
 npm start
 ```
 
-Visit `http://localhost:3000` for the site and `http://localhost:3000/admin.html` for the admin page (your browser will prompt for the admin user and password). `GET /api/health` returns `{ ok:false }` until Firebase is configured — the rest of the API returns a clear error message rather than crashing.
+Visit `http://localhost:3000` for the site and `http://localhost:3000/admin.html` for the admin page — you'll be sent to `/login.html` to sign in with `ADMIN_PASSWORD`. `GET /api/health` returns `{ ok:false }` until Firebase is configured — the rest of the API returns a clear error message rather than crashing.
 
 ## 4. Push to GitHub
 
@@ -125,7 +159,7 @@ git push -u origin main
 
 **Option A — Blueprint (uses `render.yaml`):**
 1. Render dashboard → **New → Blueprint** → pick your GitHub repo.
-2. Render reads `render.yaml` and creates the web service; it will prompt you for each `sync:false` env var (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_STORAGE_BUCKET`, `ADMIN_USER`, `ADMIN_PASSWORD`) — paste the same values from your `.env`.
+2. Render reads `render.yaml` and creates the web service; it will prompt you for each `sync:false` env var (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_STORAGE_BUCKET`, `ADMIN_PASSWORD`) — paste the same values from your `.env`.
 3. Deploy. Render runs `npm install` then `npm start`.
 
 **Option B — Manual web service:**
