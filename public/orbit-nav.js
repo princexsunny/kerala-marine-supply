@@ -125,12 +125,32 @@
   // remainder is the whitespace the strip belongs in.
   function textContentRight(col) {
     var edge = col.getBoundingClientRect().left;
-    var kids = col.querySelectorAll('h1, h2, p, a, span');
-    for (var i = 0; i < kids.length; i++) {
-      var r = kids[i].getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) edge = Math.max(edge, r.right);
+    // Measure the rendered glyphs, not the element boxes. The headline is a
+    // max-width block, so its box reaches far past where the words actually
+    // stop — using the box reported 721 where the ink ends at 623, throwing
+    // away ~100px of real whitespace and forcing a narrower arrangement.
+    try {
+      var walk = document.createTreeWalker(col, NodeFilter.SHOW_TEXT, null);
+      var node;
+      while ((node = walk.nextNode())) {
+        if (!node.nodeValue || !node.nodeValue.trim()) continue;
+        var range = document.createRange();
+        range.selectNodeContents(node);
+        var rects = range.getClientRects();
+        for (var i = 0; i < rects.length; i++) {
+          if (rects[i].width > 0 && rects[i].right > edge) edge = rects[i].right;
+        }
+      }
+      return edge;
+    } catch (e) {
+      // Fall back to element boxes if Range is unavailable for any reason.
+      var kids = col.querySelectorAll('h1, h2, p, a, span');
+      for (var k = 0; k < kids.length; k++) {
+        var r = kids[k].getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) edge = Math.max(edge, r.right);
+      }
+      return edge;
     }
-    return edge;
   }
 
   function place() {
