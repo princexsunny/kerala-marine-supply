@@ -52,18 +52,18 @@
   var STEP_Y = 72;                // vertical spacing between neighbours
   var SCALE_STEP = 0.13;          // each step away from centre shrinks by this
 
-  // Strip sizing. Width is measured from the real gap at runtime and clamped
-  // to this range; below MIN_GAP there is no room and the strip stays hidden
-  // rather than crowding the text or the photo.
+  // Strip sizing. Width is measured from the real gap at runtime. Below
+  // MIN_GAP it steps down to a narrower form rather than disappearing --
+  // it is always anchored NAV_GAP left of the photo, so it stays clear of
+  // the picture at every size.
   var NAV_MIN_W = 104;
   var NAV_MAX_W = 180;
   var NAV_GAP = 18;               // clear space kept either side of the strip
   // Derived, not hand-picked: the narrowest gutter that still fits the
-  // smallest strip AND its clearances. Below this the strip hides entirely,
-  // which guarantees it can never sit closer than NAV_GAP to the text or the
-  // photograph, at any window size.
+  // full-width strip plus both clearances. Below it, narrower forms are used.
   var MIN_GAP = NAV_MIN_W + NAV_GAP * 2;
   var COMPACT_W = 146;            // under this width, only the active item is labelled
+  var NAV_ICON_W = 58;            // tightest form: circles only, no labels
 
   var ICONS = {
     waves:  '<path d="M3 9q3-3.5 6 0t6 0 6 0"/><path d="M3 15q3-3.5 6 0t6 0 6 0"/>',
@@ -171,7 +171,7 @@
     // Placing against a degenerate measurement would fling the strip somewhere
     // arbitrary, so keep it hidden and wait for a real reading instead.
     if (!photo.width || !photo.height || !host.width) {
-      lastPlacement = { shown: false, why: 'nothing laid out yet' };
+      lastPlacement = { shown: false, why: 'nothing laid out yet — will retry' };
       nav.style.visibility = 'hidden';
       return;
     }
@@ -183,31 +183,43 @@
     var leftEdge = textCol ? textContentRight(textCol) : host.left;
     var gutter = photo.left - leftEdge;
 
-    // Too tight to sit in without crowding something. Hiding beats overlapping.
-    if (gutter < MIN_GAP) {
-      lastPlacement = {
-        shown: false,
-        why: 'gutter ' + Math.round(gutter) + 'px is under the ' + MIN_GAP + 'px minimum',
-        gutter: Math.round(gutter), textRight: Math.round(leftEdge), photoLeft: Math.round(photo.left)
-      };
-      nav.style.visibility = 'hidden';
-      return;
-    }
     nav.style.visibility = '';
 
-    var width = Math.max(NAV_MIN_W, Math.min(NAV_MAX_W, gutter - NAV_GAP * 2));
-    // Centred in the gutter, so the gap to the text and to the photo is even.
-    var left = (leftEdge - host.left) + (gutter - width) / 2;
+    // Always anchored to the photograph: the strip's right edge sits NAV_GAP
+    // left of the picture, and it grows leftward into the whitespace. That
+    // ordering is what guarantees it can never cover the photo, whatever the
+    // width works out to.
+    //
+    // It no longer refuses to appear when space is tight. Hiding was the
+    // wrong call: the whitespace the strip belongs in is *inside* the text
+    // column (the column runs to the photo, the text stops well short), so a
+    // strict gutter test can measure zero even when the gap is plainly there.
+    // Instead it steps down through narrower forms and stays visible.
+    var width;
+    if (gutter >= MIN_GAP) {
+      width = Math.max(NAV_MIN_W, Math.min(NAV_MAX_W, gutter - NAV_GAP * 2));
+    } else if (gutter >= NAV_ICON_W + NAV_GAP * 2) {
+      width = NAV_MIN_W;            // labels drop away via the compact class
+    } else {
+      width = NAV_ICON_W;           // circles only
+    }
+
+    var left = (photo.left - host.left) - NAV_GAP - width;
 
     navWidth = width;
     nav.style.width = Math.round(width) + 'px';
     nav.style.left = Math.round(left) + 'px';
-    // In a narrow gutter only the active item keeps its label, which is what
-    // stops long words like "COMMUNITY" reaching the photograph.
+    // Below this width only the active item keeps its label, which is what
+    // stops long words like "COMMUNITY" reaching across to the photograph.
     nav.classList.toggle('kms-orbit-compact', width < COMPACT_W);
     lastPlacement = {
-      shown: true, gutter: Math.round(gutter), width: Math.round(width),
-      textRight: Math.round(leftEdge), photoLeft: Math.round(photo.left),
+      shown: true,
+      gutter: Math.round(gutter),
+      width: Math.round(width),
+      form: width >= COMPACT_W ? 'full' : (width > NAV_ICON_W ? 'compact' : 'icons only'),
+      textRight: Math.round(leftEdge),
+      photoLeft: Math.round(photo.left),
+      stripSpans: Math.round(host.left + left) + '..' + Math.round(host.left + left + width),
       usedFallbackBox: photoEl === heroBox
     };
 
