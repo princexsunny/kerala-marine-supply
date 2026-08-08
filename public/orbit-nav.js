@@ -114,10 +114,45 @@
   // hero is a design-tool export whose image is swapped at runtime by
   // site-media.js, so its inline geometry is not reliable. Measuring means
   // this stays correct whatever the photo ends up doing.
+  // The hero's own photograph — never one of the overlay's crossfade layers.
+  //
+  // This distinction matters more than it looks: the overlay lives inside the
+  // hero too and its layers are <img>/<video>, so a naive "first image in the
+  // hero" lookup starts measuring the overlay against itself. Each pass then
+  // feeds its own output back in, and the overlay walks right and grows on
+  // every reflow until it covers half the page.
+  function findPhoto() {
+    var all = heroBox.querySelectorAll('img, video');
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (overlay && overlay.contains(el)) continue;
+      if (nav && nav.contains(el)) continue;
+      var r = el.getBoundingClientRect();
+      if (r.width > 40 && r.height > 40) return el;
+    }
+    return null;
+  }
+
+  // Right-hand edge of the actual text, not of the column that holds it.
+  // The text column runs all the way to the photograph, but its content stops
+  // well short — that unused remainder is the whitespace the strip belongs in.
+  // Only content-sized elements are measured; a full-width wrapper div would
+  // report the column's edge and hide the gap entirely.
+  function textContentRight(col) {
+    var edge = col.getBoundingClientRect().left;
+    var kids = col.querySelectorAll('h1, h2, p, a, span');
+    for (var i = 0; i < kids.length; i++) {
+      var r = kids[i].getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) edge = Math.max(edge, r.right);
+    }
+    return edge;
+  }
+
   function place() {
     if (!nav || !heroBox) return;
     var host = heroBox.getBoundingClientRect();
-    var photoEl = heroBox.querySelector('img, video') || heroBox;
+    var photoEl = findPhoto();
+    if (!photoEl) { nav.style.visibility = 'hidden'; return; }
     var photo = photoEl.getBoundingClientRect();
 
     // Nothing laid out yet (photo still loading, hero hidden, zero-size box).
@@ -132,7 +167,7 @@
     // left edge of the photograph. Both are measured, so the strip occupies
     // only genuinely unused whitespace and can never straddle either one.
     var textCol = document.querySelector('.g-hero > div:first-child');
-    var leftEdge = textCol ? textCol.getBoundingClientRect().right : host.left;
+    var leftEdge = textCol ? textContentRight(textCol) : host.left;
     var gutter = photo.left - leftEdge;
 
     // Too tight to sit in without crowding something. Hiding beats overlapping.
@@ -155,11 +190,17 @@
 
     // Overlay tracks the photo's box exactly, so switched media matches its
     // size, position and crop rather than the template's original numbers.
+    // Clamped to the hero: even if a measurement ever goes wrong again, the
+    // overlay is confined to its container instead of spilling across the page.
     if (overlay) {
-      overlay.style.left = Math.round(photo.left - host.left) + 'px';
-      overlay.style.top = Math.round(photo.top - host.top) + 'px';
-      overlay.style.width = Math.round(photo.width) + 'px';
-      overlay.style.height = Math.round(photo.height) + 'px';
+      var oW = Math.min(Math.round(photo.width), Math.round(host.width));
+      var oH = Math.min(Math.round(photo.height), Math.round(host.height));
+      var oL = Math.max(0, Math.min(Math.round(photo.left - host.left), Math.round(host.width) - oW));
+      var oT = Math.max(0, Math.min(Math.round(photo.top - host.top), Math.round(host.height) - oH));
+      overlay.style.left = oL + 'px';
+      overlay.style.top = oT + 'px';
+      overlay.style.width = oW + 'px';
+      overlay.style.height = oH + 'px';
     }
   }
 
