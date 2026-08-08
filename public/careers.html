@@ -25,13 +25,15 @@
   @media(max-width:700px){ .g2{ grid-template-columns:1fr !important; } .g2>*{ border-right:none !important; } }
   /* Logo + wordmark is wide; on phones the logo alone carries the brand. */
   @media(max-width:520px){ .brandmark, .brandmark + span { display:none; } }
-  /* Animated wave watermark behind the wordmark. The mark is taller than the
-     64px header, so the wrapper clips it; .wm needs its own stacking context
-     or the absolutely-positioned image would paint on top of the text. */
+  /* Animated wave watermark behind the wordmark. .wm needs its own stacking
+     context or the absolutely-positioned image would paint on top of the text.
+     overflow:hidden is a backstop only -- the mark is sized to fit. */
   .brandmark{ position:relative; display:inline-flex; align-items:center; flex:none; height:64px; overflow:hidden; }
   .brandmark .wm{ position:relative; z-index:1; }
+  /* Sized by height, not width: the mark's own aspect ratio then keeps it
+     fully inside the 64px header instead of being cropped by the wrapper. */
   .brandmark-wave{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-                   width:170px; max-width:none; opacity:.2; pointer-events:none; user-select:none; z-index:0; }
+                   height:52px; width:auto; max-width:none; opacity:.22; pointer-events:none; user-select:none; z-index:0; }
 </style>
 </head>
 <body style="margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)">
