@@ -23,9 +23,28 @@
     founder: 'kms-founder',
   };
 
-  function fillPhoto(slotEl, url) {
-    // The slot sits inside a sized, position:relative wrapper, so an absolutely
-    // positioned image inset to 0 takes exactly the space the design intended.
+  // The hero photograph has a designed box in the original template: inset
+  // 127px from the left of its container, 430x616. That inset is what created
+  // the off-white gutter between the headline and the picture.
+  //
+  // Filling the slot with a plain inset:0 image (as every other slot wants)
+  // stretched the photo across the whole column and swallowed that gutter —
+  // dropping the usable gap from ~275px to ~50px. These are the template's own
+  // numbers, restoring the composition it was exported with.
+  var HERO_BOX = 'position:absolute;left:127px;top:-2px;width:430px;height:616px;' +
+                 'object-fit:cover;display:block';
+  var FILL_BOX = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block';
+  // Below this the hero stacks into one column, where the inset would push the
+  // photo off the side — so the plain fill is correct there.
+  var WIDE = '(min-width: 901px)';
+
+  function heroStyle() {
+    var wide = true;
+    try { wide = window.matchMedia(WIDE).matches; } catch (e) {}
+    return wide ? HERO_BOX : FILL_BOX;
+  }
+
+  function fillPhoto(slotEl, url, slotKey) {
     // object-fit:cover keeps the aspect ratio and crops the overflow rather
     // than stretching the photo, which is what every one of these frames wants.
     var img = document.createElement('img');
@@ -33,19 +52,28 @@
     img.alt = '';
     img.loading = 'lazy';
     img.decoding = 'async';
-    img.style.cssText =
-      'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block';
+    var isHero = slotKey === 'hero';
+    img.style.cssText = isHero ? heroStyle() : FILL_BOX;
+    if (isHero) img.setAttribute('data-kms-hero', '');
 
     var parent = slotEl.parentNode;
     if (!parent) return;
-    // If the wrapper has no positioning context the inset:0 would escape to the
-    // page, so establish one. (Most of these already have it from the export.)
+    // If the wrapper has no positioning context the absolute placement would
+    // escape to the page, so establish one. (Most already have it.)
     if (parent.nodeType === 1) {
       var pos = window.getComputedStyle(parent).position;
       if (pos === 'static') parent.style.position = 'relative';
     }
     parent.replaceChild(img, slotEl);
   }
+
+  // Crossing the breakpoint has to swap the hero between its inset box and a
+  // plain fill, or a resized window leaves the photo in the wrong one.
+  function refreshHeroBox() {
+    var img = document.querySelector('img[data-kms-hero]');
+    if (img) img.style.cssText = heroStyle();
+  }
+  window.addEventListener('resize', refreshHeroBox);
 
   function buildVideoSection(video) {
     // Variable fallbacks: the page has moved between stylesheets before (the
@@ -119,7 +147,7 @@
         return;
       }
       try {
-        fillPhoto(el, entry.url);
+        fillPhoto(el, entry.url, slot);
       } catch (e) {
         // One bad slot must not stop the others.
         if (window.console) console.warn('site-media: could not fill ' + slot, e);
