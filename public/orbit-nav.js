@@ -130,6 +130,12 @@
       var r = el.getBoundingClientRect();
       if (r.width > 40 && r.height > 40) return el;
     }
+    // The photograph is fetched from storage and can arrive late (or not at
+    // all, if no hero photo has been uploaded). The hero container occupies
+    // the same column, so its box is a good enough stand-in for "where the
+    // picture starts" — better than refusing to show the navigation at all.
+    var hr = heroBox.getBoundingClientRect();
+    if (hr.width > 100 && hr.height > 100) return heroBox;
     return null;
   }
 
@@ -148,17 +154,24 @@
     return edge;
   }
 
+  var lastPlacement = null;   // exposed for diagnostics, see window.kmsOrbit
+
   function place() {
     if (!nav || !heroBox) return;
     var host = heroBox.getBoundingClientRect();
     var photoEl = findPhoto();
-    if (!photoEl) { nav.style.visibility = 'hidden'; return; }
+    if (!photoEl) {
+      lastPlacement = { shown: false, why: 'no photo element and hero box too small' };
+      nav.style.visibility = 'hidden';
+      return;
+    }
     var photo = photoEl.getBoundingClientRect();
 
     // Nothing laid out yet (photo still loading, hero hidden, zero-size box).
     // Placing against a degenerate measurement would fling the strip somewhere
     // arbitrary, so keep it hidden and wait for a real reading instead.
     if (!photo.width || !photo.height || !host.width) {
+      lastPlacement = { shown: false, why: 'nothing laid out yet' };
       nav.style.visibility = 'hidden';
       return;
     }
@@ -172,6 +185,11 @@
 
     // Too tight to sit in without crowding something. Hiding beats overlapping.
     if (gutter < MIN_GAP) {
+      lastPlacement = {
+        shown: false,
+        why: 'gutter ' + Math.round(gutter) + 'px is under the ' + MIN_GAP + 'px minimum',
+        gutter: Math.round(gutter), textRight: Math.round(leftEdge), photoLeft: Math.round(photo.left)
+      };
       nav.style.visibility = 'hidden';
       return;
     }
@@ -187,6 +205,11 @@
     // In a narrow gutter only the active item keeps its label, which is what
     // stops long words like "COMMUNITY" reaching the photograph.
     nav.classList.toggle('kms-orbit-compact', width < COMPACT_W);
+    lastPlacement = {
+      shown: true, gutter: Math.round(gutter), width: Math.round(width),
+      textRight: Math.round(leftEdge), photoLeft: Math.round(photo.left),
+      usedFallbackBox: photoEl === heroBox
+    };
 
     // Overlay tracks the photo's box exactly, so switched media matches its
     // size, position and crop rather than the template's original numbers.
@@ -478,10 +501,18 @@
       ro = new ResizeObserver(function () { place(); });
       ro.observe(heroImg);
     } catch (e) {}
+    // Re-measure whenever an image inside the hero finishes loading -- that is
+    // the moment the photo's real box first exists.
+    heroImg.addEventListener('load', function () { place(); }, true);
+
+    // And keep trying for a while regardless: on a cold Render start the photo
+    // can take longer than any fixed window, and a strip that gave up early
+    // would stay hidden for the rest of the visit.
     var settle = 0;
     var settleTimer = setInterval(function () {
       place();
-      if (++settle > 20) clearInterval(settleTimer);   // ~5s, then stop
+      if (lastPlacement && lastPlacement.shown) { clearInterval(settleTimer); return; }
+      if (++settle > 120) clearInterval(settleTimer);   // ~30s ceiling
     }, 250);
 
     fetch('/api/media', { credentials: 'same-origin' })
@@ -505,6 +536,13 @@
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) resetAuto();
     });
+
+    // Diagnostics: run kmsOrbit() in the browser console to see exactly what
+    // was measured and why the strip is or isn't showing.
+    window.kmsOrbit = function () {
+      place();
+      return lastPlacement;
+    };
   }
 
   // The home page is a self-unpacking bundle: the hero doesn't exist yet when
