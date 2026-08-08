@@ -59,7 +59,7 @@
   <section>
     <div class="eyebrow">Step 1 · Photographs</div>
     <h2>Website photos</h2>
-    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Choose a picture for each slot, then save. These appear on the home page within a minute. JPEG, PNG, WebP or GIF.</p>
+    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Choose a picture for each slot, then save. These appear on the home page straight away. JPEG, PNG, WebP or GIF.</p>
     <div class="grid2" id="slotGrid"></div>
     <div class="row">
       <button class="btn btn-primary" id="savePhotos">Save photos</button>
@@ -145,8 +145,64 @@
         '<div class="lbl">'+s.label+'</div>' +
         '<p class="hint">'+s.hint+'</p>' +
         '<input type="file" accept="image/*" data-slot="'+s.key+'">' +
+        '<div style="margin-top:8px">' +
+          '<span class="note" id="state-'+s.key+'" style="margin:0;font-size:12px"></span>' +
+          '<button class="del" data-slot="'+s.key+'" id="del-'+s.key+'" hidden>Delete</button>' +
+        '</div>' +
       '</div>';
     slotGrid.appendChild(div);
+  });
+
+  // Show what is actually live on the site right now, so the admin reflects
+  // the site rather than only what was picked in this session.
+  function loadPhotos(){
+    fetch('/api/media', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(m){
+      SLOTS.forEach(function(s){
+        var entry = m && m[s.key];
+        var thumb = document.getElementById('thumb-'+s.key);
+        var state = document.getElementById('state-'+s.key);
+        var del   = document.getElementById('del-'+s.key);
+        if(entry && entry.url){
+          // Only paint the live photo if the user hasn't picked a replacement
+          // in this session — otherwise it would wipe their pending choice.
+          if(!photos[s.key]) thumb.style.backgroundImage = 'url('+entry.url+')';
+          state.textContent = 'On the site now.';
+          del.hidden = false;
+        } else {
+          if(!photos[s.key]) thumb.style.backgroundImage = 'none';
+          state.textContent = 'Empty.';
+          del.hidden = true;
+        }
+      });
+    }).catch(function(){});
+  }
+
+  // Delegated, so it survives the slots being re-rendered.
+  slotGrid.addEventListener('click', function(e){
+    var btn = e.target.closest && e.target.closest('button.del');
+    if(!btn) return;
+    var key = btn.dataset.slot;
+    var slot = SLOTS.filter(function(s){ return s.key === key; })[0];
+    var label = slot ? slot.label : key;
+    if(!confirm('Remove the '+label+' from the website?\n\nThis permanently deletes the photo from storage and cannot be undone.')) return;
+    btn.disabled = true;
+    btn.textContent = 'Removing…';
+    api('DELETE', '/api/media/' + encodeURIComponent(key))
+      .then(function(){
+        delete photos[key];
+        document.getElementById('thumb-'+key).style.backgroundImage = 'none';
+        var input = slotGrid.querySelector('input[data-slot="'+key+'"]');
+        if(input) input.value = '';
+        setNote('photoNote', 'Removed the '+label+'.');
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+        loadPhotos();
+      })
+      .catch(function(err){
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+        setNote('photoNote', err.message);
+      });
   });
   // Photos straight off a phone or camera are often 5-10 MB, which is far
   // more than a website needs and big enough to blow past the request size
@@ -217,7 +273,9 @@
     var i = 0;
     (function next(){
       if(i >= keys.length){
-        setNote('photoNote', keys.length + ' photo(s) saved — live on the home page within a minute.');
+        setNote('photoNote', keys.length + ' photo(s) saved — live on the home page now.');
+        photos = {};
+        loadPhotos();
         return;
       }
       var key = keys[i];
@@ -468,6 +526,7 @@
     document.getElementById('serverStatus').textContent = 'Server offline';
   });
 
+  loadPhotos();
   loadVideo();
   loadDocs();
   loadApps();

@@ -51,6 +51,11 @@ const uploadVideo = multer({
 // homepage script has one simple contract: whatever comes back, fill what's
 // there and leave the rest alone.
 publicRouter.get('/media', async (req, res) => {
+  // Set on every path, including the failure ones below. An empty {} response
+  // must never be cached — otherwise a momentary Firebase problem would leave
+  // visitors with a photo-less homepage long after it recovered.
+  res.setHeader('Cache-Control', 'no-cache');
+
   try {
     init();
   } catch (e) {
@@ -77,9 +82,12 @@ publicRouter.get('/media', async (req, res) => {
             : null,
       };
     });
-    // Short cache: new photos should show up within a few minutes without a
-    // hard refresh, but repeat visitors shouldn't re-fetch this on every page.
-    res.setHeader('Cache-Control', 'public, max-age=60');
+    // Must revalidate every load. The payload is tiny, and caching it was
+    // part of why a replaced photo kept showing the old image: a stale copy
+    // of this JSON hands out the previous upload's URL. The image files
+    // themselves are still cached hard — they're now uniquely named, so a
+    // new upload is always a new URL and can never collide with a cached one.
+    res.setHeader('Cache-Control', 'no-cache');
     res.json(out);
   } catch (err) {
     console.error('GET /api/media failed:', err);
@@ -120,9 +128,26 @@ router.put('/media', async (req, res) => {
         return res.status(400).json({ error: `${key}: photo exceeds the size limit.` });
       }
       const safeKey = String(key).replace(/[^a-zA-Z0-9_-]/g, '_');
-      const storagePath = `media/${safeKey}.${ext}`;
+
+      // Unique filename per upload, NOT a fixed `media/hero.jpg`.
+      //
+      // With a fixed name the signed URL never changed, so replacing a photo
+      // left every browser and CDN still holding the previous image under an
+      // identical URL — which is why a refreshed page showed the old photo
+      // first and only switched once the cache expired. A new name means a
+      // new URL, so a replacement is visible immediately and the file itself
+      // can still be cached hard.
+      const stamp = Date.now().toString(36);
+      const storagePath = `media/${safeKey}-${stamp}.${ext}`;
+
+      // Note what the slot pointed at before, so it can be cleaned up after
+      // the new file is safely stored.
+      const prevSnap = await db.collection('media').doc(safeKey).get();
+      const prevPath =
+        prevSnap.exists && prevSnap.data() ? prevSnap.data().storagePath : null;
+
       const file = bucket.file(storagePath);
-      await file.save(buffer, { contentType, metadata: { cacheControl: 'public, max-age=300' } });
+      await file.save(buffer, { contentType, metadata: { cacheControl: 'public, max-age=31536000' } });
       const [url] = await file.getSignedUrl({ action: 'read', expires: '01-01-2500' });
       await db.collection('media').doc(safeKey).set({
         url,
@@ -130,6 +155,17 @@ router.put('/media', async (req, res) => {
         contentType,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      // Old file removed only after the record points at the new one, so a
+      // failure here leaves an unused file rather than a broken photo.
+      if (prevPath && prevPath !== storagePath) {
+        try {
+          await bucket.file(prevPath).delete();
+        } catch (e) {
+          if (e.code !== 404) console.warn('Could not remove old photo', prevPath, e.message);
+        }
+      }
+
       saved.push(safeKey);
     }
 
@@ -169,26 +205,19 @@ router.post('/media/video', uploadVideo.single('file'), async (req, res) => {
     const db = admin.firestore();
     const bucket = admin.storage().bucket();
 
-    // Fixed path per slot, so uploading a new video replaces the old one.
-    // The extension can change between uploads (mp4 -> webm), which would
-    // leave the previous file orphaned in Storage — so delete whatever the
-    // current record points at first, unless it's the same path we're about
-    // to overwrite anyway.
-    const storagePath = `media/video.${ext}`;
+    // Unique filename per upload, for the same reason as the photos: a fixed
+    // name would keep serving the previous video from cache under an
+    // unchanged URL. The old file is deleted below, after the new one is
+    // stored and the record updated.
+    const stamp = Date.now().toString(36);
+    const storagePath = `media/video-${stamp}.${ext}`;
     const prev = await db.collection('media').doc('video').get();
     const prevPath = prev.exists && prev.data() ? prev.data().storagePath : null;
-    if (prevPath && prevPath !== storagePath) {
-      try {
-        await bucket.file(prevPath).delete();
-      } catch (e) {
-        if (e.code !== 404) throw e;
-      }
-    }
 
     const file = bucket.file(storagePath);
     await file.save(req.file.buffer, {
       contentType,
-      metadata: { cacheControl: 'public, max-age=300' },
+      metadata: { cacheControl: 'public, max-age=31536000' },
     });
     const [url] = await file.getSignedUrl({ action: 'read', expires: '01-01-2500' });
 
@@ -200,6 +229,14 @@ router.post('/media/video', uploadVideo.single('file'), async (req, res) => {
       size: req.file.size,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    if (prevPath && prevPath !== storagePath) {
+      try {
+        await bucket.file(prevPath).delete();
+      } catch (e) {
+        if (e.code !== 404) console.warn('Could not remove old video', prevPath, e.message);
+      }
+    }
 
     res.json({ ok: true, url, size: req.file.size });
   } catch (err) {
@@ -243,6 +280,57 @@ router.delete('/media/video', async (req, res) => {
   } catch (err) {
     console.error('DELETE /api/media/video failed:', err);
     res.status(500).json({ error: 'Could not remove the video. Please try again.' });
+  }
+});
+
+// DELETE /api/media/:slot — clear one photo slot (hero, photo1…, founder).
+//
+// Declared AFTER /media/video above, so "video" matches that specific route
+// first and is never treated as a photo slot here.
+const PHOTO_SLOTS = ['hero', 'photo1', 'photo2', 'photo3', 'founder'];
+
+router.delete('/media/:slot', async (req, res) => {
+  const slot = String(req.params.slot);
+  // Whitelist rather than sanitise: this deletes files, so an unexpected
+  // value should be refused outright, not cleaned up and acted on. Checked
+  // BEFORE touching Firebase so a bad slot is always a clear 400, rather than
+  // a confusing 500 whenever the backend happens to be unreachable.
+  if (PHOTO_SLOTS.indexOf(slot) === -1) {
+    return res.status(400).json({ error: 'Unknown photo slot.' });
+  }
+
+  try {
+    init();
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+
+  try {
+    const db = admin.firestore();
+    const bucket = admin.storage().bucket();
+    const ref = db.collection('media').doc(slot);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      return res.status(404).json({ error: 'There is no photo in that slot.' });
+    }
+
+    const data = snap.data() || {};
+    // File first, then the record — if the file delete fails the photo stays
+    // listed so it can be retried, rather than leaving an unreachable file.
+    if (data.storagePath) {
+      try {
+        await bucket.file(data.storagePath).delete();
+      } catch (e) {
+        if (e.code !== 404) throw e;
+      }
+    }
+
+    await ref.delete();
+    res.json({ ok: true, deleted: slot });
+  } catch (err) {
+    console.error('DELETE /api/media/:slot failed:', err);
+    res.status(500).json({ error: 'Could not remove the photo. Please try again.' });
   }
 });
 
