@@ -48,9 +48,13 @@
   }
 
   function buildVideoSection(video) {
+    // Variable fallbacks: the page has moved between stylesheets before (the
+    // old design-system vars vs the current --line/--accent set), so accept
+    // either and end on a hard-coded colour that matches the brand.
     var section = document.createElement('section');
     section.id = 'kms-video-section';
-    section.style.cssText = 'border-bottom:2px solid var(--color-divider)';
+    section.style.cssText =
+      'border-bottom:1px solid var(--color-divider, var(--line, #e7e4e0))';
 
     var pad = document.createElement('div');
     pad.style.cssText = 'max-width:1280px;margin:0 auto;padding:72px 40px';
@@ -58,8 +62,8 @@
     var eyebrow = document.createElement('div');
     eyebrow.textContent = 'On the water';
     eyebrow.style.cssText =
-      'font-size:11px;letter-spacing:0.2em;text-transform:uppercase;' +
-      'color:var(--color-accent-700);font-weight:600;margin-bottom:24px';
+      'font-size:12px;letter-spacing:0.16em;text-transform:uppercase;' +
+      'color:var(--color-accent-700, var(--accent, #ec3013));font-weight:700;margin-bottom:24px';
 
     var el = document.createElement('video');
     el.src = video.url;
@@ -70,7 +74,8 @@
     // data without consent, and a marine-business homepage has no reason to
     // start making noise at a visitor.
     el.style.cssText =
-      'width:100%;max-height:70vh;display:block;background:#000;border:2px solid var(--color-divider)';
+      'width:100%;max-height:70vh;display:block;background:#000;border-radius:12px;' +
+      'border:1px solid var(--color-divider, var(--line, #e7e4e0))';
 
     pad.appendChild(eyebrow);
     pad.appendChild(el);
