@@ -43,14 +43,27 @@
   var WHEEL_COOLDOWN_MS = 450;    // one item per wheel gesture, not per tick
   var DRAG_STEP_PX = 48;          // vertical drag distance per item
 
-  // Geometry of the orbit. The centre sits far to the LEFT of the strip, so
-  // the items trace a gentle arc that bows toward the photo — a rotary
-  // selector, not a straight list. Angles are per-step around that centre.
-  var RADIUS = 240;
-  var STEP_DEG = 16.5;
-  var CENTER_X = -150;            // px, relative to the nav strip's own box
-  var NAV_W = 150;                // width of the strip the items are laid out in
-  var NAV_GAP = 22;               // clear space between the strip and the photo
+  // Geometry of the arc. The active item sits furthest right and vertically
+  // centred; the others step away above and below, each pushed slightly left
+  // on a parabola. That reads as a gentle arc bowing toward the photograph
+  // while keeping the whole thing inside a narrow vertical strip — a compact
+  // sculpture in the gutter, not a radial wheel.
+  var BOW_PX = 26;                // how far the outermost items lean left
+  var STEP_Y = 72;                // vertical spacing between neighbours
+  var SCALE_STEP = 0.13;          // each step away from centre shrinks by this
+
+  // Strip sizing. Width is measured from the real gap at runtime and clamped
+  // to this range; below MIN_GAP there is no room and the strip stays hidden
+  // rather than crowding the text or the photo.
+  var NAV_MIN_W = 104;
+  var NAV_MAX_W = 180;
+  var NAV_GAP = 18;               // clear space kept either side of the strip
+  // Derived, not hand-picked: the narrowest gutter that still fits the
+  // smallest strip AND its clearances. Below this the strip hides entirely,
+  // which guarantees it can never sit closer than NAV_GAP to the text or the
+  // photograph, at any window size.
+  var MIN_GAP = NAV_MIN_W + NAV_GAP * 2;
+  var COMPACT_W = 146;            // under this width, only the active item is labelled
 
   var ICONS = {
     waves:  '<path d="M3 9q3-3.5 6 0t6 0 6 0"/><path d="M3 15q3-3.5 6 0t6 0 6 0"/>',
@@ -73,6 +86,7 @@
 
   var nav, itemEls = [], overlay, overlayLayers = [null, null], overlayFront = 0;
   var heroBox = null;   // the .hero-img container the strip is mounted into
+  var navWidth = 0;     // strip width measured by place()
 
   // ---- helpers -------------------------------------------------------------
 
@@ -113,13 +127,31 @@
       nav.style.visibility = 'hidden';
       return;
     }
+
+    // The usable gutter runs from the right edge of the text column to the
+    // left edge of the photograph. Both are measured, so the strip occupies
+    // only genuinely unused whitespace and can never straddle either one.
+    var textCol = document.querySelector('.g-hero > div:first-child');
+    var leftEdge = textCol ? textCol.getBoundingClientRect().right : host.left;
+    var gutter = photo.left - leftEdge;
+
+    // Too tight to sit in without crowding something. Hiding beats overlapping.
+    if (gutter < MIN_GAP) {
+      nav.style.visibility = 'hidden';
+      return;
+    }
     nav.style.visibility = '';
 
-    // Right edge of the strip sits NAV_GAP left of the photo's left edge.
-    var left = (photo.left - host.left) - NAV_W - NAV_GAP;
+    var width = Math.max(NAV_MIN_W, Math.min(NAV_MAX_W, gutter - NAV_GAP * 2));
+    // Centred in the gutter, so the gap to the text and to the photo is even.
+    var left = (leftEdge - host.left) + (gutter - width) / 2;
 
-    nav.style.width = NAV_W + 'px';
+    navWidth = width;
+    nav.style.width = Math.round(width) + 'px';
     nav.style.left = Math.round(left) + 'px';
+    // In a narrow gutter only the active item keeps its label, which is what
+    // stops long words like "COMMUNITY" reaching the photograph.
+    nav.classList.toggle('kms-orbit-compact', width < COMPACT_W);
 
     // Overlay tracks the photo's box exactly, so switched media matches its
     // size, position and crop rather than the template's original numbers.
@@ -136,24 +168,36 @@
   function layout(animate) {
     var h = nav.clientHeight;
     var cy = h / 2;
-    for (var i = 0; i < ITEMS.length; i++) {
+    var n = ITEMS.length;
+
+    // Squeeze the vertical spacing if the hero is short, so the top and bottom
+    // items can't ride out past the photograph's edges.
+    var stepY = Math.min(STEP_Y, (h - 70) / (n - 1));
+
+    for (var i = 0; i < n; i++) {
       var el = itemEls[i];
       // Offset from the active item, taken the short way around the loop so
       // 05 -> 01 animates one step forward, not four steps backward.
-      var raw = i - active;
-      var n = ITEMS.length;
-      var off = mod(raw + n / 2, n) - n / 2;
-      var a = off * STEP_DEG * Math.PI / 180;
-      var x = CENTER_X + RADIUS * Math.cos(a);
-      var y = cy + RADIUS * Math.sin(a);
+      var off = mod(i - active + n / 2, n) - n / 2;
+      var dist = Math.abs(off);
+
+      // Parabolic lean: active flush right at x=0, outer items pushed left.
+      // A parabola gives an even, readable arc and — unlike a true circle —
+      // its depth is a single number, so the bow can't grow past the strip.
+      var x = -BOW_PX * (dist * dist) / ((n - 1) / 2 * ((n - 1) / 2));
+      var y = cy + off * stepY;
+
       var isActive = i === active;
-      var scale = isActive ? 1 : Math.max(0.72, 1 - Math.abs(off) * 0.16);
+      var scale = isActive ? 1 : Math.max(0.7, 1 - dist * SCALE_STEP);
+
       el.style.transition = (animate && !reducedMotion)
         ? 'transform ' + SPIN_MS + 'ms cubic-bezier(.33,.9,.25,1), opacity ' + SPIN_MS + 'ms ease'
         : 'none';
-      el.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translate(0,-50%) scale(' + scale + ')';
-      el.style.opacity = String(Math.max(0.35, 1 - Math.abs(off) * 0.22));
-      el.style.zIndex = String(10 - Math.abs(Math.round(off)));
+      // Anchored right: the item grows leftward from the strip's right edge,
+      // so a longer label can never push the active circle into the photo.
+      el.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translateY(-50%) scale(' + scale + ')';
+      el.style.opacity = String(Math.max(0.4, 1 - dist * 0.2));
+      el.style.zIndex = String(10 - Math.round(dist));
       el.classList.toggle('kms-orbit-active', isActive);
       el.setAttribute('aria-current', isActive ? 'true' : 'false');
       el.tabIndex = isActive ? 0 : -1;
@@ -329,21 +373,28 @@
     // moves to make room for it.
     '.kms-orbit{position:absolute;top:0;bottom:0;margin:0;padding:0;' +
     '  z-index:6;overflow:visible;background:none;border:none;cursor:default;touch-action:none}' +
-    '.kms-orbit-item{position:absolute;left:0;top:0;display:flex;align-items:center;gap:9px;' +
-    '  background:none;border:none;padding:4px;margin:0;cursor:pointer;font-family:var(--font-body,inherit);' +
+    // Anchored to the strip's RIGHT edge and laid out right-to-left, so the
+    // circle holds its position and the label grows into the empty space
+    // beside it rather than creeping toward the photograph.
+    '.kms-orbit-item{position:absolute;right:0;top:0;display:flex;align-items:center;gap:8px;' +
+    '  flex-direction:row-reverse;transform-origin:100% 50%;' +
+    '  background:none;border:none;padding:3px;margin:0;cursor:pointer;font-family:var(--font-body,inherit);' +
     '  will-change:transform,opacity}' +
-    '.kms-orbit-dot{width:40px;height:40px;flex:none;border-radius:50%;background:var(--color-bg,#fff);' +
+    '.kms-orbit-dot{width:34px;height:34px;flex:none;border-radius:50%;background:var(--color-bg,#fff);' +
     '  border:1.5px solid var(--color-neutral-300,#d8d4cf);display:flex;align-items:center;justify-content:center;' +
     '  color:var(--color-neutral-700,#6a6660);transition:border-color .25s,color .25s,box-shadow .25s}' +
-    '.kms-orbit-dot svg{width:20px;height:20px}' +
-    '.kms-orbit-meta{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;text-align:left}' +
+    '.kms-orbit-dot svg{width:17px;height:17px}' +
+    '.kms-orbit-meta{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2;text-align:right;min-width:0}' +
     '.kms-orbit-num{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--color-neutral-600,#8a857f)}' +
-    '.kms-orbit-lbl{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;' +
+    '.kms-orbit-lbl{font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;' +
     '  color:var(--color-neutral-800,#4d4a45);white-space:nowrap}' +
+    // Narrow gutter: keep only the active label. The number still identifies
+    // every item, and no long word can reach across to the photograph.
+    '.kms-orbit-compact .kms-orbit-item:not(.kms-orbit-active) .kms-orbit-lbl{display:none}' +
     '.kms-orbit-item:focus-visible .kms-orbit-dot{outline:2px solid var(--color-accent,#ec3013);outline-offset:2px}' +
-    '.kms-orbit-active .kms-orbit-dot{width:52px;height:52px;border:2px solid var(--color-accent,#ec3013);' +
+    '.kms-orbit-active .kms-orbit-dot{width:46px;height:46px;border:2px solid var(--color-accent,#ec3013);' +
     '  color:var(--color-accent,#ec3013);box-shadow:0 0 0 5px rgba(236,48,19,.08),0 6px 18px rgba(236,48,19,.14)}' +
-    '.kms-orbit-active .kms-orbit-dot svg{width:24px;height:24px}' +
+    '.kms-orbit-active .kms-orbit-dot svg{width:22px;height:22px}' +
     '.kms-orbit-active .kms-orbit-num,.kms-orbit-active .kms-orbit-lbl{color:var(--color-accent,#ec3013)}' +
     // Media overlay: EXACTLY the hero photo's box (the same inline geometry
     // the template gives the hero video variant), so switched media has the
@@ -355,7 +406,7 @@
     // The gutter only exists on the wide layout. Below it the hero stacks and
     // there is no empty strip, so the addition bows out entirely rather than
     // covering the headline or the photo. (Media reverts to the plain hero.)
-    '@media (max-width:1099px){.kms-orbit,.kms-orbit-media{display:none !important}}' +
+    '@media (max-width:900px){.kms-orbit,.kms-orbit-media{display:none !important}}' +
     '@media (prefers-reduced-motion:reduce){.kms-orbit-item{transition:none !important}' +
     '  .kms-orbit-media,.kms-orbit-media-layer{transition:none !important}}';
 
