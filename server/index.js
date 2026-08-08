@@ -102,13 +102,22 @@ app.get('/login.html', (req, res, next) => {
 // assets, images) is served as plain static files.
 app.use(
   express.static(PUBLIC_DIR, {
-    // HTML must revalidate so content edits go live on the next visit;
-    // fingerprint-free assets (_ds/, image-slot.js) get a short cache.
+    // None of these files are fingerprinted — site-media.js is always
+    // "site-media.js" — so a long cache means a deploy quietly does nothing
+    // for an hour: the browser keeps serving the previous version of the
+    // script under the same name. That is exactly how a shipped fix can look
+    // like it never shipped.
+    //
+    // Code and markup therefore revalidate on every request (cheap: the
+    // response is a 304 with no body when nothing changed). Pictures and
+    // fonts, whose contents don't change under a fixed name, keep a real
+    // cache — the media the admin uploads is uniquely named per upload and
+    // cached hard by Firebase, so it isn't affected by this at all.
     setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.html')) {
+      if (/\.(html|js|css|svg|json)$/i.test(filePath)) {
         res.setHeader('Cache-Control', 'no-cache');
       } else {
-        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
       }
     },
   })
