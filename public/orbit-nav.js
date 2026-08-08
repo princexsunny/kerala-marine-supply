@@ -186,6 +186,14 @@
     navWidth = width;
     nav.style.width = Math.round(width) + 'px';
     nav.style.left = Math.round(left) + 'px';
+
+    // Match the photograph's vertical box exactly, so the column of circles is
+    // the same height as the picture it sits beside and the two read as one
+    // composition. (Without this the strip spanned the whole hero container,
+    // which is taller than the photo.)
+    nav.style.top = Math.round(photo.top - host.top) + 'px';
+    nav.style.bottom = 'auto';
+    nav.style.height = Math.round(photo.height) + 'px';
     nav.classList.toggle('kms-orbit-mid', width === NAV_MID_W);
     nav.classList.toggle('kms-orbit-tight', width === NAV_TIGHT_W);
 
@@ -226,23 +234,16 @@
     if (!h) return;
     var n = ITEMS.length;
 
-    // Fit the arc to the part of the hero that is actually ON SCREEN, not to
-    // the hero's full height. The hero is often taller than the window, so
-    // centring on the hero pushed the first and last items past the bottom
-    // edge — the whole column looked cropped.
+    // The strip is sized to the photograph by place(), so the run of circles
+    // simply fills it: first item flush with the top edge, last flush with the
+    // bottom, giving the column exactly the picture's height.
     //
-    // The band is computed as it would be with the page scrolled to the top,
-    // so it doesn't shift around while the visitor scrolls.
-    var heroDocTop = nav.getBoundingClientRect().top + (window.pageYOffset || 0);
-    var winH = window.innerHeight || h;
-    var visTop = Math.max(heroDocTop, 0);
-    var visBottom = Math.min(heroDocTop + h, winH);
-    var band = Math.max(260, visBottom - visTop);
-
-    var cy = (visTop + visBottom) / 2 - heroDocTop;
-    // Room for half a circle plus its caption at each end of the run.
-    var END_PAD = 56;
-    var stepY = Math.min(STEP_Y, Math.max(58, (band - END_PAD * 2) / (n - 1)));
+    // Spacing is derived from the real rendered item height rather than a
+    // guess, so the outer captions land inside the edges instead of hanging
+    // over them.
+    var itemH = (itemEls[0] && itemEls[0].offsetHeight) || 86;
+    var cy = h / 2;
+    var stepY = Math.max(52, (h - itemH) / (n - 1));
 
     for (var i = 0; i < n; i++) {
       var el = itemEls[i];
