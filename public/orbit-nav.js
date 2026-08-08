@@ -25,11 +25,14 @@
   var ITEMS = [
     // icon: minimalist line icon, drawn inline further down by ICONS[key].
     // slot: which /api/media entry supplies this item's picture or video.
-    { num: '01', label: 'Coastline', icon: 'waves',     slot: 'photo3' },
-    { num: '02', label: 'Deepwater', icon: 'anchor',    slot: 'photo2' },
-    { num: '03', label: 'Boat yard', icon: 'ship',      slot: 'hero'   }, // default — the existing hero photo
-    { num: '04', label: 'Community', icon: 'people',    slot: 'photo1' },
-    { num: '05', label: 'Ventures',  icon: 'grid',      slot: 'founder' },
+    //       These are the dedicated "Hero orbit" slots in /admin.html, so each
+    //       category's media is managed there alongside the other photos.
+    //       An empty slot falls back to the existing hero photograph.
+    { num: '01', label: 'Coastline', icon: 'waves',  slot: 'orbit1' },
+    { num: '02', label: 'Deepwater', icon: 'anchor', slot: 'orbit2' },
+    { num: '03', label: 'Boat yard', icon: 'ship',   slot: 'hero'   }, // default — the existing hero photo
+    { num: '04', label: 'Community', icon: 'people', slot: 'orbit4' },
+    { num: '05', label: 'Ventures',  icon: 'grid',   slot: 'orbit5' },
   ];
   var DEFAULT_INDEX = 2;          // 03 — Boat yard
   var HERO_SLOT = 'hero';         // the slot the untouched hero photo shows
@@ -45,7 +48,9 @@
   // selector, not a straight list. Angles are per-step around that centre.
   var RADIUS = 240;
   var STEP_DEG = 16.5;
-  var CENTER_X = -170;            // px, relative to the nav strip's own box
+  var CENTER_X = -150;            // px, relative to the nav strip's own box
+  var NAV_W = 150;                // width of the strip the items are laid out in
+  var NAV_GAP = 22;               // clear space between the strip and the photo
 
   var ICONS = {
     waves:  '<path d="M3 9q3-3.5 6 0t6 0 6 0"/><path d="M3 15q3-3.5 6 0t6 0 6 0"/>',
@@ -67,6 +72,7 @@
   } catch (e) {}
 
   var nav, itemEls = [], overlay, overlayLayers = [null, null], overlayFront = 0;
+  var heroBox = null;   // the .hero-img container the strip is mounted into
 
   // ---- helpers -------------------------------------------------------------
 
@@ -85,6 +91,44 @@
     // No media at all, or the same file as the untouched hero photo: show the
     // existing hero by fading the overlay out rather than duplicating it.
     return !m || (h && m.url === h.url);
+  }
+
+  // ---- placement -----------------------------------------------------------
+
+  // Park the strip entirely to the LEFT of the photograph, in the off-white
+  // gutter. The photo's real position is measured rather than assumed: the
+  // hero is a design-tool export whose image is swapped at runtime by
+  // site-media.js, so its inline geometry is not reliable. Measuring means
+  // this stays correct whatever the photo ends up doing.
+  function place() {
+    if (!nav || !heroBox) return;
+    var host = heroBox.getBoundingClientRect();
+    var photoEl = heroBox.querySelector('img, video') || heroBox;
+    var photo = photoEl.getBoundingClientRect();
+
+    // Nothing laid out yet (photo still loading, hero hidden, zero-size box).
+    // Placing against a degenerate measurement would fling the strip somewhere
+    // arbitrary, so keep it hidden and wait for a real reading instead.
+    if (!photo.width || !photo.height || !host.width) {
+      nav.style.visibility = 'hidden';
+      return;
+    }
+    nav.style.visibility = '';
+
+    // Right edge of the strip sits NAV_GAP left of the photo's left edge.
+    var left = (photo.left - host.left) - NAV_W - NAV_GAP;
+
+    nav.style.width = NAV_W + 'px';
+    nav.style.left = Math.round(left) + 'px';
+
+    // Overlay tracks the photo's box exactly, so switched media matches its
+    // size, position and crop rather than the template's original numbers.
+    if (overlay) {
+      overlay.style.left = Math.round(photo.left - host.left) + 'px';
+      overlay.style.top = Math.round(photo.top - host.top) + 'px';
+      overlay.style.width = Math.round(photo.width) + 'px';
+      overlay.style.height = Math.round(photo.height) + 'px';
+    }
   }
 
   // ---- orbit layout --------------------------------------------------------
@@ -283,7 +327,7 @@
     // The strip occupies the hero's empty left gutter (the photo starts at
     // 127px). Positioned absolutely inside .hero-img, so nothing existing
     // moves to make room for it.
-    '.kms-orbit{position:absolute;left:0;top:0;bottom:0;width:127px;margin:0;padding:0;' +
+    '.kms-orbit{position:absolute;top:0;bottom:0;margin:0;padding:0;' +
     '  z-index:6;overflow:visible;background:none;border:none;cursor:default;touch-action:none}' +
     '.kms-orbit-item{position:absolute;left:0;top:0;display:flex;align-items:center;gap:9px;' +
     '  background:none;border:none;padding:4px;margin:0;cursor:pointer;font-family:var(--font-body,inherit);' +
@@ -304,7 +348,7 @@
     // Media overlay: EXACTLY the hero photo's box (the same inline geometry
     // the template gives the hero video variant), so switched media has the
     // same size, position and cover behaviour as the photo it covers.
-    '.kms-orbit-media{position:absolute;left:127px;top:-2px;width:430px;height:616px;z-index:5;' +
+    '.kms-orbit-media{position:absolute;z-index:5;' +
     '  overflow:hidden;pointer-events:none;opacity:0;transition:opacity ' + FADE_MS + 'ms ease}' +
     '.kms-orbit-media-layer{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;' +
     '  transition:opacity ' + FADE_MS + 'ms ease,transform ' + (FADE_MS + 200) + 'ms ease}' +
@@ -326,9 +370,27 @@
     overlay.className = 'kms-orbit-media';
     overlay.setAttribute('aria-hidden', 'true');
 
+    heroBox = heroImg;
+    if (getComputedStyle(heroImg).position === 'static') heroImg.style.position = 'relative';
     heroImg.appendChild(overlay);
     heroImg.appendChild(buildNav());
+    place();
     layout(false);
+
+    // The photo arrives asynchronously (site-media.js swaps it in after
+    // fetching /api/media), and the hero reflows on resize -- so re-measure
+    // rather than trusting the first reading.
+    window.addEventListener('resize', place);
+    var ro = null;
+    try {
+      ro = new ResizeObserver(function () { place(); });
+      ro.observe(heroImg);
+    } catch (e) {}
+    var settle = 0;
+    var settleTimer = setInterval(function () {
+      place();
+      if (++settle > 20) clearInterval(settleTimer);   // ~5s, then stop
+    }, 250);
 
     fetch('/api/media', { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : {}; })

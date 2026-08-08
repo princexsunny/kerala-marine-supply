@@ -61,6 +61,11 @@
     <h2>Website photos</h2>
     <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Choose a picture for each slot, then save. These appear on the home page straight away. JPEG, PNG, WebP or GIF.</p>
     <div class="grid2" id="slotGrid"></div>
+
+    <h3 style="font-size:16px;font-weight:800;margin:30px 0 4px">Hero orbit categories</h3>
+    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px;margin:0 0 14px">The rotating selector on the home page. Each category shows its own picture. Leave one empty and it shows the hero photograph instead. <strong>Boat yard</strong> always uses the hero photograph, so it has no slot of its own.</p>
+    <div class="grid2" id="orbitGrid"></div>
+
     <div class="row">
       <button class="btn btn-primary" id="savePhotos">Save photos</button>
       <button class="btn btn-ghost" id="clearPhotos">Clear choices</button>
@@ -133,10 +138,26 @@
     { key: 'photo3', label: 'Strip 3', hint: 'The crew, or a boat at the harbour.' },
     { key: 'founder',label: 'Founder portrait', hint: 'Prince, in the founder section.' },
   ];
+
+  // The hero orbit's five categories. 03 Boat yard is deliberately not here:
+  // it always shows the main hero photograph, so there is nothing separate to
+  // upload for it. Same upload, preview and delete behaviour as the slots
+  // above -- they share every handler below.
+  var ORBIT_SLOTS = [
+    { key: 'orbit1', label: '01 · Coastline', hint: 'The coast, the shoreline, the sea.' },
+    { key: 'orbit2', label: '02 · Deepwater', hint: 'The harbour or the deepwater port nearby.' },
+    { key: 'orbit4', label: '04 · Community', hint: 'The fishing community, the crew.' },
+    { key: 'orbit5', label: '05 · Ventures',  hint: 'The yard, machines or a venture at work.' },
+  ];
+
+  // Everything below treats the two groups identically.
+  var ALL_SLOTS = SLOTS.concat(ORBIT_SLOTS);
   var photos = {}; // key -> dataURL chosen (not yet saved / just saved)
 
-  var slotGrid = document.getElementById('slotGrid');
-  SLOTS.forEach(function(s){
+  var slotGrid  = document.getElementById('slotGrid');
+  var orbitGrid = document.getElementById('orbitGrid');
+  ALL_SLOTS.forEach(function(s){
+    var grid = ORBIT_SLOTS.indexOf(s) !== -1 ? orbitGrid : slotGrid;
     var div = document.createElement('div');
     div.className = 'slot';
     div.innerHTML =
@@ -150,14 +171,14 @@
           '<button class="del" data-slot="'+s.key+'" id="del-'+s.key+'" hidden>Delete</button>' +
         '</div>' +
       '</div>';
-    slotGrid.appendChild(div);
+    grid.appendChild(div);
   });
 
   // Show what is actually live on the site right now, so the admin reflects
   // the site rather than only what was picked in this session.
   function loadPhotos(){
     fetch('/api/media', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(m){
-      SLOTS.forEach(function(s){
+      ALL_SLOTS.forEach(function(s){
         var entry = m && m[s.key];
         var thumb = document.getElementById('thumb-'+s.key);
         var state = document.getElementById('state-'+s.key);
@@ -182,7 +203,7 @@
     var btn = e.target.closest && e.target.closest('button.del');
     if(!btn) return;
     var key = btn.dataset.slot;
-    var slot = SLOTS.filter(function(s){ return s.key === key; })[0];
+    var slot = ALL_SLOTS.filter(function(s){ return s.key === key; })[0];
     var label = slot ? slot.label : key;
     if(!confirm('Remove the '+label+' from the website?\n\nThis permanently deletes the photo from storage and cannot be undone.')) return;
     btn.disabled = true;
@@ -262,7 +283,7 @@
   });
   document.getElementById('clearPhotos').addEventListener('click', function(){
     photos = {};
-    SLOTS.forEach(function(s){ document.getElementById('thumb-'+s.key).style.backgroundImage = 'none'; });
+    ALL_SLOTS.forEach(function(s){ document.getElementById('thumb-'+s.key).style.backgroundImage = 'none'; });
     setNote('photoNote', 'Choices cleared.');
   });
   document.getElementById('savePhotos').addEventListener('click', function(){

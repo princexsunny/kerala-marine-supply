@@ -287,7 +287,13 @@ router.delete('/media/video', async (req, res) => {
 //
 // Declared AFTER /media/video above, so "video" matches that specific route
 // first and is never treated as a photo slot here.
-const PHOTO_SLOTS = ['hero', 'photo1', 'photo2', 'photo3', 'founder'];
+// orbit1..orbit5 back the hero orbit navigation's five categories. orbit3
+// (Boat yard) is intentionally absent: that category always shows the main
+// hero photograph, so it has no separate slot to upload or delete.
+const PHOTO_SLOTS = [
+  'hero', 'photo1', 'photo2', 'photo3', 'founder',
+  'orbit1', 'orbit2', 'orbit4', 'orbit5',
+];
 
 router.delete('/media/:slot', async (req, res) => {
   const slot = String(req.params.slot);
