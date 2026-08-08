@@ -224,9 +224,25 @@
   function layout(animate) {
     var h = nav.clientHeight;
     if (!h) return;
-    var cy = h / 2;
     var n = ITEMS.length;
-    var stepY = Math.min(STEP_Y, (h - 150) / (n - 1));
+
+    // Fit the arc to the part of the hero that is actually ON SCREEN, not to
+    // the hero's full height. The hero is often taller than the window, so
+    // centring on the hero pushed the first and last items past the bottom
+    // edge — the whole column looked cropped.
+    //
+    // The band is computed as it would be with the page scrolled to the top,
+    // so it doesn't shift around while the visitor scrolls.
+    var heroDocTop = nav.getBoundingClientRect().top + (window.pageYOffset || 0);
+    var winH = window.innerHeight || h;
+    var visTop = Math.max(heroDocTop, 0);
+    var visBottom = Math.min(heroDocTop + h, winH);
+    var band = Math.max(260, visBottom - visTop);
+
+    var cy = (visTop + visBottom) / 2 - heroDocTop;
+    // Room for half a circle plus its caption at each end of the run.
+    var END_PAD = 56;
+    var stepY = Math.min(STEP_Y, Math.max(58, (band - END_PAD * 2) / (n - 1)));
 
     for (var i = 0; i < n; i++) {
       var el = itemEls[i];
