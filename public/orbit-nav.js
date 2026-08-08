@@ -52,12 +52,10 @@
   var DOT = 48;                   // circle diameter
   var DOT_ACTIVE = 66;
 
-  // Strip sizing, measured from the real gap at runtime. It never hides for
-  // want of space — it steps down through narrower forms instead.
-  var NAV_FULL_W = 196;           // curve + circles + captions + "scroll to explore"
-  var NAV_MID_W = 150;            // curve + circles + captions
-  var NAV_TIGHT_W = 74;           // circles + curve only
-  var NAV_GAP = 18;               // clear space kept between the strip and the photo
+  // The strip is a real grid column now, so its width is declared once rather
+  // than negotiated against whatever space happens to be left over.
+  var ORBIT_COL = 216;            // px — column width in the hero grid
+  var HEADER_FALLBACK = 96;       // used only if the header can't be measured
 
   var ICONS = {
     waves:    '<path d="M3 8.5q3-3.5 6 0t6 0 6 0"/><path d="M3 14q3-3.5 6 0t6 0 6 0"/><path d="M3 19.5q3-3.5 6 0t6 0 6 0"/>',
@@ -157,56 +155,18 @@
     if (!nav || !heroBox) return;
     var host = heroBox.getBoundingClientRect();
     var photoEl = findPhoto();
-    if (!photoEl) {
-      lastPlacement = { shown: false, why: 'no photo element and hero box too small' };
-      nav.style.visibility = 'hidden';
-      return;
-    }
+    if (!photoEl) { lastPlacement = { shown: false, why: 'no photo yet' }; return; }
     var photo = photoEl.getBoundingClientRect();
-    if (!photo.width || !photo.height || !host.width) {
-      lastPlacement = { shown: false, why: 'nothing laid out yet — will retry' };
-      nav.style.visibility = 'hidden';
+    if (!photo.width || !host.width) {
+      lastPlacement = { shown: false, why: 'nothing laid out yet - will retry' };
       return;
     }
-    nav.style.visibility = '';
 
-    var textCol = document.querySelector('.g-hero > div:first-child');
-    var leftEdge = textCol ? textContentRight(textCol) : host.left;
-    var gutter = photo.left - leftEdge;
-
-    // Always anchored to the photograph: the strip's right edge sits NAV_GAP
-    // left of the picture and grows leftward into the whitespace. Anchoring
-    // this way is what guarantees it can never cover the photo.
-    var width = gutter >= NAV_FULL_W + NAV_GAP ? NAV_FULL_W
-              : gutter >= NAV_MID_W + NAV_GAP ? NAV_MID_W
-              : NAV_TIGHT_W;
-
-    var left = (photo.left - host.left) - NAV_GAP - width;
-
-    navWidth = width;
-    nav.style.width = Math.round(width) + 'px';
-    nav.style.left = Math.round(left) + 'px';
-
-    // Match the photograph's vertical box exactly, so the column of circles is
-    // the same height as the picture it sits beside and the two read as one
-    // composition. (Without this the strip spanned the whole hero container,
-    // which is taller than the photo.)
-    nav.style.top = Math.round(photo.top - host.top) + 'px';
-    nav.style.bottom = 'auto';
-    nav.style.height = Math.round(photo.height) + 'px';
-    nav.classList.toggle('kms-orbit-mid', width === NAV_MID_W);
-    nav.classList.toggle('kms-orbit-tight', width === NAV_TIGHT_W);
-
-    lastPlacement = {
-      shown: true, gutter: Math.round(gutter), width: width,
-      form: width === NAV_FULL_W ? 'full' : (width === NAV_MID_W ? 'captions only' : 'circles only'),
-      textRight: Math.round(leftEdge), photoLeft: Math.round(photo.left),
-      stripSpans: Math.round(host.left + left) + '..' + Math.round(host.left + left + width),
-      usedFallbackBox: photoEl === heroBox,
-    };
-
-    // Overlay tracks the photo's box exactly, clamped to the hero so a bad
-    // measurement can never let it spill across the page.
+    // The strip no longer positions itself: it occupies its own column in the
+    // hero grid, so it cannot overlap the text or the photograph by
+    // construction. All that is left to place is the media overlay, which must
+    // track the photograph's box exactly, clamped to the hero so a bad
+    // measurement can never spill it across the page.
     if (overlay) {
       var oW = Math.min(Math.round(photo.width), Math.round(host.width));
       var oH = Math.min(Math.round(photo.height), Math.round(host.height));
@@ -217,6 +177,15 @@
       overlay.style.width = oW + 'px';
       overlay.style.height = oH + 'px';
     }
+
+    var nr = nav.getBoundingClientRect();
+    lastPlacement = {
+      shown: nr.width > 0 && nr.height > 0,
+      column: Math.round(nr.width) + 'x' + Math.round(nr.height),
+      stripSpans: Math.round(nr.left) + '..' + Math.round(nr.right),
+      photoSpans: Math.round(photo.left) + '..' + Math.round(photo.right),
+      overlapsPhoto: nr.right > photo.left,
+    };
 
     layout(false);
   }
@@ -234,13 +203,10 @@
     if (!h) return;
     var n = ITEMS.length;
 
-    // The strip is sized to the photograph by place(), so the run of circles
-    // simply fills it: first item flush with the top edge, last flush with the
-    // bottom, giving the column exactly the picture's height.
-    //
-    // Spacing is derived from the real rendered item height rather than a
-    // guess, so the outer captions land inside the edges instead of hanging
-    // over them.
+    // The column is exactly the hero's height, so the run of circles simply
+    // fills it: first item flush with the top, last flush with the bottom.
+    // Spacing comes from the real rendered item height, so the outer captions
+    // land inside the edges instead of hanging over them.
     var itemH = (itemEls[0] && itemEls[0].offsetHeight) || 86;
     var cy = h / 2;
     var stepY = Math.max(52, (h - itemH) / (n - 1));
@@ -477,8 +443,21 @@
   }
 
   var CSS =
-    '.kms-orbit{position:absolute;top:0;bottom:0;margin:0;padding:0;z-index:6;' +
-    '  overflow:visible;background:none;border:none;touch-action:none}' +
+    // Hero becomes three columns: text | orbit | photograph. The export used
+    // fixed pixel widths (a 731px text column beside a 430px picture) that
+    // together overflowed narrower windows, which is what left the orbit
+    // nowhere to go. Fluid columns give it a lane of its own, so it can no
+    // longer collide with the text or the picture at any width.
+    '.g-hero{display:grid !important;align-items:stretch !important;' +
+    '  grid-template-columns:minmax(0,1fr) ' + ORBIT_COL + 'px minmax(0,.78fr) !important;' +
+    '  height:clamp(480px, calc(100vh - var(--kms-hdr, ' + HEADER_FALLBACK + 'px)), 780px) !important;' +
+    '  padding-right:0 !important}' +
+    '.g-hero > div:first-child{width:auto !important;height:auto !important;' +
+    '  padding:44px 36px 40px 0 !important;display:flex !important;flex-direction:column !important;' +
+    '  justify-content:center !important;overflow:hidden !important}' +
+    '.g-hero .hero-img{min-height:0 !important;height:100% !important;position:relative !important}' +
+    '.kms-orbit{position:relative;height:100%;margin:0;padding:0;z-index:6;' +
+    '  overflow:visible;background:none;border:none;touch-action:none;align-self:stretch}' +
     '.kms-orbit-curve{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}' +
     '.kms-orbit-curve path{fill:none;stroke:var(--color-neutral-400,#c9c5c0);stroke-width:1;' +
     '  stroke-linecap:round;opacity:.85}' +
@@ -554,7 +533,20 @@
     heroBox = heroImg;
     if (getComputedStyle(heroImg).position === 'static') heroImg.style.position = 'relative';
     heroImg.appendChild(overlay);
-    heroImg.appendChild(buildNav());
+
+    // Publish the real header height so the hero can size itself to exactly
+    // one screen rather than assuming a fixed offset.
+    var hdr = document.querySelector('header');
+    var hdrH = hdr ? Math.round(hdr.getBoundingClientRect().height) : HEADER_FALLBACK;
+    document.documentElement.style.setProperty('--kms-hdr', hdrH + 'px');
+
+    // The strip goes in the grid BETWEEN the text and the picture. Placing it
+    // in the flow, rather than floating it over the hero, is what guarantees
+    // it can never sit on top of either one.
+    var grid = heroImg.parentElement;
+    var strip = buildNav();
+    if (grid && grid.classList.contains('g-hero')) grid.insertBefore(strip, heroImg);
+    else heroImg.appendChild(strip);
     place();
 
     // The photograph arrives asynchronously and the hero reflows on resize, so

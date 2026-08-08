@@ -23,26 +23,11 @@
     founder: 'kms-founder',
   };
 
-  // The hero photograph has a designed box in the original template: inset
-  // 127px from the left of its container, 430x616. That inset is what created
-  // the off-white gutter between the headline and the picture.
-  //
-  // Filling the slot with a plain inset:0 image (as every other slot wants)
-  // stretched the photo across the whole column and swallowed that gutter —
-  // dropping the usable gap from ~275px to ~50px. These are the template's own
-  // numbers, restoring the composition it was exported with.
-  var HERO_BOX = 'position:absolute;left:127px;top:-2px;width:430px;height:616px;' +
-                 'object-fit:cover;display:block';
+  // Every slot, hero included, simply fills its own frame. The hero used to
+  // need a hand-placed inset to carve out a gutter for the orbit; the hero is
+  // a three-column grid now, so the orbit has its own lane and the picture can
+  // go back to filling the column it was given.
   var FILL_BOX = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block';
-  // Below this the hero stacks into one column, where the inset would push the
-  // photo off the side — so the plain fill is correct there.
-  var WIDE = '(min-width: 901px)';
-
-  function heroStyle() {
-    var wide = true;
-    try { wide = window.matchMedia(WIDE).matches; } catch (e) {}
-    return wide ? HERO_BOX : FILL_BOX;
-  }
 
   function fillPhoto(slotEl, url, slotKey) {
     // object-fit:cover keeps the aspect ratio and crops the overflow rather
@@ -52,9 +37,8 @@
     img.alt = '';
     img.loading = 'lazy';
     img.decoding = 'async';
-    var isHero = slotKey === 'hero';
-    img.style.cssText = isHero ? heroStyle() : FILL_BOX;
-    if (isHero) img.setAttribute('data-kms-hero', '');
+    img.style.cssText = FILL_BOX;
+    if (slotKey === 'hero') img.setAttribute('data-kms-hero', '');
 
     var parent = slotEl.parentNode;
     if (!parent) return;
@@ -66,14 +50,6 @@
     }
     parent.replaceChild(img, slotEl);
   }
-
-  // Crossing the breakpoint has to swap the hero between its inset box and a
-  // plain fill, or a resized window leaves the photo in the wrong one.
-  function refreshHeroBox() {
-    var img = document.querySelector('img[data-kms-hero]');
-    if (img) img.style.cssText = heroStyle();
-  }
-  window.addEventListener('resize', refreshHeroBox);
 
   function buildVideoSection(video) {
     // Variable fallbacks: the page has moved between stylesheets before (the
