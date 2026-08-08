@@ -40,12 +40,19 @@
   .done .tick{width:56px;height:56px;background:var(--color-text);color:var(--color-bg);font-size:24px;display:flex;align-items:center;justify-content:center;margin-bottom:20px}
   .done h2{font-size:26px;font-weight:800;margin:0 0 8px;letter-spacing:-0.02em}
   .done p{color:var(--color-neutral-800);margin-bottom:18px;line-height:1.5}
-  @media(max-width:520px){ .logo .wm, .logo span[style*="width:1px"] { display:none; } }
+  @media(max-width:520px){ .logo .brandmark, .logo span[style*="width:1px"] { display:none; } }
+  /* Wave watermark behind the wordmark. This logo row is only ~34px tall, so
+     the wrapper clips the taller mark rather than letting it spill over the
+     form below. */
+  .brandmark{ position:relative; display:inline-flex; align-items:center; flex:none; height:34px; overflow:hidden; }
+  .brandmark .wm{ position:relative; z-index:1; }
+  .brandmark-wave{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+                   width:150px; max-width:none; opacity:.18; pointer-events:none; user-select:none; z-index:0; }
 </style>
 </head>
 <body>
   <div class="box">
-    <a href="index.html" class="logo" style="color:var(--color-text)"><img src="shalom-group-logo.png" alt="Shalom Group" style="height:30px;width:auto;display:block;flex:none"><span style="width:1px;height:22px;background:var(--color-divider);display:inline-block;flex:none"></span><span class="wm">KERALA MARINE SUPPLY</span><span style="width:8px;height:8px;background:var(--color-accent);display:inline-block"></span></a>
+    <a href="index.html" class="logo" style="color:var(--color-text)"><img src="shalom-group-logo.png" alt="Shalom Group" style="height:30px;width:auto;display:block;flex:none"><span style="width:1px;height:22px;background:var(--color-divider);display:inline-block;flex:none"></span><span class="brandmark"><img class="brandmark-wave" src="/wave-mark.svg" alt="" aria-hidden="true"><span class="wm">KERALA MARINE SUPPLY</span></span><span style="width:8px;height:8px;background:var(--color-accent);display:inline-block"></span></a>
 
     <!-- FORM -->
     <div id="formView">
