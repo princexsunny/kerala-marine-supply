@@ -13,6 +13,10 @@ const {
   publicRouter: mediaPublicRoutes,
   MAX_VIDEO_BYTES,
 } = require('./routes/media');
+const {
+  router: ventureLinkRoutes,
+  publicRouter: ventureLinkPublicRoutes,
+} = require('./routes/ventureLinks');
 const documentsRoutes = require('./routes/documents');
 const applicationsRoutes = require('./routes/applications');
 
@@ -66,12 +70,14 @@ app.use('/api', applyRoutes);
 // isn't signed in as admin — i.e. everyone. Only the read is public; uploading
 // and deleting media stays behind adminAuth.
 app.use('/api', mediaPublicRoutes);
+app.use('/api', ventureLinkPublicRoutes);
 
 // Public health check — used by admin.html's "server connected" dot.
 app.get('/api/health', (req, res) => res.json({ ok: isReady() }));
 
 // Admin-only API — site photos, document library, application review.
 app.use('/api', adminAuth, mediaRoutes);
+app.use('/api', adminAuth, ventureLinkRoutes);
 app.use('/api', adminAuth, documentsRoutes);
 app.use('/api', adminAuth, applicationsRoutes);
 

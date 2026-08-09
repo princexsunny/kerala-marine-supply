@@ -136,10 +136,17 @@
       }).join('') + '</ul>'
     : '';
 
-  var linkBtn = v.link
-    ? '<a href="' + v.link.href + '"' + (/^https?:/.test(v.link.href) ? ' target="_blank" rel="noopener"' : '') +
-      ' class="btn btn-primary" style="font-size:14px">' + esc(v.link.label) + ' ↗</a>'
-    : '';
+  // The built-in link is the fallback; a link saved in the admin overrides it.
+  // Rendered after the fetch below, so an admin change shows without a code edit.
+  function linkButton(link) {
+    if (!link || !link.href) return '';
+    var external = /^https?:/i.test(link.href);
+    return '<a href="' + encodeURI(link.href) + '"' +
+           (external ? ' target="_blank" rel="noopener"' : '') +
+           ' class="btn btn-primary" style="font-size:14px">' +
+           esc(link.label || 'Visit website') + (external ? ' ↗' : ' →') + '</a>';
+  }
+  var linkBtn = linkButton(v.link);
 
   document.getElementById('main').innerHTML =
     '<div class="hero">' +
@@ -178,6 +185,22 @@
     return '<a href="venture.html?v=' + x.slug + '"' + (x.slug === v.slug ? ' class="on"' : '') + '>' +
            '<span class="n">' + esc(x.num) + '</span><span>' + esc(x.name) + '</span></a>';
   }).join('');
+
+  // Website set in /admin.html, if any — replaces the built-in one.
+  fetch('/api/venture-links', { credentials: 'same-origin' })
+    .then(function (r) { return r.ok ? r.json() : {}; })
+    .then(function (m) {
+      var saved = m && m[v.slug];
+      if (!saved || !saved.href) return;
+      var holder = document.querySelector('.hero .btn.btn-primary');
+      var html = linkButton(saved);
+      if (holder) holder.outerHTML = html;
+      else {
+        var row = document.querySelector('.hero div[style*="display:flex"]');
+        if (row) row.insertAdjacentHTML('afterbegin', html);
+      }
+    })
+    .catch(function () { /* keep the built-in link */ });
 
   // Venture photograph, uploaded in /admin.html. Empty slot keeps the caption.
   fetch('/api/media', { credentials: 'same-origin' })

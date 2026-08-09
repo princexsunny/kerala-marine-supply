@@ -44,6 +44,13 @@
   .t-desc{font-size:12.5px;color:var(--color-neutral-800)}
   .t-meta{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
           color:var(--color-neutral-500);margin-top:4px}
+  .lrow{display:grid;grid-template-columns:220px 1fr 190px;gap:12px;align-items:center;
+        padding:12px 0;border-bottom:1px solid var(--color-divider)}
+  .lrow .lname{font-family:var(--font-heading);font-weight:800;font-size:13.5px}
+  .lrow input{width:100%;padding:9px 11px;border:2px solid var(--color-divider);
+              background:var(--color-bg);color:var(--color-text);font:inherit;font-size:13px}
+  .lrow input:focus{outline:none;border-color:var(--color-accent)}
+  @media(max-width:760px){.lrow{grid-template-columns:1fr;gap:6px}}
   /* Each category is its own page (admin.html?p=...), so the back button,
      refresh, bookmarks and open-in-new-tab all work normally. */
   .page{display:none}
@@ -94,6 +101,12 @@
         <span class="t-desc">One picture per venture page</span>
         <span class="t-meta">12 slots</span>
       </a>
+      <a class="tile" href="admin.html?p=links">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+        <span class="t-name">Venture websites</span>
+        <span class="t-desc">A link for each venture page</span>
+        <span class="t-meta">12 links</span>
+      </a>
       <a class="tile" href="admin.html?p=video">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="14" height="13" rx="2"/><path d="m16.5 10 5-3v10l-5-3z"/></svg>
         <span class="t-name">Website video</span>
@@ -115,7 +128,7 @@
   </div>
 </main>
 
-  <div class="page" id="panel-photos" hidden>
+  <div class="page" id="panel-photos">
     <div class="page-box" aria-label="Website photos">
       <div class="page-head"><h2>Website photos</h2><a class="page-back" href="admin.html">← All settings</a></div>
       <div class="page-body">
@@ -127,7 +140,7 @@
     <div class="row"><button class="btn btn-primary savePhotos">Save photos</button><button class="btn btn-ghost clearPhotos">Clear choices</button><span class="note photoNote"></span></div></div>
     </div>
   </div>
-  <div class="page" id="panel-ventures" hidden>
+  <div class="page" id="panel-ventures">
     <div class="page-box" aria-label="Venture photos">
       <div class="page-head"><h2>Venture photos</h2><a class="page-back" href="admin.html">← All settings</a></div>
       <div class="page-body"><h3 style="font-size:16px;font-weight:800;margin:30px 0 4px">Venture photographs</h3>
@@ -137,7 +150,21 @@
     <div class="row"><button class="btn btn-primary savePhotos">Save photos</button><button class="btn btn-ghost clearPhotos">Clear choices</button><span class="note photoNote"></span></div></div>
     </div>
   </div>
-  <div class="page" id="panel-video" hidden>
+  <div class="page" id="panel-links">
+    <div class="page-box" aria-label="Venture websites">
+      <div class="page-head"><h2>Venture websites</h2><a class="page-back" href="admin.html">← All settings</a></div>
+      <div class="page-body">
+        <p style="max-width:64ch;color:var(--color-neutral-800);font-size:14px;margin:0 0 18px">Give a venture its own website and a button appears on that venture's page. Leave the address empty to remove it. Use a full address starting with <strong>https://</strong>, or a page on this site such as <strong>ledger-app.html</strong>.</p>
+        <div id="linkRows"></div>
+        <div class="row">
+          <button class="btn btn-primary" id="saveLinks">Save links</button>
+          <span class="note" id="linkNote"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="panel-video">
     <div class="page-box" aria-label="Website video">
       <div class="page-head"><h2>Website video</h2><a class="page-back" href="admin.html">← All settings</a></div>
       <div class="page-body">
@@ -154,7 +181,7 @@
   </div>
     </div>
   </div>
-  <div class="page" id="panel-docs" hidden>
+  <div class="page" id="panel-docs">
     <div class="page-box" aria-label="Documents">
       <div class="page-head"><h2>Documents</h2><a class="page-back" href="admin.html">← All settings</a></div>
       <div class="page-body">
@@ -187,7 +214,7 @@
   </div>
     </div>
   </div>
-  <div class="page" id="panel-apps" hidden>
+  <div class="page" id="panel-apps">
     <div class="page-box" aria-label="Job applications">
       <div class="page-head"><h2>Job applications</h2><a class="page-back" href="admin.html">← All settings</a></div>
       <div class="page-body">
@@ -635,6 +662,69 @@
     document.getElementById('serverStatus').textContent = 'Server offline';
   });
 
+  // ---- Venture websites ----
+  // Each venture's site address, stored server-side so it can be changed
+  // without editing code. The venture page merges these over its built-in
+  // default, and an empty address restores that default.
+  var VLINKS = [
+    ['fishing-net-online','01 · Fishing Net Online'],
+    ['marine-machine-manufacturing','02 · Machine Manufacturing'],
+    ['fisherman-finance','03 · Fisherman Finance'],
+    ['boat-yard','04 · Boat Yard'],
+    ['marine-fuels','05 · Marine Fuels'],
+    ['shipbuilding','06 · Shipbuilding'],
+    ['fishing-gear','07 · Fishing Gear'],
+    ['fish-online','08 · Fish Online'],
+    ['marine-engineering','09 · Marine Engineering'],
+    ['marine-spare-parts','10 · Marine Spare Parts'],
+    ['cold-chain','11 · Cold Chain'],
+    ['seafood-export','12 · Seafood Export'],
+  ];
+
+  var linkRows = document.getElementById('linkRows');
+  if (linkRows) {
+    linkRows.innerHTML = VLINKS.map(function(v){
+      return '<div class="lrow"><span class="lname">' + v[1] + '</span>' +
+        '<input type="url" data-slug="' + v[0] + '" data-f="href" placeholder="https://example.com">' +
+        '<input type="text" data-slug="' + v[0] + '" data-f="label" placeholder="Button text">' +
+      '</div>';
+    }).join('');
+
+    function field(slug, f){
+      return linkRows.querySelector('input[data-slug="' + slug + '"][data-f="' + f + '"]');
+    }
+
+    fetch('/api/venture-links', { cache: 'no-store' })
+      .then(function(r){ return r.json(); })
+      .then(function(m){
+        VLINKS.forEach(function(v){
+          var e = m[v[0]];
+          if (!e) return;
+          var h = field(v[0], 'href'), l = field(v[0], 'label');
+          if (h) h.value = e.href || '';
+          if (l) l.value = e.label || '';
+        });
+      })
+      .catch(function(){ setNote('linkNote', 'Could not load the current links.'); });
+
+    document.getElementById('saveLinks').addEventListener('click', function(){
+      var btn = this, body = {};
+      VLINKS.forEach(function(v){
+        var h = field(v[0], 'href'), l = field(v[0], 'label');
+        body[v[0]] = { href: h ? h.value.trim() : '', label: l ? l.value.trim() : '' };
+      });
+      btn.disabled = true;
+      setNote('linkNote', 'Saving…');
+      api('PUT', '/api/venture-links', body)
+        .then(function(){
+          btn.disabled = false;
+          setNote('linkNote', 'Saved — the venture pages show these now.');
+        })
+        .catch(function(err){ btn.disabled = false; setNote('linkNote', err.message); });
+    });
+  }
+
+
   // ---- Category pages ----
   // Each category is a page of its own at admin.html?p=<key>. Rendering from
   // the URL rather than from a click means the back button, refresh, bookmarks
@@ -642,6 +732,7 @@
   var TITLES = {
     photos:   'Website photos',
     ventures: 'Venture photos',
+    links:    'Venture websites',
     video:    'Website video',
     docs:     'Documents',
     apps:     'Job applications',
