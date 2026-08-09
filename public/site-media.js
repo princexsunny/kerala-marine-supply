@@ -14,6 +14,45 @@
 (function () {
   'use strict';
 
+  // Why photos used to appear late, and what this does about it.
+  //
+  // Nothing could be drawn until three things had happened in sequence:
+  // the page loaded, /api/media answered (on Render's free tier that can mean
+  // waking a sleeping server), and only then did the image itself start
+  // downloading. Three round trips before a single pixel.
+  //
+  // The payload is tiny and rarely changes, so it is kept in localStorage.
+  // A repeat visit paints from that copy straight away and then quietly
+  // refreshes in the background — so the wait happens once, not every load.
+  var CACHE_KEY = 'kms.media.v1';
+
+  function readCache() {
+    try {
+      var raw = localStorage.getItem(CACHE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }   // private mode, quota, corrupt entry
+  }
+  function writeCache(media) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(media)); } catch (e) {}
+  }
+
+  // Open the connection to the image host early. Without this the browser only
+  // starts DNS + TLS after the API replies, adding a further delay before the
+  // first byte of the picture.
+  function preconnect(url) {
+    try {
+      var origin = new URL(url, location.href).origin;
+      if (origin === location.origin) return;
+      if (document.querySelector('link[data-kms-pc="' + origin + '"]')) return;
+      var l = document.createElement('link');
+      l.rel = 'preconnect';
+      l.href = origin;
+      l.crossOrigin = '';
+      l.setAttribute('data-kms-pc', origin);
+      document.head.appendChild(l);
+    } catch (e) {}
+  }
+
   // Admin slot key -> the id the design tool gave that spot in index.html.
   // The redesigned homepage renamed its picture areas and dropped the three
   // strip photos, so the old kms-* ids no longer exist. Slots with no element
@@ -32,7 +71,7 @@
   // stay in the flow and inherit the slot's own box instead.
   function styleFor(slotEl) {
     var inline = slotEl.getAttribute('style') || '';
-    var css = inline + ';display:block;object-fit:cover;';
+    var css = inline + ';display:block;object-fit:cover;transition:opacity .45s ease;';
     if (!/(^|;)\s*width\s*:/.test(inline)) css += 'width:100%;';
     // Without a height or a ratio the image would collapse; a ratio is the
     // better default because it survives a column resize.
@@ -49,10 +88,31 @@
     var img = document.createElement('img');
     img.src = url;
     img.alt = '';
-    img.loading = 'lazy';
+    // The hero sits at the top of the page, so it must load eagerly and with
+    // priority; lazy-loading the most visible image on the site delayed the
+    // very picture people were waiting for.
+    var aboveFold = slotKey === 'hero';
+    img.loading = aboveFold ? 'eager' : 'lazy';
     img.decoding = 'async';
+    if (aboveFold) img.setAttribute('fetchpriority', 'high');
+
+    // cssText replaces the whole style attribute, so it has to be set BEFORE
+    // the opacity below — the other way round silently wiped the fade.
     img.style.cssText = styleFor(slotEl);
     img.setAttribute('data-kms-slot', slotKey);   // marks this slot as filled
+
+    // Fade in once decoded, so it arrives rather than snapping into place.
+    // A cached image can already be complete here, in which case there is
+    // nothing to wait for and it should simply be visible.
+    if (img.complete && img.naturalWidth) {
+      img.style.opacity = '1';
+    } else {
+      img.style.opacity = '0';
+      img.addEventListener('load', function () { img.style.opacity = '1'; });
+      img.addEventListener('error', function () { img.style.opacity = '1'; });
+      // Belt and braces: never leave a picture stuck invisible.
+      setTimeout(function () { img.style.opacity = '1'; }, 2500);
+    }
 
     var parent = slotEl.parentNode;
     if (!parent) return;
@@ -179,15 +239,26 @@
   }
 
   function start() {
+    // Straight away, from the last known payload.
+    var cached = readCache();
+    if (cached && typeof cached === 'object') {
+      Object.keys(cached).forEach(function (k) {
+        if (cached[k] && cached[k].url) preconnect(cached[k].url);
+      });
+      applyWhenReady(cached);
+    }
+
+    // Then check for changes. Uploads are uniquely named, so a new photo is a
+    // new URL and simply replaces the cached one on the next load.
     fetch('/api/media', { credentials: 'same-origin' })
-      .then(function (r) {
-        return r.ok ? r.json() : null;
-      })
+      .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (media) {
-        if (media && typeof media === 'object') applyWhenReady(media);
+        if (!media || typeof media !== 'object') return;
+        writeCache(media);
+        applyWhenReady(media);
       })
       .catch(function () {
-        // Offline, server asleep, whatever — the page just shows no photos.
+        // Offline, server asleep, whatever — the cached photos still show.
       });
   }
 
