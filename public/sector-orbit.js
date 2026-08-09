@@ -10,9 +10,9 @@
 (function () {
   'use strict';
 
-  var R = 148;              // ring radius
-  var DOT = 46;             // circle diameter
-  var DOT_ACTIVE = 58;
+  var R = 142;              // ring radius
+  var DOT = 50;             // circle diameter
+  var DOT_ACTIVE = 64;
   var BOX = (R + DOT_ACTIVE / 2 + 6) * 2;   // square the ring needs
   var WHEEL_COOLDOWN = 320; // one venture per wheel gesture, not per tick
   var SPIN_MS = 620;
@@ -47,8 +47,11 @@
   var CSS =
     '.so-wrap{position:relative;width:' + BOX + 'px;height:' + BOX + 'px;max-width:100%;margin:0 auto;' +
     '  touch-action:none;user-select:none}' +
-    '.so-ring{position:absolute;inset:0;border-radius:50%;border:1px dashed var(--color-neutral-400,#c9c5c0);' +
-    '  margin:' + (DOT_ACTIVE / 2 + 6) + 'px;opacity:.8}' +
+    '.so-ring{position:absolute;inset:0;border-radius:50%;' +
+    '  border:1px dashed var(--color-neutral-500,#a09b95);' +
+    '  margin:' + (DOT_ACTIVE / 2 + 6) + 'px;opacity:.55}' +
+    '.so-disc{position:absolute;inset:0;border-radius:50%;margin:' + (DOT_ACTIVE / 2 + 18) + 'px;' +
+    '  background:radial-gradient(circle at 50% 45%,rgba(236,48,19,.045),rgba(236,48,19,0) 70%)}' +
     // One rotating layer holds every circle and dot; each circle is
     // counter-rotated by the same angle so the icons stay upright while the
     // ring turns underneath them.
@@ -56,31 +59,34 @@
     '.so-item{position:absolute;left:50%;top:50%;width:' + DOT + 'px;height:' + DOT + 'px;margin:' +
     '  ' + (-DOT / 2) + 'px 0 0 ' + (-DOT / 2) + 'px;border-radius:50%;background:#fff;border:none;padding:0;' +
     '  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--color-accent,#ec3013);' +
-    '  box-shadow:0 3px 12px rgba(32,30,29,.10),0 0 0 1px rgba(32,30,29,.04);' +
-    '  transition:width ' + SPIN_MS + 'ms,height ' + SPIN_MS + 'ms,margin ' + SPIN_MS + 'ms,box-shadow .3s}' +
-    '.so-item svg{width:22px;height:22px}' +
+    '  box-shadow:0 2px 8px rgba(32,30,29,.09),0 0 0 1px rgba(32,30,29,.07);' +
+    '  transition:width ' + SPIN_MS + 'ms,height ' + SPIN_MS + 'ms,margin ' + SPIN_MS + 'ms,box-shadow .22s}' +
+    '.so-item:hover{box-shadow:0 4px 14px rgba(32,30,29,.16),0 0 0 1px var(--color-accent,#ec3013)}' +
+    '.so-item svg{width:24px;height:24px}' +
     '.so-item.on{width:' + DOT_ACTIVE + 'px;height:' + DOT_ACTIVE + 'px;margin:' +
     '  ' + (-DOT_ACTIVE / 2) + 'px 0 0 ' + (-DOT_ACTIVE / 2) + 'px;' +
-    '  box-shadow:0 0 0 2px var(--color-accent,#ec3013),0 0 0 8px rgba(236,48,19,.09),0 8px 20px rgba(236,48,19,.16)}' +
-    '.so-item.on svg{width:27px;height:27px}' +
+    '  box-shadow:0 0 0 2px var(--color-accent,#ec3013),0 0 0 6px rgba(236,48,19,.12),0 6px 16px rgba(236,48,19,.20)}' +
+    '.so-item.on svg{width:30px;height:30px}' +
     '.so-item:focus-visible{outline:2px solid var(--color-accent,#ec3013);outline-offset:3px}' +
     '.so-pip{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;' +
     '  background:var(--color-accent,#ec3013);opacity:.85}' +
     // Centre label: the ring is decorative without it — this is what tells you
     // which venture you are looking at.
-    '.so-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:' + (R * 1.15) + 'px;' +
+    '.so-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:' + (R * 1.25) + 'px;' +
     '  text-align:center}' +
     '.so-open{display:block;background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer;' +
     '  width:100%}' +
     '.so-open:hover .so-name{color:var(--color-accent,#ec3013)}' +
     '.so-open:focus-visible{outline:2px solid var(--color-accent,#ec3013);outline-offset:6px}' +
-    '.so-wave{color:var(--color-accent,#ec3013);font-size:26px;line-height:1;font-weight:700}' +
+    '.so-wave{color:var(--color-accent,#ec3013);font-size:20px;line-height:1;font-weight:700;opacity:.55}' +
     '.so-num{font-family:var(--font-heading,inherit);font-weight:800;font-size:11px;letter-spacing:.12em;' +
-    '  color:var(--color-neutral-500,#a09b95);margin-top:10px}' +
-    '.so-name{font-family:var(--font-heading,inherit);font-weight:800;font-size:15px;line-height:1.25;' +
-    '  letter-spacing:-0.01em;margin-top:4px;color:var(--color-text,#201e1d)}' +
-    '.so-hint{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-500,#a09b95);' +
-    '  margin-top:12px}' +
+    '  color:var(--color-accent,#ec3013);margin-top:12px}' +
+    '.so-name{font-family:var(--font-heading,inherit);font-weight:800;font-size:16px;line-height:1.2;' +
+    '  letter-spacing:-0.015em;margin-top:5px;color:var(--color-text,#201e1d)}' +
+    '.so-status{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;' +
+    '  color:var(--color-neutral-500,#a09b95);margin-top:6px}' +
+    '.so-hint{font-size:10px;letter-spacing:.12em;text-transform:uppercase;' +
+    '  color:var(--color-neutral-500,#a09b95);margin-top:14px;white-space:nowrap;opacity:.9}' +
     '@media(max-width:520px){.so-wrap{transform:scale(.8);transform-origin:top center;margin-bottom:-60px}}' +
     '@media (prefers-reduced-motion:reduce){.so-spin,.so-item{transition:none !important}}';
 
@@ -90,15 +96,17 @@
 
   var wrap = document.createElement('div');
   wrap.className = 'so-wrap';
-  wrap.innerHTML = '<div class="so-ring"></div><div class="so-spin"></div>' +
+  wrap.innerHTML = '<div class="so-disc"></div><div class="so-ring"></div><div class="so-spin"></div>' +
     '<div class="so-mid"><button type="button" class="so-open">' +
     '<div class="so-wave">≈</div><div class="so-num"></div><div class="so-name"></div>' +
-    '</button><div class="so-hint">Scroll to turn · click to open</div></div>';
+    '<div class="so-status"></div></button>' +
+    '<div class="so-hint">Scroll · click to open</div></div>';
   host.appendChild(wrap);
 
   var spin = wrap.querySelector('.so-spin');
   var midNum = wrap.querySelector('.so-num');
   var midName = wrap.querySelector('.so-name');
+  var midStatus = wrap.querySelector('.so-status');
   var items = [];
 
   wrap.querySelector('.so-open').addEventListener('click', function () {
@@ -157,6 +165,7 @@
     var v = V[active];
     midNum.textContent = v.num;
     midName.textContent = v.name.replace(/^Shalom /, '');
+    midStatus.textContent = v.status;
   }
 
   function go(i) { turn += i - active; active = mod(i, N); render(); }
