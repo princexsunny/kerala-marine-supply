@@ -23,31 +23,39 @@
     founder: 'founder',
   };
 
-  // Every slot, hero included, simply fills its own frame. The hero used to
-  // need a hand-placed inset to carve out a gutter for the orbit; the hero is
-  // a three-column grid now, so the orbit has its own lane and the picture can
-  // go back to filling the column it was given.
-  var FILL_BOX = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block';
+  // How the replacement image is sized.
+  //
+  // These slots are direct children of the hero/founder grids and carry their
+  // own dimensions (width:100%; aspect-ratio:4/3). An absolutely positioned
+  // "fill the parent" image was therefore filling the whole GRID — covering
+  // the headline and the buttons with the photograph. The replacement must
+  // stay in the flow and inherit the slot's own box instead.
+  function styleFor(slotEl) {
+    var inline = slotEl.getAttribute('style') || '';
+    var css = inline + ';display:block;object-fit:cover;';
+    if (!/(^|;)\s*width\s*:/.test(inline)) css += 'width:100%;';
+    // Without a height or a ratio the image would collapse; a ratio is the
+    // better default because it survives a column resize.
+    if (!/(^|;)\s*(height|aspect-ratio)\s*:/.test(inline)) css += 'aspect-ratio:4/3;';
+    // The export offsets some slots (top:-55px), which needs a position to
+    // resolve against.
+    if (/(^|;)\s*(top|left|right|bottom)\s*:/.test(inline) && !/position\s*:/.test(inline)) {
+      css += 'position:relative;';
+    }
+    return css;
+  }
 
   function fillPhoto(slotEl, url, slotKey) {
-    // object-fit:cover keeps the aspect ratio and crops the overflow rather
-    // than stretching the photo, which is what every one of these frames wants.
     var img = document.createElement('img');
     img.src = url;
     img.alt = '';
     img.loading = 'lazy';
     img.decoding = 'async';
-    img.style.cssText = FILL_BOX;
-    if (slotKey === 'hero') img.setAttribute('data-kms-hero', '');
+    img.style.cssText = styleFor(slotEl);
+    img.setAttribute('data-kms-slot', slotKey);   // marks this slot as filled
 
     var parent = slotEl.parentNode;
     if (!parent) return;
-    // If the wrapper has no positioning context the absolute placement would
-    // escape to the page, so establish one. (Most already have it.)
-    if (parent.nodeType === 1) {
-      var pos = window.getComputedStyle(parent).position;
-      if (pos === 'static') parent.style.position = 'relative';
-    }
     parent.replaceChild(img, slotEl);
   }
 
@@ -93,8 +101,8 @@
 
     // Prefer just after the photo strip — the video belongs with the other
     // visual material rather than stranded at the bottom of the page.
-    var anchorImg =
-      document.getElementById('founder') || document.getElementById('hero');
+    var anchorImg = document.querySelector('[data-kms-slot="founder"], image-slot#founder') ||
+                    document.querySelector('[data-kms-slot="hero"], image-slot#hero');
     var anchorSection = anchorImg && anchorImg.closest ? anchorImg.closest('section') : null;
 
     if (anchorSection && anchorSection.parentNode) {
@@ -117,7 +125,13 @@
     Object.keys(SLOT_TO_ELEMENT).forEach(function (slot) {
       var entry = media[slot];
       if (!entry || !entry.url) return;
-      var el = document.getElementById(SLOT_TO_ELEMENT[slot]);
+      if (document.querySelector('[data-kms-slot="' + slot + '"]')) return;  // already filled
+
+      // Matched by TAG as well as id, deliberately. index.html carries both
+      // <section id="founder"> and <image-slot id="founder">, and
+      // getElementById returns the section — which would replace the whole
+      // founder section with the photograph.
+      var el = document.querySelector('image-slot#' + SLOT_TO_ELEMENT[slot]);
       if (!el) {
         pending++; // not rendered yet — try again on the next mutation
         return;
