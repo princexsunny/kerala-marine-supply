@@ -16,7 +16,10 @@
   .brandmark-wave{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);height:26px;width:auto;max-width:none;opacity:.22;pointer-events:none;user-select:none;z-index:0}
   .navlink{font-size:13px;font-weight:600;color:var(--color-text)}
   .navlink:hover{color:var(--color-accent-700)}
-  @media(max-width:900px){.navlinks{display:none}}
+  /* Hidden before the nav can crowd the buttons, not after. */
+  @media(max-width:1150px){.navlinks{display:none}}
+  @media(max-width:560px){.hdr-call{font-size:0}
+                          .hdr-call::after{content:"Call";font-size:13px}}
   @media(max-width:640px){.g4{grid-template-columns:1fr 1fr !important}.g3{grid-template-columns:1fr !important}.g2{grid-template-columns:1fr !important}}
   /* --- Marine sector: text left, venture orbit right --- */
   @media(max-width:1040px){.secwrap{grid-template-columns:1fr !important;gap:36px !important}}
@@ -72,16 +75,16 @@
       <span style="width:8px;height:8px;background:var(--color-accent);display:inline-block;flex:none"></span>
     </a>
     
-    <nav class="navlinks" style="display: flex; gap: 26px; margin-left: 8px; flex-direction: row; align-self: auto; flex-grow: 0; z-index: 552; position: relative; left: 65px">
+    <nav class="navlinks" style="display:flex;gap:20px;margin:0 auto;flex-wrap:nowrap;min-width:0">
       <a class="navlink" href="#sector">Sector</a>
       <a class="navlink" href="#ecosystem">Ventures</a>
       <a class="navlink" href="#founder">Founder</a>
       <a class="navlink" href="#ask">The ask</a>
       <a class="navlink" href="careers.html">Careers</a>
       <a class="navlink" href="#software">Software</a>
-    </nav><div style="display:flex;gap:10px;margin-left:auto;flex:none">
+    </nav><div style="display:flex;gap:10px;flex:none">
       <a href="https://wa.me/919400912894" class="btn btn-secondary" style="font-size:13px">WhatsApp</a>
-      <a href="tel:+919400912894" class="btn btn-primary" style="font-size:13px">Call +91 94009 12894</a>
+      <a href="tel:+919400912894" class="btn btn-primary hdr-call" style="font-size:13px">Call +91 94009 12894</a>
     </div>
   </div></header>
 
