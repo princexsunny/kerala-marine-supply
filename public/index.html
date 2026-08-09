@@ -18,6 +18,8 @@
   .navlink:hover{color:var(--color-accent-700)}
   @media(max-width:900px){.navlinks{display:none}}
   @media(max-width:640px){.g4{grid-template-columns:1fr 1fr !important}.g3{grid-template-columns:1fr !important}.g2{grid-template-columns:1fr !important}}
+  /* --- Marine sector: text left, venture orbit right --- */
+  @media(max-width:1040px){.secwrap{grid-template-columns:1fr !important;gap:36px !important}}
   /* --- Status strip: four even columns, no orphan on a second row --- */
   .statstrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:26px 32px}
   .statitem{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.45}
@@ -121,7 +123,8 @@
 </section>
 
 <section id="sector" style="border-bottom:2px solid var(--color-divider)">
-  <div style="max-width:1280px;margin:0 auto;padding:64px 40px">
+  <div class="secwrap" style="max-width:1280px;margin:0 auto;padding:64px 40px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,auto);gap:56px;align-items:center">
+   <div>
     <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--color-accent-700);font-weight:600;margin-bottom:8px">The marine sector</div>
     <div style="width:48px;height:2px;background:var(--color-accent);margin-bottom:28px"></div>
     <p style="font-size:22px;line-height:1.5;font-weight:600;max-width:44ch;margin:0 0 20px;letter-spacing:-0.01em">A boat owner in Trivandrum can catch fish, but cannot refuel, repair, or rebuild without travelling for it.</p>
@@ -137,6 +140,8 @@
       <span class="tag tag-outline">Coastal management</span>
       <span class="tag tag-outline">Blue economy</span>
     </div>
+   </div>
+   <div id="sector-orbit" aria-label="The twelve ventures"></div>
   </div>
 </section>
 
@@ -297,6 +302,8 @@
     <a href="admin.html">Admin</a>
   </div>
 </footer>
+<script src="ventures-data.js"></script>
+<script src="sector-orbit.js?v=1"></script>
 <script src="site-media.js?v=7"></script>
 </body>
 </html>
