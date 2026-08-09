@@ -23,8 +23,6 @@
   .role .rt{ font-size:15px; font-weight:600; }
   .role .ra{ margin-left:auto; color:var(--color-neutral-500); }
   @media(max-width:700px){ .g2{ grid-template-columns:1fr !important; } .g2>*{ border-right:none !important; } }
-  /* Logo + wordmark is wide; on phones the logo alone carries the brand. */
-  @media(max-width:520px){ .brandmark, .brandmark + span { display:none; } }
   /* Animated wave watermark behind the wordmark. .wm needs its own stacking
      context or the absolutely-positioned image would paint on top of the text.
      overflow:hidden is a backstop only -- the mark is sized to fit. */
@@ -34,18 +32,37 @@
      fully inside the 64px header instead of being cropped by the wrapper. */
   .brandmark-wave{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
                    height:52px; width:auto; max-width:none; opacity:.22; pointer-events:none; user-select:none; z-index:0; }
+
+  /* ---------------------------------------------------------------------
+     PHONES
+     The rule that hides the wordmark used to sit ABOVE the .brandmark block
+     above. Same specificity, so the later rule won -- display:none never took
+     effect and the 388px-wide wordmark pushed this page 172px off the side of
+     every phone screen. It now sits after, where it can do its job.
+     --------------------------------------------------------------------- */
+  @media(max-width:620px){ .brandmark, .brandmark + span { display:none !important; } }
+  @media(max-width:900px){
+    .barrow, section > div, footer > div{ padding-left:20px !important; padding-right:20px !important; }
+    section > div{ padding-top:44px !important; padding-bottom:44px !important; }
+    /* You are already on the site; the domain is the line that can go. */
+    .tb-domain{ display:none; }
+    /* 32px is under the ~44px that a thumb reliably hits. */
+    .btn{ min-height:46px; display:inline-flex !important; align-items:center; }
+    .role{ padding:14px 16px !important; }
+    .role .rt{ font-size:14.5px; }
+  }
 </style>
 </head>
 <body style="margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)">
 
 <div style="background:var(--color-text);color:var(--color-neutral-300)">
-  <div style="max-width:1280px;margin:0 auto;padding:0 40px;display:flex;justify-content:space-between;gap:24px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;line-height:30px">
+  <div class="barrow" style="max-width:1280px;margin:0 auto;padding:0 40px;display:flex;justify-content:space-between;gap:8px 24px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;line-height:30px;flex-wrap:wrap">
     <span>Blue economy ventures · Trivandrum, Kerala</span>
-    <span style="display:flex;gap:20px"><a href="mailto:princexsunny@gmail.com" class="plain" style="color:var(--color-neutral-300)">princexsunny@gmail.com</a><span style="color:var(--color-neutral-500)">keralamarinesupply.in</span></span>
+    <span style="display:flex;gap:20px;flex-wrap:wrap"><a href="mailto:princexsunny@gmail.com" class="plain" style="color:var(--color-neutral-300)">princexsunny@gmail.com</a><span class="tb-domain" style="color:var(--color-neutral-500)">keralamarinesupply.in</span></span>
   </div>
 </div>
 <header style="border-bottom:2px solid var(--color-divider)">
-  <div style="max-width:1280px;margin:0 auto;padding:0 40px;display:flex;align-items:center;justify-content:space-between;gap:32px;height:64px">
+  <div class="barrow" style="max-width:1280px;margin:0 auto;padding:0 40px;display:flex;align-items:center;justify-content:space-between;gap:16px;height:64px">
     <a href="index.html" class="plain" style="display:flex;align-items:center;gap:13px;flex:none">
       <img src="shalom-group-logo.png" alt="Shalom Group" style="height:30px;width:auto;display:block;flex:none">
       <span style="width:1px;height:22px;background:var(--color-divider);display:inline-block;flex:none"></span>

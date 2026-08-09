@@ -44,18 +44,32 @@
     .blocks{grid-template-columns:1fr}
     .allgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
     .wrap{padding:0 20px}
+    .block{padding:26px 20px}
+    /* 32px is under the ~44px a thumb reliably hits. */
+    .btn{min-height:46px;display:inline-flex !important;align-items:center}
+  }
+  /* The wordmark is ~330px of ink; below this it leaves no room for the two
+     header links, and the page ran 133px off the side of the screen. */
+  @media(max-width:620px){
+    .brandmark,.brand-sep{display:none}
+    header .wrap{gap:14px}
+    header .wrap a[href^="index.html#"]{font-size:12.5px}
+    .tb-domain{display:none}
+  }
+  @media(max-width:420px){
+    .allgrid{grid-template-columns:1fr}
   }
 </style>
 </head>
 <body>
 
 <div style="background:var(--color-text);color:var(--color-neutral-300)">
-  <div class="wrap" style="display:flex;justify-content:space-between;gap:24px;font-size:11px;
+  <div class="wrap" style="display:flex;justify-content:space-between;gap:4px 24px;font-size:11px;
        letter-spacing:0.14em;text-transform:uppercase;line-height:30px;flex-wrap:wrap;max-width:1280px">
     <span>Trivandrum · Kerala · India — Est. 2025</span>
-    <span style="display:flex;gap:20px">
+    <span style="display:flex;gap:20px;flex-wrap:wrap">
       <a href="mailto:princexsunny@gmail.com" style="color:var(--color-neutral-300)">princexsunny@gmail.com</a>
-      <span style="color:var(--color-neutral-500)">keralamarinesupply.in</span>
+      <span class="tb-domain" style="color:var(--color-neutral-500)">keralamarinesupply.in</span>
     </span>
   </div>
 </div>
@@ -64,7 +78,7 @@
   <div class="wrap" style="max-width:1280px;display:flex;align-items:center;gap:20px;height:50px">
     <a href="index.html" style="display:flex;align-items:center;gap:13px;flex:none;color:var(--color-text)">
       <span class="brandmark"><img class="brandmark-wave" src="wave-mark.svg" alt="" aria-hidden="true"><span class="wm" style="font-family:var(--font-heading);font-weight:800;font-size:16px;letter-spacing:-0.01em">KERALA MARINE SUPPLY</span></span>
-      <span style="width:1px;height:22px;background:var(--color-divider);display:inline-block;flex:none"></span>
+      <span class="brand-sep" style="width:1px;height:22px;background:var(--color-divider);display:inline-block;flex:none"></span>
       <img src="shalom-group-logo.png" alt="Shalom Group" style="height:22px;width:auto;display:block;flex:none">
     </a>
     <a href="index.html#ecosystem" style="margin-left:auto;font-size:13px;font-weight:600;color:var(--color-text)">← All ventures</a>

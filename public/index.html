@@ -16,13 +16,14 @@
   .brandmark-wave{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);height:26px;width:auto;max-width:none;opacity:.22;pointer-events:none;user-select:none;z-index:0}
   .navlink{font-size:13px;font-weight:600;color:var(--color-text)}
   .navlink:hover{color:var(--color-accent-700)}
-  /* Hidden before the nav can crowd the buttons, not after. */
-  @media(max-width:1150px){.navlinks{display:none}}
   @media(max-width:560px){.hdr-call{font-size:0}
                           .hdr-call::after{content:"Call";font-size:13px}}
   @media(max-width:640px){.g4{grid-template-columns:1fr 1fr !important}.g3{grid-template-columns:1fr !important}.g2{grid-template-columns:1fr !important}}
   /* --- Marine sector: text left, venture orbit right --- */
-  @media(max-width:1040px){.secwrap{grid-template-columns:1fr !important;gap:36px !important}}
+  /* minmax(0,1fr), not 1fr: a plain 1fr track has min-width:auto, so the
+     orbit's fixed 360px box became the section's minimum width and pushed the
+     whole page sideways on a phone. */
+  @media(max-width:1040px){.secwrap{grid-template-columns:minmax(0,1fr) !important;gap:36px !important}}
   /* --- Status strip: four even columns, no orphan on a second row --- */
   .statstrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:26px 32px}
   .statitem{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.45}
@@ -52,29 +53,118 @@
                           .vgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
   @media(max-width:720px){.vgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
   @media(max-width:460px){.vgrid{grid-template-columns:1fr}}
+
+  /* ======================================================================
+     PHONES AND SMALL TABLETS
+     ----------------------------------------------------------------------
+     The page's spacing and grids live in inline style attributes (the design
+     tool writes them that way), and a media query can only beat an inline
+     style with !important. That is why this block leans on it — not as a
+     shortcut, but because there is no lower-specificity way to reach those
+     declarations. Everything here is layout-only; nothing changes on desktop.
+     ====================================================================== */
+
+  /* --- Menu button: the nav used to just vanish below 1150px, which left a
+         phone with no way to reach Ventures, Careers or The ask at all. --- */
+  .navbtn{display:none}
+  .navtoggle{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+  @media(max-width:1150px){
+    .hdrbar{position:relative}
+    .navbtn{display:inline-flex;align-items:center;justify-content:center;order:3;
+            width:42px;height:42px;flex:none;cursor:pointer;font-size:17px;line-height:1;
+            color:var(--color-text);border:2px solid var(--color-divider);border-radius:8px;
+            -webkit-tap-highlight-color:transparent}
+    .navbtn:hover{border-color:var(--color-accent)}
+    .navtoggle:focus-visible + .navbtn{outline:2px solid var(--color-accent);outline-offset:2px}
+    .navtoggle:checked ~ .navbtn{border-color:var(--color-accent);color:var(--color-accent)}
+    .navlinks{display:none !important;position:absolute;left:0;right:0;top:100%;
+              flex-direction:column;gap:0 !important;margin:0 !important;padding:4px 20px 10px;
+              background:var(--color-bg);border-bottom:2px solid var(--color-divider);
+              box-shadow:0 12px 26px rgba(32,30,29,.10);z-index:30}
+    .navtoggle:checked ~ .navlinks{display:flex !important}
+    .navlinks .navlink{font-size:15px;padding:14px 0;border-bottom:1px solid var(--color-divider)}
+    .navlinks .navlink:last-child{border-bottom:none}
+  }
+
+  @media(max-width:900px){
+    /* 40px of side padding on a 375px screen leaves 295px of usable width.
+       20px is the width a phone actually wants. */
+    .hdrbar,.topbar,main section > div,footer > div{padding-left:20px !important;padding-right:20px !important}
+    .hdrbar{gap:12px !important}
+    .hdr-cta{margin-left:auto;order:2}
+
+    /* --- Hero. This was the worst of it: the 7fr/5fr grid and the fixed
+           500px height both survived onto phones, so the headline column was
+           139px wide, the photograph was a 99px thumbnail, and ~470px of text
+           spilled out of the bottom of the section over what came next. --- */
+    [data-screen-label="Hero"] > div{grid-template-columns:1fr !important;height:auto !important;
+                                     gap:28px !important;padding-top:40px !important;padding-bottom:40px !important}
+    [data-screen-label="Hero"] > div > *{top:0 !important}
+    [data-screen-label="Hero"] h1{font-size:clamp(32px,9vw,44px) !important}
+    [data-screen-label="Hero"] p{font-size:16px !important}
+
+    /* --- Founder: same fault, 4fr/8fr held on a phone and squeezed the
+           portrait to 80px. --- */
+    #founder > div{grid-template-columns:1fr !important;gap:26px !important}
+    #founder > div > image-slot{max-width:300px}
+
+    main section > div{padding-top:44px !important;padding-bottom:44px !important}
+    footer > div{justify-content:flex-start !important;gap:6px 20px !important}
+  }
+
+  /* The wordmark is ~330px of ink at 16px — on a 375px screen it leaves no
+     room for the call button, which is the one thing a fisherman needs. Below
+     620px the Shalom logo carries the brand on its own. */
+  @media(max-width:620px){
+    .brandmark{display:none}
+    .hdrbar .brand-sep{display:none}
+  }
+
+  /* Second line of the contact strip: you are already on the site, so the
+     domain is the piece that can go. */
+  @media(max-width:700px){
+    .topbar{gap:4px 16px !important}
+    .topbar .tb-domain{display:none}
+  }
+
+  /* Touch targets. Apple and Google both ask for ~44px; the design-system
+     buttons render at 32px, which is a miss on a small screen. */
+  @media(max-width:900px){
+    .btn{min-height:46px;display:inline-flex !important;align-items:center}
+    .table th,.table td{padding-top:12px !important;padding-bottom:12px !important}
+  }
+
+  /* Very small phones (320–360px): the four-up stat grid stops working. */
+  @media(max-width:400px){
+    .g4{grid-template-columns:1fr !important}
+  }
 </style>
 </head>
 <body>
 <div style="background:var(--color-text);color:var(--color-neutral-300)">
-  <div style="max-width:1280px;margin:0 auto;padding:0 40px;display:flex;justify-content:space-between;gap:24px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;line-height:30px;flex-wrap:wrap">
+  <div class="topbar" style="max-width:1280px;margin:0 auto;padding:0 40px;display:flex;justify-content:space-between;gap:24px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;line-height:30px;flex-wrap:wrap">
     <span>Trivandrum · Kerala · India — Est. 2025</span>
-    <span style="display:flex;gap:20px">
+    <span style="display:flex;gap:20px;flex-wrap:wrap">
       <a href="mailto:princexsunny@gmail.com" style="color:var(--color-neutral-300)">princexsunny@gmail.com</a>
-      <span style="color:var(--color-neutral-500)">keralamarinesupply.in</span>
+      <span class="tb-domain" style="color:var(--color-neutral-500)">keralamarinesupply.in</span>
     </span>
   </div>
 </div>
 
 <header style="border-bottom:2px solid var(--color-divider);position:sticky;top:0;background:var(--color-bg);z-index:10" data-screen-label="Home — header">
   
-<div style="max-width: 1280px; margin: 0 auto; padding: 0 40px; display: flex; align-items: center; gap: 28px; height: 50px">
+<div class="hdrbar" style="max-width: 1280px; margin: 0 auto; padding: 0 40px; display: flex; align-items: center; gap: 28px; height: 50px">
     <a href="#top" style="display:flex;align-items:center;gap:13px;flex:none;color:var(--color-text)">
       <span class="brandmark"><img class="brandmark-wave" src="wave-mark.svg" alt="" aria-hidden="true"><span class="wm" style="font-family:var(--font-heading);font-weight:800;font-size:16px;letter-spacing:-0.01em">KERALA MARINE SUPPLY</span></span>
-      <span style="width:1px;height:22px;background:var(--color-divider);display:inline-block;flex:none"></span>
+      <span class="brand-sep" style="width:1px;height:22px;background:var(--color-divider);display:inline-block;flex:none"></span>
       <img src="shalom-group-logo.png" alt="Shalom Group" style="height:22px;width:auto;display:block;flex:none">
       <span style="width:8px;height:8px;background:var(--color-accent);display:inline-block;flex:none"></span>
     </a>
-    
+
+    <!-- Checkbox + label is the whole mobile menu: no JavaScript, so it still
+         works if a script fails to load on a weak connection, and the links
+         remain in the markup for search engines either way. -->
+    <input class="navtoggle" type="checkbox" id="navtoggle" aria-label="Menu">
     <nav class="navlinks" style="display:flex;gap:20px;margin:0 auto;flex-wrap:nowrap;min-width:0">
       <a class="navlink" href="#sector">Sector</a>
       <a class="navlink" href="#ecosystem">Ventures</a>
@@ -82,10 +172,10 @@
       <a class="navlink" href="#ask">The ask</a>
       <a class="navlink" href="careers.html">Careers</a>
       <a class="navlink" href="#software">Software</a>
-    </nav><div style="display:flex;gap:10px;flex:none">
+    </nav><div class="hdr-cta" style="display:flex;gap:10px;flex:none">
       <a href="https://wa.me/919400912894" class="btn btn-secondary" style="font-size:13px">WhatsApp</a>
       <a href="tel:+919400912894" class="btn btn-primary hdr-call" style="font-size:13px">Call +91 94009 12894</a>
-    </div>
+    </div><label class="navbtn" for="navtoggle" aria-hidden="true">☰</label>
   </div></header>
 
 <main id="top">
@@ -305,8 +395,27 @@
     <a href="admin.html">Admin</a>
   </div>
 </footer>
+<script>
+// Close the mobile menu once you have chosen where to go. Without this the
+// panel stays open over the section you just jumped to.
+(function () {
+  var t = document.getElementById('navtoggle');
+  if (!t) return;
+  document.querySelectorAll('.navlinks a').forEach(function (a) {
+    a.addEventListener('click', function () { t.checked = false; });
+  });
+  document.addEventListener('click', function (e) {
+    if (!t.checked) return;
+    if (e.target.closest('.navlinks') || e.target.closest('.navbtn')) return;
+    t.checked = false;
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') t.checked = false;
+  });
+})();
+</script>
 <script src="ventures-data.js"></script>
-<script src="sector-orbit.js?v=3"></script>
+<script src="sector-orbit.js?v=4"></script>
 <script src="site-media.js?v=11"></script>
 </body>
 </html>

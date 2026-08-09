@@ -66,6 +66,25 @@
   .page-body section{padding:0;border-bottom:none}
   a.tile{text-decoration:none}
   @media(max-width:700px){.page-box{padding:0 20px}}
+
+  /* --- Phones. You will sometimes be adding a photo from the yard on your
+         own handset, so this page has to work there too. --- */
+  @media(max-width:700px){
+    /* The applications and documents tables have more columns than a phone is
+       wide. Let them scroll sideways inside their own box rather than pushing
+       the whole page off the screen. */
+    table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
+    .msg{white-space:pre-wrap;min-width:220px}
+    /* Under 16px, iOS zooms in the moment you tap a field and does not zoom
+       back out — every subsequent tap then lands in the wrong place. */
+    input,select,textarea,.lrow input{font-size:16px !important}
+    input[type=file]{max-width:100%}
+    .drop{padding:22px 16px}
+    button.del{margin-left:0;margin-top:8px;min-height:38px}
+    .page-head{flex-wrap:wrap;gap:10px}
+    .tiles{grid-template-columns:1fr;gap:10px}
+    .pad{gap:6px 16px;flex-wrap:wrap}
+  }
 </style>
 </head>
 <body>

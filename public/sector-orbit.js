@@ -45,8 +45,16 @@
   if (!host) return;
 
   var CSS =
-    '.so-wrap{position:relative;width:' + BOX + 'px;height:' + BOX + 'px;max-width:100%;margin:0 auto;' +
-    '  touch-action:none;user-select:none}' +
+    // .so-fit is the element that occupies layout space; .so-wrap keeps its
+    // true 360px geometry and is scaled down inside it. Scaling alone would
+    // not help — a transform doesn't change the box the page reserves — so
+    // .so-fit's height is set to the scaled height in JS.
+    '.so-fit{width:100%;max-width:' + BOX + 'px;margin:0 auto;position:relative}' +
+    '.so-wrap{position:relative;width:' + BOX + 'px;height:' + BOX + 'px;' +
+    // pan-y, not none: a finger dragged up or down must still scroll the page.
+    // Anything else turns this into a 360px-tall dead zone the reader can get
+    // stuck in halfway down the homepage.
+    '  touch-action:pan-y;user-select:none;transform-origin:top left}' +
     '.so-ring{position:absolute;inset:0;border-radius:50%;' +
     '  border:1px dashed var(--color-neutral-500,#a09b95);' +
     '  margin:' + (DOT_ACTIVE / 2 + 6) + 'px;opacity:.55}' +
@@ -87,21 +95,42 @@
     '  color:var(--color-neutral-500,#a09b95);margin-top:6px}' +
     '.so-hint{font-size:10px;letter-spacing:.12em;text-transform:uppercase;' +
     '  color:var(--color-neutral-500,#a09b95);margin-top:14px;white-space:nowrap;opacity:.9}' +
-    '@media(max-width:520px){.so-wrap{transform:scale(.8);transform-origin:top center;margin-bottom:-60px}}' +
     '@media (prefers-reduced-motion:reduce){.so-spin,.so-item{transition:none !important}}';
 
   var style = document.createElement('style');
   style.textContent = CSS;
   document.head.appendChild(style);
 
+  var fit = document.createElement('div');
+  fit.className = 'so-fit';
   var wrap = document.createElement('div');
   wrap.className = 'so-wrap';
   wrap.innerHTML = '<div class="so-disc"></div><div class="so-ring"></div><div class="so-spin"></div>' +
     '<div class="so-mid"><button type="button" class="so-open">' +
     '<div class="so-wave">≈</div><div class="so-num"></div><div class="so-name"></div>' +
     '<div class="so-status"></div></button>' +
-    '<div class="so-hint">Scroll · click to open</div></div>';
-  host.appendChild(wrap);
+    '<div class="so-hint"></div></div>';
+  fit.appendChild(wrap);
+  host.appendChild(fit);
+
+  // A phone has no wheel, so the desktop hint would be a lie there.
+  var coarse = false;
+  try { coarse = window.matchMedia('(pointer: coarse)').matches; } catch (e) {}
+  wrap.querySelector('.so-hint').textContent =
+    coarse ? 'Swipe sideways · tap to open' : 'Scroll · click to open';
+
+  // Shrink to whatever width the column actually has, and reserve exactly the
+  // height the shrunken ring occupies.
+  function resize() {
+    var avail = fit.clientWidth;
+    if (!avail) return;
+    var s = Math.min(1, avail / BOX);
+    wrap.style.transform = s < 1 ? 'scale(' + s.toFixed(4) + ')' : 'none';
+    fit.style.height = Math.round(BOX * s) + 'px';
+  }
+  resize();
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(fit);
+  else window.addEventListener('resize', resize);
 
   var spin = wrap.querySelector('.so-spin');
   var midNum = wrap.querySelector('.so-num');
@@ -186,16 +215,25 @@
     if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); step(-1); items[active].focus(); }
   });
 
-  // Touch: a vertical swipe turns the ring.
-  var startY = null;
-  wrap.addEventListener('pointerdown', function (e) { startY = e.clientY; });
+  // Touch: a SIDEWAYS swipe turns the ring. Up and down are left alone so the
+  // page keeps scrolling normally through this section — the ring must never
+  // trap a reader's thumb.
+  var startX = null, startY = null, axis = null;
+  wrap.addEventListener('pointerdown', function (e) {
+    startX = e.clientX; startY = e.clientY; axis = null;
+  });
   wrap.addEventListener('pointermove', function (e) {
-    if (startY === null) return;
-    var dy = e.clientY - startY;
-    if (Math.abs(dy) >= 42) { step(dy > 0 ? -1 : 1); startY = e.clientY; }
+    if (startX === null) return;
+    var dx = e.clientX - startX, dy = e.clientY - startY;
+    // Decide once which way this gesture is going, then stick with it.
+    if (!axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    }
+    if (axis !== 'x') return;
+    if (Math.abs(dx) >= 46) { step(dx < 0 ? 1 : -1); startX = e.clientX; }
   });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) {
-    wrap.addEventListener(t, function () { startY = null; });
+    wrap.addEventListener(t, function () { startX = null; startY = null; axis = null; });
   });
 
   render();

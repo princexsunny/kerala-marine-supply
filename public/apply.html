@@ -21,7 +21,10 @@
   label{display:block;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-neutral-700);font-weight:600;margin:18px 0 6px}
   label:first-child{margin-top:0}
   .req{color:var(--color-accent-700)}
-  input,select,textarea{width:100%;padding:12px 14px;border:2px solid var(--color-divider);font-size:15px;background:var(--color-bg);color:var(--color-text);outline:none;font-family:inherit}
+  /* 16px is not a style choice: iOS Safari zooms the whole page in when you
+     focus a field smaller than that, and the applicant then has to pinch back
+     out for every question. Anything at or above 16px leaves the page alone. */
+  input,select,textarea{width:100%;padding:13px 14px;border:2px solid var(--color-divider);font-size:16px;background:var(--color-bg);color:var(--color-text);outline:none;font-family:inherit}
   textarea{resize:vertical;min-height:70px}
   input:focus,select:focus,textarea:focus{border-color:var(--color-accent)}
   .file{border:2px dashed var(--color-neutral-400);padding:18px;text-align:center;cursor:pointer;background:var(--color-bg)}
@@ -40,7 +43,6 @@
   .done .tick{width:56px;height:56px;background:var(--color-text);color:var(--color-bg);font-size:24px;display:flex;align-items:center;justify-content:center;margin-bottom:20px}
   .done h2{font-size:26px;font-weight:800;margin:0 0 8px;letter-spacing:-0.02em}
   .done p{color:var(--color-neutral-800);margin-bottom:18px;line-height:1.5}
-  @media(max-width:520px){ .logo .brandmark, .logo span[style*="width:1px"] { display:none; } }
   /* Wave watermark behind the wordmark, sized to fit this ~34px logo row.
      overflow:hidden is a backstop so nothing can spill over the form below. */
   .brandmark{ position:relative; display:inline-flex; align-items:center; flex:none; height:34px; overflow:hidden; }
@@ -48,6 +50,15 @@
   /* Sized by height so the whole mark fits this shorter logo row uncropped. */
   .brandmark-wave{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
                    height:30px; width:auto; max-width:none; opacity:.22; pointer-events:none; user-select:none; z-index:0; }
+
+  /* Must come AFTER the .brandmark block above: same specificity, so placed
+     before it the display:none simply lost and the wordmark stayed visible. */
+  @media(max-width:520px){ .logo .brandmark, .logo span[style*="width:1px"] { display:none !important; } }
+  @media(max-width:520px){
+    body{ padding:36px 16px }
+    .card{ padding:22px 18px }
+    .back{ min-height:44px; display:inline-flex; align-items:center }
+  }
 </style>
 </head>
 <body>
