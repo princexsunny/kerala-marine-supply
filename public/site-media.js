@@ -98,24 +98,54 @@
     el.loop = true;
     el.playsInline = true;
     el.setAttribute('playsinline', '');
-    el.controls = true;         // so it can be unmuted, paused or scrubbed
-    el.preload = 'metadata';
+
+    // No player chrome: this is hero artwork, not something to operate. The
+    // control bar, the picture-in-picture button and the browser's own hover
+    // overlay all get turned off, and pointer events are disabled so a stray
+    // click can't pause it.
+    el.controls = false;
+    el.removeAttribute('controls');
+    el.disablePictureInPicture = true;
+    el.setAttribute('disablepictureinpicture', '');
+    el.setAttribute('disableremoteplayback', '');
+    el.setAttribute('controlslist', 'nodownload nofullscreen noremoteplayback noplaybackrate');
+
+    // Buffer properly before starting, so it plays through rather than
+    // stuttering on the first loop.
+    el.preload = 'auto';
 
     var reduced = false;
     try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
     el.autoplay = !reduced;
     if (!reduced) el.setAttribute('autoplay', '');
 
-    el.style.cssText = styleFor(slotEl) + 'background:#000;';
+    // Background matches the page rather than black: with object-fit:cover
+    // there should be no bars, and if a frame ever does show through, off-white
+    // disappears into the layout where black would not.
+    el.style.cssText = styleFor(slotEl) +
+      'background:var(--color-neutral-200,#eceae7);pointer-events:none;';
     el.setAttribute('data-kms-slot', slotKey);
+
+    // Fade in once there is a frame to show, the same way the photos do, so
+    // it eases in instead of snapping from poster to video.
+    el.style.opacity = '0';
+    var reveal = function () { el.style.opacity = '1'; };
+    el.addEventListener('loadeddata', reveal);
+    el.addEventListener('canplay', reveal);
+    el.addEventListener('error', reveal);
+    setTimeout(reveal, 2500);   // never leave it stuck invisible
 
     var parent = slotEl.parentNode;
     if (!parent) return;
     parent.replaceChild(el, slotEl);
 
-    // Autoplay can still be refused (data saver, battery saver). Not an error
-    // — the poster stays up and the controls are there to press play.
-    if (!reduced && el.play) { var p = el.play(); if (p && p.catch) p.catch(function () {}); }
+    // Autoplay can still be refused (data saver, battery saver). With no
+    // controls there is nothing for the visitor to press, so fall back to the
+    // poster image — which is the hero photograph, and looks intentional.
+    if (!reduced && el.play) {
+      var pr = el.play();
+      if (pr && pr.catch) pr.catch(function () {});
+    }
   }
 
   function fillPhoto(slotEl, url, slotKey) {
