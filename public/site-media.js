@@ -84,6 +84,40 @@
     return css;
   }
 
+  // The hero shows the uploaded video when there is one, with the hero
+  // PHOTOGRAPH as its poster frame. That means the picture is on screen the
+  // instant it loads while the video is still buffering, instead of a black
+  // rectangle — the video then starts over the top of it.
+  function fillVideo(slotEl, video, posterUrl, slotKey) {
+    var el = document.createElement('video');
+    el.src = video.url;
+    if (posterUrl) el.poster = posterUrl;
+    el.muted = true;            // required for autoplay, and nothing should
+    el.defaultMuted = true;     // start making noise at a visitor uninvited
+    el.setAttribute('muted', '');
+    el.loop = true;
+    el.playsInline = true;
+    el.setAttribute('playsinline', '');
+    el.controls = true;         // so it can be unmuted, paused or scrubbed
+    el.preload = 'metadata';
+
+    var reduced = false;
+    try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    el.autoplay = !reduced;
+    if (!reduced) el.setAttribute('autoplay', '');
+
+    el.style.cssText = styleFor(slotEl) + 'background:#000;';
+    el.setAttribute('data-kms-slot', slotKey);
+
+    var parent = slotEl.parentNode;
+    if (!parent) return;
+    parent.replaceChild(el, slotEl);
+
+    // Autoplay can still be refused (data saver, battery saver). Not an error
+    // — the poster stays up and the controls are there to press play.
+    if (!reduced && el.play) { var p = el.play(); if (p && p.catch) p.catch(function () {}); }
+  }
+
   function fillPhoto(slotEl, url, slotKey) {
     var img = document.createElement('img');
     img.src = url;
@@ -197,7 +231,12 @@
         return;
       }
       try {
-        fillPhoto(el, entry.url, slot);
+        // Hero: video wins if one has been uploaded, with the photo as poster.
+        if (slot === 'hero' && media.video && media.video.url) {
+          fillVideo(el, media.video, entry.url, slot);
+        } else {
+          fillPhoto(el, entry.url, slot);
+        }
       } catch (e) {
         // One bad slot must not stop the others.
         if (window.console) console.warn('site-media: could not fill ' + slot, e);
@@ -206,7 +245,17 @@
 
     if (media.video && media.video.url) {
       try {
-        placeVideo(media.video);
+        // With no hero photo uploaded, the loop above never runs for 'hero',
+        // so put the video straight into that slot here.
+        var heroSlot = document.querySelector('image-slot#' + SLOT_TO_ELEMENT.hero);
+        if (heroSlot && !document.querySelector('[data-kms-slot="hero"]')) {
+          fillVideo(heroSlot, media.video, null, 'hero');
+        } else if (!document.querySelector('[data-kms-slot="hero"]')) {
+          pending++;                      // hero not rendered yet — retry
+        }
+        // Only fall back to a section of its own if the hero can't take it,
+        // so the same clip never appears twice on the page.
+        if (!document.querySelector('video[data-kms-slot="hero"]')) placeVideo(media.video);
       } catch (e) {
         if (window.console) console.warn('site-media: could not place video', e);
       }
