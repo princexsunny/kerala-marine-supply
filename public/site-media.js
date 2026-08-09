@@ -15,12 +15,12 @@
   'use strict';
 
   // Admin slot key -> the id the design tool gave that spot in index.html.
+  // The redesigned homepage renamed its picture areas and dropped the three
+  // strip photos, so the old kms-* ids no longer exist. Slots with no element
+  // on the page are skipped, which keeps this safe if the design changes again.
   var SLOT_TO_ELEMENT = {
-    hero: 'kms-hero',
-    photo1: 'kms-photo-1',
-    photo2: 'kms-photo-2',
-    photo3: 'kms-photo-3',
-    founder: 'kms-founder',
+    hero: 'hero',
+    founder: 'founder',
   };
 
   // Every slot, hero included, simply fills its own frame. The hero used to
@@ -94,7 +94,7 @@
     // Prefer just after the photo strip — the video belongs with the other
     // visual material rather than stranded at the bottom of the page.
     var anchorImg =
-      document.getElementById('kms-photo-3') || document.getElementById('kms-photo-1');
+      document.getElementById('founder') || document.getElementById('hero');
     var anchorSection = anchorImg && anchorImg.closest ? anchorImg.closest('section') : null;
 
     if (anchorSection && anchorSection.parentNode) {

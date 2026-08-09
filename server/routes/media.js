@@ -290,9 +290,13 @@ router.delete('/media/video', async (req, res) => {
 // orbit1..orbit5 back the hero orbit navigation's five categories. orbit3
 // (Boat yard) is intentionally absent: that category always shows the main
 // hero photograph, so it has no separate slot to upload or delete.
+// Slots that exist on the site today. The homepage was redesigned and no
+// longer has the three strip photos or the hero-orbit categories, so those
+// were removed rather than left as uploads that lead nowhere.
 const PHOTO_SLOTS = [
-  'hero', 'photo1', 'photo2', 'photo3', 'founder',
-  'orbit1', 'orbit2', 'orbit4', 'orbit5',
+  'hero', 'founder',
+  'venture1', 'venture2', 'venture3', 'venture4', 'venture5', 'venture6',
+  'venture7', 'venture8', 'venture9', 'venture10', 'venture11', 'venture12',
 ];
 
 router.delete('/media/:slot', async (req, res) => {

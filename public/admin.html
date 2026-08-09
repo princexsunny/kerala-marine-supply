@@ -62,9 +62,9 @@
     <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Choose a picture for each slot, then save. These appear on the home page straight away. JPEG, PNG, WebP or GIF.</p>
     <div class="grid2" id="slotGrid"></div>
 
-    <h3 style="font-size:16px;font-weight:800;margin:30px 0 4px">Hero orbit categories</h3>
-    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px;margin:0 0 14px">The rotating selector on the home page. Each category shows its own picture. Leave one empty and it shows the hero photograph instead. <strong>Boat yard</strong> always uses the hero photograph, so it has no slot of its own.</p>
-    <div class="grid2" id="orbitGrid"></div>
+    <h3 style="font-size:16px;font-weight:800;margin:30px 0 4px">Venture photographs</h3>
+    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px;margin:0 0 14px">One picture for each venture page. Leave a slot empty and that page shows a caption instead.</p>
+    <div class="grid2" id="ventureGrid"></div>
 
     <div class="row">
       <button class="btn btn-primary" id="savePhotos">Save photos</button>
@@ -132,32 +132,34 @@
 <script>
 (function(){
   var SLOTS = [
-    { key: 'hero',   label: 'Hero photograph', hint: 'Beside the headline — a boat, the yard or the harbour.' },
-    { key: 'photo1', label: 'Strip 1', hint: 'The boat yard at Chirayinkeezhu.' },
-    { key: 'photo2', label: 'Strip 2', hint: 'Nets, gear or the net-sewing machine.' },
-    { key: 'photo3', label: 'Strip 3', hint: 'The crew, or a boat at the harbour.' },
-    { key: 'founder',label: 'Founder portrait', hint: 'Prince, in the founder section.' },
+    { key: 'hero',    label: 'Hero photograph', hint: 'Beside the headline — a boat, the yard or the harbour.' },
+    { key: 'founder', label: 'Founder portrait', hint: 'Prince, in the founder section.' },
   ];
 
-  // The hero orbit's five categories. 03 Boat yard is deliberately not here:
-  // it always shows the main hero photograph, so there is nothing separate to
-  // upload for it. Same upload, preview and delete behaviour as the slots
-  // above -- they share every handler below.
-  var ORBIT_SLOTS = [
-    { key: 'orbit1', label: '01 · Coastline', hint: 'The coast, the shoreline, the sea.' },
-    { key: 'orbit2', label: '02 · Deepwater', hint: 'The harbour or the deepwater port nearby.' },
-    { key: 'orbit4', label: '04 · Community', hint: 'The fishing community, the crew.' },
-    { key: 'orbit5', label: '05 · Ventures',  hint: 'The yard, machines or a venture at work.' },
+  // One photograph per venture page (venture.html?v=...).
+  var VENTURE_SLOTS = [
+    { key: 'venture1',  label: '01 · Fishing Net Online',   hint: 'Nets, the storefront, an order going out.' },
+    { key: 'venture2',  label: '02 · Machine Manufacturing', hint: 'A winch, hauler or the workshop.' },
+    { key: 'venture3',  label: '03 · Fisherman Finance',     hint: 'The calculator in use on a boat.' },
+    { key: 'venture4',  label: '04 · Boat Yard',             hint: 'Chirayinkeezhu — the slipway or the build.' },
+    { key: 'venture5',  label: '05 · Marine Fuels',          hint: 'Refuelling, cans, or the site.' },
+    { key: 'venture6',  label: '06 · Shipbuilding',          hint: 'A hull under construction.' },
+    { key: 'venture7',  label: '07 · Fishing Gear',          hint: 'Ropes, hooks, floats, safety gear.' },
+    { key: 'venture8',  label: '08 · Fish Online',           hint: 'The catch, or a sale being made.' },
+    { key: 'venture9',  label: '09 · Marine Engineering',    hint: 'Machinery being installed or modified.' },
+    { key: 'venture10', label: '10 · Marine Spare Parts',    hint: 'Engines, pumps, propellers on the shelf.' },
+    { key: 'venture11', label: '11 · Cold Chain',            hint: 'Ice, cold store or refrigerated transport.' },
+    { key: 'venture12', label: '12 · Seafood Export',        hint: 'Processing, packing or despatch.' },
   ];
 
-  // Everything below treats the two groups identically.
-  var ALL_SLOTS = SLOTS.concat(ORBIT_SLOTS);
+  // Everything below treats both groups identically.
+  var ALL_SLOTS = SLOTS.concat(VENTURE_SLOTS);
   var photos = {}; // key -> dataURL chosen (not yet saved / just saved)
 
   var slotGrid  = document.getElementById('slotGrid');
-  var orbitGrid = document.getElementById('orbitGrid');
+  var ventureGrid = document.getElementById('ventureGrid');
   ALL_SLOTS.forEach(function(s){
-    var grid = ORBIT_SLOTS.indexOf(s) !== -1 ? orbitGrid : slotGrid;
+    var grid = VENTURE_SLOTS.indexOf(s) !== -1 ? ventureGrid : slotGrid;
     var div = document.createElement('div');
     div.className = 'slot';
     div.innerHTML =
