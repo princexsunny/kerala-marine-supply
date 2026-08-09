@@ -18,6 +18,15 @@
   .navlink:hover{color:var(--color-accent-700)}
   @media(max-width:900px){.navlinks{display:none}}
   @media(max-width:640px){.g4{grid-template-columns:1fr 1fr !important}.g3{grid-template-columns:1fr !important}.g2{grid-template-columns:1fr !important}}
+  /* --- Status strip: four even columns, no orphan on a second row --- */
+  .statstrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:26px 32px}
+  .statitem{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.45}
+  .statdot{width:7px;height:7px;border-radius:50%;background:var(--color-accent);flex:none;margin-top:6px}
+  .stattext{display:flex;flex-direction:column;min-width:0}
+  .stattext strong{font-family:var(--font-heading);font-weight:800;letter-spacing:-0.01em}
+  .stattext span{color:var(--color-neutral-800)}
+  @media(max-width:900px){.statstrip{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:520px){.statstrip{grid-template-columns:1fr}}
   /* --- Ventures cards (reference style: icon, title, short line, chevron) --- */
   .vgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
   .vcard{position:relative;display:flex;flex-direction:column;background:var(--color-bg);
@@ -103,11 +112,11 @@
 </section>
 
 <section style="border-bottom:2px solid var(--color-divider);background:var(--color-neutral-200)">
-  <div style="max-width:1280px;margin:0 auto;padding:22px 40px;display:flex;gap:32px;flex-wrap:wrap;font-size:13px">
-    <span><strong>Selling today</strong> — Shalom Marine Nets online</span>
-    <span><strong>LOI sanctioned</strong> — Marine fuel · with Jio-bp</span>
-    <span><strong>8 months of construction</strong> — Boat yard · Chirayinkeezhu</span>
-    <span><strong>5 years at sea</strong> — Vessel owner &amp; fisherman</span>
+  <div class="statstrip" style="max-width:1280px;margin:0 auto;padding:26px 40px">
+      <div class="statitem"><span class="statdot"></span><span class="stattext"><strong>Selling today</strong><span>Shalom Marine Nets online</span></span></div>
+      <div class="statitem"><span class="statdot"></span><span class="stattext"><strong>LOI sanctioned</strong><span>Marine fuel · with Jio-bp</span></span></div>
+      <div class="statitem"><span class="statdot"></span><span class="stattext"><strong>8 months of construction</strong><span>Boat yard · Chirayinkeezhu</span></span></div>
+      <div class="statitem"><span class="statdot"></span><span class="stattext"><strong>5 years at sea</strong><span>Vessel owner &amp; fisherman</span></span></div>
   </div>
 </section>
 
