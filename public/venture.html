@@ -126,6 +126,16 @@
   var md = document.querySelector('meta[name="description"]');
   if (md) md.setAttribute('content', v.summary);
 
+  // The vacancies come from the same list careers.html renders, so a role can
+  // never be advertised in one place and missing from the other.
+  var roleList = (v.roles && v.roles.length)
+    ? '<ul style="margin:14px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px">' +
+      v.roles.map(function (r) {
+        return '<li><a class="tag tag-outline" style="font-size:12px;display:inline-block" ' +
+               'href="apply.html?role=' + encodeURIComponent(r) + '">' + esc(r) + ' &rarr;</a></li>';
+      }).join('') + '</ul>'
+    : '';
+
   var linkBtn = v.link
     ? '<a href="' + v.link.href + '"' + (/^https?:/.test(v.link.href) ? ' target="_blank" rel="noopener"' : '') +
       ' class="btn btn-primary" style="font-size:14px">' + esc(v.link.label) + ' ↗</a>'
@@ -154,7 +164,7 @@
       '<div class="block"><h2>What it is</h2><p>' + esc(v.brief) + '</p></div>' +
       '<div class="block"><h2>The opportunity</h2><p>' + esc(v.opportunity) + '</p></div>' +
       '<div class="block"><h2>How it earns</h2><p>' + esc(v.model) + '</p></div>' +
-      '<div class="block"><h2>Jobs it creates</h2><p>' + esc(v.jobs) + '</p></div>' +
+      '<div class="block"><h2>Jobs it creates</h2><p>' + esc(v.jobs) + '</p>' + roleList + '</div>' +
       '<div class="block" style="grid-column:1/-1"><h2>What it unlocks next</h2><p>' + esc(v.next) + '</p></div>' +
     '</div>' +
 

@@ -1,6 +1,10 @@
 // The twelve Shalom ventures — the single source of truth for both the
 // homepage cards and the individual venture pages.
 //
+// `roles` lists the vacancies each venture is hiring for; careers.html and
+// the venture pages both render from it, so a role can never appear in one
+// place and not the other.
+//
 // A note on what is and isn't in here: the descriptions, statuses and links
 // are Kerala Marine Supply's own. The "how it earns" sections describe the
 // SHAPE of each business (where revenue comes from, what the cost drivers
@@ -11,6 +15,7 @@ window.KMS_VENTURES = [
   {
     slug: 'fishing-net-online',
     num: '01',
+    roles: ['Online Store Executive', 'Packing & Dispatch Assistant'],
     photo: 'venture1',
     name: 'Shalom Fishing Net Online',
     status: 'Running now',
@@ -40,6 +45,7 @@ window.KMS_VENTURES = [
   {
     slug: 'marine-machine-manufacturing',
     num: '02',
+    roles: ['Hydraulics Technician', 'Machinist / Fitter', 'Assembly Technician'],
     photo: 'venture2',
     name: 'Shalom Marine Machine Manufacturing',
     status: 'Running now',
@@ -66,6 +72,7 @@ window.KMS_VENTURES = [
   {
     slug: 'fisherman-finance',
     num: '03',
+    roles: ['Software Support Executive', 'Field Trainer (Fishermen)'],
     photo: 'venture3',
     name: 'Shalom Fisherman Finance',
     status: 'Running now',
@@ -91,6 +98,7 @@ window.KMS_VENTURES = [
   {
     slug: 'boat-yard',
     num: '04',
+    roles: ['Boat Yard Manager', 'Boat Yard Supervisor', 'Marine Mechanic', 'Marine Electrician', 'Fiberglass (FRP) Technician', 'Welder & Fabricator', 'Boat Maintenance Technician', 'Boat Cleaner & Detailer', 'Dock & Slipway Operator', 'Crane & Hoist Operator', 'Quality Control Inspector', 'Storekeeper / Inventory Executive', 'Safety (HSE) Officer', 'Yard Assistant / General Worker', 'Operations Coordinator'],
     photo: 'venture4',
     name: 'Shalom Boat Yard',
     status: 'Building now',
@@ -117,6 +125,7 @@ window.KMS_VENTURES = [
   {
     slug: 'marine-fuels',
     num: '05',
+    roles: ['Fuel Station Supervisor', 'Fuel Pump Operator', 'Maintenance Technician'],
     photo: 'venture5',
     name: 'Shalom Marine Fuels',
     status: 'Building now',
@@ -140,6 +149,7 @@ window.KMS_VENTURES = [
   {
     slug: 'shipbuilding',
     num: '06',
+    roles: ['Production Manager', 'Naval Architect / Design Engineer', 'Boat Builder (FRP Technician)'],
     photo: 'venture6',
     name: 'Shalom Shipbuilding & Vessel Manufacturing',
     status: 'Next',
@@ -163,6 +173,7 @@ window.KMS_VENTURES = [
   {
     slug: 'fishing-gear',
     num: '07',
+    roles: ['Retail Sales Executive', 'Wholesale Accounts Executive'],
     photo: 'venture7',
     name: 'Shalom Fishing Gear',
     status: 'Next',
@@ -186,6 +197,7 @@ window.KMS_VENTURES = [
   {
     slug: 'fish-online',
     num: '08',
+    roles: ['Marketplace Operations Executive', 'Quality Checker (Landing Centre)'],
     photo: 'venture8',
     name: 'Shalom Fish Online',
     status: 'Next',
@@ -210,6 +222,7 @@ window.KMS_VENTURES = [
   {
     slug: 'marine-engineering',
     num: '09',
+    roles: ['Marine Engineer', 'Hydraulic Systems Technician'],
     photo: 'venture9',
     name: 'Shalom Marine Engineering',
     status: 'Next',
@@ -233,6 +246,7 @@ window.KMS_VENTURES = [
   {
     slug: 'marine-spare-parts',
     num: '10',
+    roles: ['Spare Parts Counter Executive', 'Inventory Controller'],
     photo: 'venture10',
     name: 'Shalom Marine Spare Parts',
     status: 'Next',
@@ -256,6 +270,7 @@ window.KMS_VENTURES = [
   {
     slug: 'cold-chain',
     num: '11',
+    roles: ['Cold Store Operator', 'Refrigerated Transport Driver'],
     photo: 'venture11',
     name: 'Shalom Cold Chain & Seafood Logistics',
     status: 'Future',
@@ -279,6 +294,7 @@ window.KMS_VENTURES = [
   {
     slug: 'seafood-export',
     num: '12',
+    roles: ['Processing Supervisor', 'Export Documentation Executive'],
     photo: 'venture12',
     name: 'Shalom Seafood Export',
     status: 'Future',
