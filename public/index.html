@@ -67,7 +67,11 @@
   /* --- Menu button: the nav used to just vanish below 1150px, which left a
          phone with no way to reach Ventures, Careers or The ask at all. --- */
   .navbtn{display:none}
-  .navtoggle{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+  /* Kept in the accessibility tree (and focusable) where the menu button is
+     actually shown, so it works from a keyboard; removed entirely above that,
+     where a stray checkbox would only confuse a screen reader. */
+  .navtoggle{position:absolute;width:1px;height:1px;opacity:0;margin:0;pointer-events:none}
+  @media(min-width:1151px){.navtoggle{display:none}}
   @media(max-width:1150px){
     .hdrbar{position:relative}
     .navbtn{display:inline-flex;align-items:center;justify-content:center;order:3;
@@ -118,6 +122,15 @@
   @media(max-width:620px){
     .brandmark{display:none}
     .hdrbar .brand-sep{display:none}
+    /* Two buttons plus a menu button will not fit beside the logo. WhatsApp
+       stays in the hero, in The ask and in the footer; the phone number is the
+       one thing that has to be reachable from the top of every screen. */
+    .hdr-cta .btn-secondary{display:none !important}
+  }
+  /* font-size:0 alone lost to the inline style="font-size:13px" on the link,
+     so the button never shrank and kept pushing the header off the screen. */
+  @media(max-width:560px){
+    .hdr-call{font-size:0 !important;padding-left:16px;padding-right:16px}
   }
 
   /* Second line of the contact strip: you are already on the site, so the
@@ -132,6 +145,10 @@
   @media(max-width:900px){
     .btn{min-height:46px;display:inline-flex !important;align-items:center}
     .table th,.table td{padding-top:12px !important;padding-bottom:12px !important}
+    /* "Open ↗" was a 15px-tall target in the software table. */
+    .table a{display:inline-block;padding:9px 0}
+    .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    footer a{display:inline-block;padding:6px 0}
   }
 
   /* Very small phones (320–360px): the four-up stat grid stops working. */
@@ -357,6 +374,11 @@
   <div style="max-width:1280px;margin:0 auto;padding:64px 40px">
     <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--color-accent-700);font-weight:600;margin-bottom:8px">Software — built in-house · free to use</div>
     <div style="width:48px;height:2px;background:var(--color-accent);margin-bottom:32px"></div>
+    <!-- The four columns have a 295px minimum between them, which is wider
+         than the content area of a 320px phone. Scrolling inside this box is
+         better than the whole page sliding sideways; from 360px up it never
+         scrolls at all. -->
+    <div class="tablewrap">
     <table class="table" style="width:100%">
       <thead><tr><th>#</th><th>Name</th><th>Description</th><th>Link</th></tr></thead>
       <tbody>
@@ -365,6 +387,7 @@
         <tr><td>03</td><td style="font-weight:700">Shalom Fish Online</td><td style="max-width:44ch">Two live builds of the fish marketplace — fishermen selling direct to buyers.</td><td><a href="https://shalom-fish.onrender.com/">shalom-fish ↗</a> · <a href="https://fishko.onrender.com/">fishko ↗</a></td></tr>
       </tbody>
     </table>
+    </div>
   </div>
 </section>
 

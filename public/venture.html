@@ -45,8 +45,16 @@
     .allgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
     .wrap{padding:0 20px}
     .block{padding:26px 20px}
-    /* 32px is under the ~44px a thumb reliably hits. */
+    /* Everything below was between 13px and 32px tall — all of it under the
+       ~44px a thumb reliably hits, and all of it a link someone is meant to
+       actually use. */
     .btn{min-height:46px;display:inline-flex !important;align-items:center}
+    .rolelist a{min-height:40px;display:inline-flex !important;align-items:center;padding:8px 12px !important}
+    .nextnav{gap:0}
+    .nextnav a{min-height:46px;display:inline-flex;align-items:center;width:100%}
+    .allgrid a{min-height:52px}
+    header .wrap a{min-height:44px;display:inline-flex;align-items:center}
+    footer a{display:inline-block;padding:8px 0}
   }
   /* The wordmark is ~330px of ink; below this it leaves no room for the two
      header links, and the page ran 133px off the side of the screen. */
@@ -143,7 +151,7 @@
   // The vacancies come from the same list careers.html renders, so a role can
   // never be advertised in one place and missing from the other.
   var roleList = (v.roles && v.roles.length)
-    ? '<ul style="margin:14px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px">' +
+    ? '<ul class="rolelist" style="margin:14px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px">' +
       v.roles.map(function (r) {
         return '<li><a class="tag tag-outline" style="font-size:12px;display:inline-block" ' +
                'href="apply.html?role=' + encodeURIComponent(r) + '">' + esc(r) + ' &rarr;</a></li>';
