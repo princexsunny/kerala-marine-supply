@@ -69,7 +69,11 @@
     // Centre label: the ring is decorative without it — this is what tells you
     // which venture you are looking at.
     '.so-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:' + (R * 1.15) + 'px;' +
-    '  text-align:center;pointer-events:none}' +
+    '  text-align:center}' +
+    '.so-open{display:block;background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer;' +
+    '  width:100%}' +
+    '.so-open:hover .so-name{color:var(--color-accent,#ec3013)}' +
+    '.so-open:focus-visible{outline:2px solid var(--color-accent,#ec3013);outline-offset:6px}' +
     '.so-wave{color:var(--color-accent,#ec3013);font-size:26px;line-height:1;font-weight:700}' +
     '.so-num{font-family:var(--font-heading,inherit);font-weight:800;font-size:11px;letter-spacing:.12em;' +
     '  color:var(--color-neutral-500,#a09b95);margin-top:10px}' +
@@ -87,14 +91,19 @@
   var wrap = document.createElement('div');
   wrap.className = 'so-wrap';
   wrap.innerHTML = '<div class="so-ring"></div><div class="so-spin"></div>' +
-    '<div class="so-mid"><div class="so-wave">≈</div><div class="so-num"></div>' +
-    '<div class="so-name"></div><div class="so-hint">Scroll or click</div></div>';
+    '<div class="so-mid"><button type="button" class="so-open">' +
+    '<div class="so-wave">≈</div><div class="so-num"></div><div class="so-name"></div>' +
+    '</button><div class="so-hint">Scroll to turn · click to open</div></div>';
   host.appendChild(wrap);
 
   var spin = wrap.querySelector('.so-spin');
   var midNum = wrap.querySelector('.so-num');
   var midName = wrap.querySelector('.so-name');
   var items = [];
+
+  wrap.querySelector('.so-open').addEventListener('click', function () {
+    location.href = 'venture.html?v=' + V[active].slug;
+  });
 
   V.forEach(function (v, i) {
     // -90deg puts index 0 at the top of the ring.
@@ -106,12 +115,16 @@
     b.style.transform = 'translate(' + (Math.cos(a) * R).toFixed(1) + 'px,' + (Math.sin(a) * R).toFixed(1) + 'px)';
     b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
       'stroke-linecap="round" stroke-linejoin="round">' + (ICONS[v.icon] || '') + '</svg>';
+    // A click opens that venture straight away. Turning the ring is what the
+    // wheel, the arrow keys and dragging are for, so a click never needs to
+    // mean "bring this one round first".
     b.addEventListener('click', function () {
-      // A second click on the venture already in focus opens its page, so the
-      // first click can be used to bring one round without navigating away.
-      if (i === active) location.href = 'venture.html?v=' + v.slug;
-      else go(i);
+      location.href = 'venture.html?v=' + v.slug;
     });
+    // Hovering brings a venture to the top and names it in the middle, so you
+    // can see what an icon is before committing to the click.
+    b.addEventListener('pointerenter', function () { if (i !== active) go(i); });
+    b.addEventListener('focus', function () { if (i !== active) go(i); });
     spin.appendChild(b);
     items.push(b);
 
