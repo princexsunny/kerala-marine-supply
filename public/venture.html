@@ -115,6 +115,7 @@
 </footer>
 
 <script src="ventures-data.js"></script>
+<script src="media-stage.js?v=1"></script>
 <script>
 (function () {
   var ICONS = {
@@ -224,26 +225,35 @@
     })
     .catch(function () { /* keep the built-in link */ });
 
-  // Venture photograph, uploaded in /admin.html. Empty slot keeps the caption.
+  // Venture photographs, uploaded in /admin.html. A slot can now hold several,
+  // in which case this becomes a slideshow with dots; one photo behaves exactly
+  // as before, and an empty slot keeps the caption.
   fetch('/api/media', { credentials: 'same-origin' })
     .then(function (r) { return r.ok ? r.json() : {}; })
     .then(function (m) {
       var entry = m && m[v.photo];
       if (!entry || !entry.url) return;
+      var items = (entry.items && entry.items.length) ? entry.items : [{ url: entry.url }];
       var shot = document.getElementById('shot');
-      var isVideo = entry.contentType && entry.contentType.indexOf('video/') === 0;
-      var el;
-      if (isVideo) {
-        el = document.createElement('video');
-        el.muted = true; el.loop = true; el.autoplay = true; el.playsInline = true;
-        el.setAttribute('playsinline', '');
-      } else {
-        el = document.createElement('img');
-        el.alt = v.name;
-      }
-      el.src = entry.url;
       shot.innerHTML = '';
-      shot.appendChild(el);
+      if (!window.KMSStage) {
+        // Slideshow script missing or blocked — still show the picture.
+        var img = document.createElement('img');
+        img.src = entry.url;
+        img.alt = v.name;
+        shot.appendChild(img);
+        return;
+      }
+      window.KMSStage.mount({
+        target: shot,
+        mode: 'fill',
+        // .shot already sets the box (4:3, rounded, clipped); the stage only
+        // needs to stretch to it.
+        boxStyle: 'position:absolute;inset:0;width:100%;height:100%;background:transparent',
+        items: items,
+        eager: true,
+        name: v.name,
+      });
     })
     .catch(function () { /* no photo — the caption stays */ });
 })();

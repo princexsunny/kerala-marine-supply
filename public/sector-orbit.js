@@ -14,8 +14,16 @@
   var DOT = 50;             // circle diameter
   var DOT_ACTIVE = 64;
   var BOX = (R + DOT_ACTIVE / 2 + 6) * 2;   // square the ring needs
-  var WHEEL_COOLDOWN = 320; // one venture per wheel gesture, not per tick
-  var SPIN_MS = 620;
+  // Timing. The ring used to snap round in 620ms, which read as a flick rather
+  // than a turn — twelve ventures went past faster than any of them could be
+  // read. 1150ms with a soft settle is slow enough to follow the icon you were
+  // looking at all the way to the top.
+  var SPIN_MS = 1150;
+  // The cooldown has to be at least as long as the spin, or a second scroll
+  // lands mid-turn and the ring never comes to rest anywhere.
+  var WHEEL_COOLDOWN = SPIN_MS - 150;
+  var EASE = 'cubic-bezier(.28,.72,.22,1)';   // quick to leave, long to arrive
+  var HOVER_INTENT = 110;   // ms a pointer must rest before the ring follows it
 
   var ICONS = {
     cart:   '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.5 3h2l2.7 13a2 2 0 0 0 2 1.6h9a2 2 0 0 0 2-1.6L20 8H6"/>',
@@ -55,29 +63,50 @@
     // Anything else turns this into a 360px-tall dead zone the reader can get
     // stuck in halfway down the homepage.
     '  touch-action:pan-y;user-select:none;transform-origin:top left}' +
+    // The dashed ring turns very slowly on its own — a minute per revolution,
+    // far too slow to read as movement, but enough that the thing never looks
+    // like a still image. It is a border, so it is rotated as a whole.
     '.so-ring{position:absolute;inset:0;border-radius:50%;' +
     '  border:1px dashed var(--color-neutral-500,#a09b95);' +
-    '  margin:' + (DOT_ACTIVE / 2 + 6) + 'px;opacity:.55}' +
+    '  margin:' + (DOT_ACTIVE / 2 + 6) + 'px;opacity:.55;animation:so-drift 60s linear infinite}' +
+    '@keyframes so-drift{to{transform:rotate(360deg)}}' +
     '.so-disc{position:absolute;inset:0;border-radius:50%;margin:' + (DOT_ACTIVE / 2 + 18) + 'px;' +
     '  background:radial-gradient(circle at 50% 45%,rgba(236,48,19,.045),rgba(236,48,19,0) 70%)}' +
     // One rotating layer holds every circle and dot; each circle is
     // counter-rotated by the same angle so the icons stay upright while the
     // ring turns underneath them.
-    '.so-spin{position:absolute;inset:0;transition:transform ' + SPIN_MS + 'ms cubic-bezier(.33,.9,.25,1)}' +
+    '.so-spin{position:absolute;inset:0;transition:transform ' + SPIN_MS + 'ms ' + EASE + '}' +
     '.so-item{position:absolute;left:50%;top:50%;width:' + DOT + 'px;height:' + DOT + 'px;margin:' +
     '  ' + (-DOT / 2) + 'px 0 0 ' + (-DOT / 2) + 'px;border-radius:50%;background:#fff;border:none;padding:0;' +
     '  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--color-accent,#ec3013);' +
     '  box-shadow:0 2px 8px rgba(32,30,29,.09),0 0 0 1px rgba(32,30,29,.07);' +
-    '  transition:width ' + SPIN_MS + 'ms,height ' + SPIN_MS + 'ms,margin ' + SPIN_MS + 'ms,box-shadow .22s}' +
+    // transform and opacity carry the depth falloff set in render(), and have
+    // to ease over the same duration as the ring or the two come apart.
+    '  transition:width ' + SPIN_MS + 'ms ' + EASE + ',height ' + SPIN_MS + 'ms ' + EASE + ',' +
+    '    margin ' + SPIN_MS + 'ms ' + EASE + ',transform ' + SPIN_MS + 'ms ' + EASE + ',' +
+    '    opacity ' + SPIN_MS + 'ms ' + EASE + ',box-shadow .28s ease}' +
     '.so-item:hover{box-shadow:0 4px 14px rgba(32,30,29,.16),0 0 0 1px var(--color-accent,#ec3013)}' +
-    '.so-item svg{width:24px;height:24px}' +
+    '.so-item svg{width:24px;height:24px;transition:width ' + SPIN_MS + 'ms ' + EASE + ',height ' + SPIN_MS + 'ms ' + EASE + '}' +
     '.so-item.on{width:' + DOT_ACTIVE + 'px;height:' + DOT_ACTIVE + 'px;margin:' +
     '  ' + (-DOT_ACTIVE / 2) + 'px 0 0 ' + (-DOT_ACTIVE / 2) + 'px;' +
     '  box-shadow:0 0 0 2px var(--color-accent,#ec3013),0 0 0 6px rgba(236,48,19,.12),0 6px 16px rgba(236,48,19,.20)}' +
     '.so-item.on svg{width:30px;height:30px}' +
     '.so-item:focus-visible{outline:2px solid var(--color-accent,#ec3013);outline-offset:3px}' +
+    // A halo that breathes behind whichever venture is at the top. Drawn on a
+    // separate element rather than the button's own box-shadow so the pulse
+    // cannot fight the size transition happening on the button itself.
+    '.so-halo{position:absolute;left:50%;top:50%;width:' + (DOT_ACTIVE + 26) + 'px;' +
+    '  height:' + (DOT_ACTIVE + 26) + 'px;margin:' + (-(DOT_ACTIVE + 26) / 2) + 'px 0 0 ' +
+    '  ' + (-(DOT_ACTIVE + 26) / 2) + 'px;border-radius:50%;pointer-events:none;' +
+    '  border:1px solid rgba(236,48,19,.30);opacity:0;' +
+    '  transition:transform ' + SPIN_MS + 'ms ' + EASE + ',opacity .5s ease;' +
+    '  animation:so-breathe 3.4s ease-in-out infinite}' +
+    '.so-halo.on{opacity:1}' +
+    '@keyframes so-breathe{0%,100%{box-shadow:0 0 0 0 rgba(236,48,19,.18)}' +
+    '  50%{box-shadow:0 0 0 9px rgba(236,48,19,0)}}' +
     '.so-pip{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;' +
-    '  background:var(--color-accent,#ec3013);opacity:.85}' +
+    '  background:var(--color-accent,#ec3013);opacity:.85;' +
+    '  transition:opacity ' + SPIN_MS + 'ms ' + EASE + '}' +
     // Centre label: the ring is decorative without it — this is what tells you
     // which venture you are looking at.
     '.so-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:' + (R * 1.25) + 'px;' +
@@ -95,7 +124,22 @@
     '  color:var(--color-neutral-500,#a09b95);margin-top:6px}' +
     '.so-hint{font-size:10px;letter-spacing:.12em;text-transform:uppercase;' +
     '  color:var(--color-neutral-500,#a09b95);margin-top:14px;white-space:nowrap;opacity:.9}' +
-    '@media (prefers-reduced-motion:reduce){.so-spin,.so-item{transition:none !important}}';
+    // The name in the middle changes the moment the ring starts moving, which
+    // read as a glitch against a turn that now takes over a second. It lifts
+    // and fades instead, and is swapped while it is invisible.
+    '.so-label{transition:opacity .3s ease,transform .3s ease}' +
+    '.so-label.swap{opacity:0;transform:translateY(-6px)}' +
+    // Each circle arrives rather than simply being there, one after another
+    // round the ring. Only opacity is animated: transform carries each item's
+    // position and is written inline by render(), so a keyframe touching it
+    // would drag every circle to the centre. fill-mode is `backwards`, not
+    // `both` — with `both` the final keyframe would keep overriding the depth
+    // opacity set below for the rest of the page's life.
+    '.so-wrap.intro .so-item,.so-wrap.intro .so-pip{animation:so-arrive .55s ease backwards}' +
+    '@keyframes so-arrive{from{opacity:0}to{opacity:1}}' +
+    '@media (prefers-reduced-motion:reduce){' +
+    '  .so-spin,.so-item,.so-pip,.so-halo,.so-label,.so-item svg{transition:none !important;animation:none !important}' +
+    '  .so-ring{animation:none !important}}';
 
   var style = document.createElement('style');
   style.textContent = CSS;
@@ -137,6 +181,23 @@
   var midName = wrap.querySelector('.so-name');
   var midStatus = wrap.querySelector('.so-status');
   var items = [];
+  var hoverTimer = null;
+  var introDone = false;
+
+  var reduced = false;
+  try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+  // The breathing halo behind whichever venture is at the top. It sits outside
+  // the rotating layer, permanently at the top of the ring, so it never has to
+  // travel — the circles come to it.
+  var halo = document.createElement('span');
+  halo.className = 'so-halo';
+  halo.style.transform = 'translate(0px,' + (-R) + 'px)';
+  wrap.insertBefore(halo, wrap.querySelector('.so-mid'));
+
+  // Marked so the centre text can be faded out and back rather than swapped
+  // under the reader's eye halfway through a turn.
+  [midNum, midName, midStatus].forEach(function (el) { el.classList.add('so-label'); });
 
   wrap.querySelector('.so-open').addEventListener('click', function () {
     location.href = 'venture.html?v=' + V[active].slug;
@@ -159,8 +220,15 @@
       location.href = 'venture.html?v=' + v.slug;
     });
     // Hovering brings a venture to the top and names it in the middle, so you
-    // can see what an icon is before committing to the click.
-    b.addEventListener('pointerenter', function () { if (i !== active) go(i); });
+    // can see what an icon is before committing to the click. The short delay
+    // is hover INTENT: at this speed, a cursor crossing the ring on its way
+    // somewhere else would otherwise set off four turns in a row.
+    b.addEventListener('pointerenter', function (e) {
+      if (e.pointerType === 'touch') return;   // a tap opens the page, it does not aim
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(function () { if (i !== active) go(i); }, HOVER_INTENT);
+    });
+    b.addEventListener('pointerleave', function () { clearTimeout(hoverTimer); });
     b.addEventListener('focus', function () { if (i !== active) go(i); });
     spin.appendChild(b);
     items.push(b);
@@ -178,6 +246,12 @@
   // whole ring backwards.
   var turn = 0;
 
+  // How far round the ring an item currently sits from the top, 0 to 6.
+  function distanceFromTop(i) {
+    var k = mod(i - active, N);
+    return Math.min(k, N - k);
+  }
+
   function render() {
     spin.style.transform = 'rotate(' + (-turn * STEP) + 'deg)';
     items.forEach(function (el, i) {
@@ -185,16 +259,45 @@
       el.classList.toggle('on', on);
       el.tabIndex = on ? 0 : -1;
       el.setAttribute('aria-current', on ? 'true' : 'false');
+
+      // Depth. Circles further from the top sit back a little — slightly
+      // smaller and softer — so the ring reads as a wheel turning towards you
+      // rather than twelve flat buttons on a circle. It also puts the eye
+      // where the label is.
+      var d = distanceFromTop(i);
+      var scale = on ? 1 : Math.max(0.80, 1 - d * 0.045);
       // Undo the ring's rotation so icons stay upright.
       var a = (i * STEP - 90) * Math.PI / 180;
       el.style.transform =
         'translate(' + (Math.cos(a) * R).toFixed(1) + 'px,' + (Math.sin(a) * R).toFixed(1) + 'px) ' +
-        'rotate(' + (turn * STEP) + 'deg)';
+        'rotate(' + (turn * STEP) + 'deg) ' +
+        'scale(' + scale.toFixed(3) + ')';
+      // Held back until the entrance animation has finished, because that
+      // animation owns opacity while it runs.
+      if (introDone) el.style.opacity = on ? '1' : String(Math.max(0.55, 1 - d * 0.075));
     });
+
+    halo.classList.toggle('on', true);
+
     var v = V[active];
-    midNum.textContent = v.num;
-    midName.textContent = v.name.replace(/^Shalom /, '');
-    midStatus.textContent = v.status;
+    setLabel(v);
+  }
+
+  // Fade the centre text out, change it while nobody can see it, fade it back.
+  var labelTimer = null;
+  function setLabel(v) {
+    var write = function () {
+      midNum.textContent = v.num;
+      midName.textContent = v.name.replace(/^Shalom /, '');
+      midStatus.textContent = v.status;
+    };
+    if (reduced || midName.textContent === '') { write(); return; }
+    clearTimeout(labelTimer);
+    [midNum, midName, midStatus].forEach(function (el) { el.classList.add('swap'); });
+    labelTimer = setTimeout(function () {
+      write();
+      [midNum, midName, midStatus].forEach(function (el) { el.classList.remove('swap'); });
+    }, 300);
   }
 
   function go(i) { turn += i - active; active = mod(i, N); render(); }
@@ -205,6 +308,9 @@
     // Scoped to this element only — the page scrolls normally everywhere else.
     e.preventDefault();
     var now = Date.now();
+    // A trackpad or a free-spinning wheel sends a burst of events per gesture.
+    // With a turn now taking over a second, letting them through would build a
+    // queue the ring spends the next ten seconds working off.
     if (now - lastWheel < WHEEL_COOLDOWN) return;
     lastWheel = now;
     step(e.deltaY > 0 ? 1 : -1);
@@ -230,11 +336,40 @@
       axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
     }
     if (axis !== 'x') return;
-    if (Math.abs(dx) >= 46) { step(dx < 0 ? 1 : -1); startX = e.clientX; }
+    // A longer throw per step, to match the slower turn — otherwise one swipe
+    // across the ring fires three of them.
+    if (Math.abs(dx) >= 64) { step(dx < 0 ? 1 : -1); startX = e.clientX; }
   });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) {
     wrap.addEventListener(t, function () { startX = null; startY = null; axis = null; });
   });
 
+  // ---- first paint ---------------------------------------------------------
+
   render();
+
+  // The twelve circles come in one after another, starting at the top and
+  // going round. Skipped entirely under reduced motion, where the ring should
+  // simply be there.
+  if (!reduced) {
+    wrap.classList.add('intro');
+    items.forEach(function (el, i) {
+      el.style.animationDelay = (i * 45) + 'ms';
+    });
+    wrap.querySelectorAll('.so-pip').forEach(function (el, i) {
+      el.style.animationDelay = (i * 45 + 120) + 'ms';
+    });
+    var last = (N - 1) * 45 + 550 + 60;
+    setTimeout(function () {
+      wrap.classList.remove('intro');
+      items.forEach(function (el) { el.style.animationDelay = ''; });
+      // Only now can the depth opacities be written — until the entrance
+      // finishes, the animation is what owns opacity on these elements.
+      introDone = true;
+      render();
+    }, last);
+  } else {
+    introDone = true;
+    render();
+  }
 })();

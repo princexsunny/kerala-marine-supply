@@ -16,6 +16,21 @@
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--color-divider)}
   .slot{background:var(--color-bg);padding:20px 22px;display:flex;gap:18px;align-items:flex-start}
   .thumb{width:100px;height:74px;flex:none;background:var(--color-surface);background-size:cover;background-position:center;border:1px solid var(--color-neutral-300)}
+  /* A slot holds several photos now, so it needs a strip rather than one box.
+     The order shown here is the order they appear on the site. */
+  .shots{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+  .shots:empty{display:none}
+  .shot-i{position:relative;width:88px;height:66px;background:var(--color-surface) center/cover no-repeat;
+          border:1px solid var(--color-neutral-300)}
+  .shot-i.pending{border-style:dashed;border-color:var(--color-accent);opacity:.85}
+  .shot-n{position:absolute;left:0;bottom:0;background:rgba(32,30,29,.72);color:#fff;
+          font-size:10px;font-weight:700;letter-spacing:.06em;padding:2px 5px}
+  .shot-x{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;
+          border:1px solid var(--color-neutral-300);background:var(--color-bg);color:var(--color-accent-700);
+          font:inherit;font-size:13px;font-weight:700;line-height:1;cursor:pointer;padding:0;
+          display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(32,30,29,.2)}
+  .shot-x:hover:not(:disabled){border-color:var(--color-accent);background:var(--color-accent-100)}
+  .shot-x:disabled{opacity:.5;cursor:default}
   .slot .lbl{font-family:var(--font-heading);font-weight:800;font-size:14px}
   .slot .hint{margin:4px 0 10px;font-size:12px;color:var(--color-neutral-700)}
   .note{font-size:13px;color:var(--color-neutral-800);margin-top:14px}
@@ -153,7 +168,7 @@
       <div class="page-body">
     <div class="eyebrow">Step 1 · Photographs</div>
     <h2>Website photos</h2>
-    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Choose a picture for each slot, then save. These appear on the home page straight away. JPEG, PNG, WebP or GIF.</p>
+    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Choose one picture or several for each slot, then save. Two or more become a slideshow that fades between them on the site. Drop a photo's × to remove just that one. JPEG, PNG, WebP or GIF, up to 12 per slot.</p>
     <div class="grid2" id="slotGrid"></div>
 
     <div class="row"><button class="btn btn-primary savePhotos">Save photos</button><button class="btn btn-ghost clearPhotos">Clear choices</button><span class="note photoNote"></span></div></div>
@@ -163,7 +178,7 @@
     <div class="page-box" aria-label="Venture photos">
       <div class="page-head"><h2>Venture photos</h2><a class="page-back" href="admin.html">← All settings</a></div>
       <div class="page-body"><h3 style="font-size:16px;font-weight:800;margin:30px 0 4px">Venture photographs</h3>
-    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px;margin:0 0 14px">One picture for each venture page. Leave a slot empty and that page shows a caption instead.</p>
+    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px;margin:0 0 14px">Pictures for each venture page — one, or several to make a slideshow. Leave a slot empty and that page shows a caption instead.</p>
     <div class="grid2" id="ventureGrid"></div>
 
     <div class="row"><button class="btn btn-primary savePhotos">Save photos</button><button class="btn btn-ghost clearPhotos">Clear choices</button><span class="note photoNote"></span></div></div>
@@ -275,7 +290,15 @@
 
   // Everything below treats both groups identically.
   var ALL_SLOTS = SLOTS.concat(VENTURE_SLOTS);
-  var photos = {}; // key -> dataURL chosen (not yet saved / just saved)
+  var MAX_PER_SLOT = 12;   // must match MAX_PHOTOS_PER_SLOT in server/routes/media.js
+
+  // Two separate things, deliberately kept apart:
+  //   live[key]  what the website is showing right now
+  //   queued[key] photographs picked in this session, not yet saved
+  // Merging them would mean a picked-but-unsaved photo looking identical to a
+  // published one, which is exactly the confusion that gets work lost.
+  var live = {};
+  var queued = {};
 
   var slotGrid  = document.getElementById('slotGrid');
   var ventureGrid = document.getElementById('ventureGrid');
@@ -284,70 +307,128 @@
     var div = document.createElement('div');
     div.className = 'slot';
     div.innerHTML =
-      '<div class="thumb" id="thumb-'+s.key+'"></div>' +
-      '<div style="min-width:0">' +
+      '<div style="min-width:0;flex:1">' +
         '<div class="lbl">'+s.label+'</div>' +
         '<p class="hint">'+s.hint+'</p>' +
-        '<input type="file" accept="image/*" data-slot="'+s.key+'">' +
+        '<div class="shots" id="shots-'+s.key+'" data-slot="'+s.key+'"></div>' +
+        '<input type="file" accept="image/*" multiple data-slot="'+s.key+'">' +
         '<div style="margin-top:8px">' +
           '<span class="note" id="state-'+s.key+'" style="margin:0;font-size:12px"></span>' +
-          '<button class="del" data-slot="'+s.key+'" id="del-'+s.key+'" hidden>Delete</button>' +
+          '<button class="del" data-slot="'+s.key+'" id="del-'+s.key+'" hidden>Remove all</button>' +
         '</div>' +
       '</div>';
     grid.appendChild(div);
   });
 
+  function slotLabel(key){
+    var s = ALL_SLOTS.filter(function(x){ return x.key === key; })[0];
+    return s ? s.label : key;
+  }
+
+  // Draw one slot: the photos on the site, then anything waiting to be saved.
+  function paintSlot(key){
+    var strip = document.getElementById('shots-'+key);
+    var state = document.getElementById('state-'+key);
+    var del   = document.getElementById('del-'+key);
+    if(!strip) return;
+
+    var onSite = live[key] || [];
+    var waiting = queued[key] || [];
+    strip.innerHTML =
+      onSite.map(function(it, i){
+        return '<div class="shot-i" style="background-image:url('+it.url+')">' +
+                 '<span class="shot-n">'+(i+1)+'</span>' +
+                 '<button class="shot-x" data-slot="'+key+'" data-id="'+it.id+'" ' +
+                   'title="Remove this photo" aria-label="Remove photo '+(i+1)+'">&times;</button>' +
+               '</div>';
+      }).join('') +
+      waiting.map(function(d, i){
+        return '<div class="shot-i pending" style="background-image:url('+d+')">' +
+                 '<span class="shot-n">NEW</span>' +
+                 '<button class="shot-x" data-slot="'+key+'" data-queued="'+i+'" ' +
+                   'title="Do not add this one" aria-label="Remove pending photo">&times;</button>' +
+               '</div>';
+      }).join('');
+
+    var bits = [];
+    if(onSite.length) bits.push(onSite.length + (onSite.length === 1 ? ' photo' : ' photos') + ' on the site' + (onSite.length > 1 ? ' (slideshow)' : ''));
+    else bits.push('Empty');
+    if(waiting.length) bits.push(waiting.length + ' waiting to be saved');
+    state.textContent = bits.join(' · ') + '.';
+    del.hidden = onSite.length === 0;
+  }
+
   // Show what is actually live on the site right now, so the admin reflects
   // the site rather than only what was picked in this session.
   function loadPhotos(){
-    fetch('/api/media', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(m){
+    return fetch('/api/media', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(m){
       ALL_SLOTS.forEach(function(s){
         var entry = m && m[s.key];
-        var thumb = document.getElementById('thumb-'+s.key);
-        var state = document.getElementById('state-'+s.key);
-        var del   = document.getElementById('del-'+s.key);
-        if(entry && entry.url){
-          // Only paint the live photo if the user hasn't picked a replacement
-          // in this session — otherwise it would wipe their pending choice.
-          if(!photos[s.key]) thumb.style.backgroundImage = 'url('+entry.url+')';
-          state.textContent = 'On the site now.';
-          del.hidden = false;
-        } else {
-          if(!photos[s.key]) thumb.style.backgroundImage = 'none';
-          state.textContent = 'Empty.';
-          del.hidden = true;
-        }
+        live[s.key] = (entry && entry.items && entry.items.length) ? entry.items
+                    : (entry && entry.url ? [{ id: null, url: entry.url }] : []);
+        paintSlot(s.key);
       });
     }).catch(function(){});
   }
 
-  // Delegated, so it survives the slots being re-rendered.
-  slotGrid.addEventListener('click', function(e){
+  // One delegated handler for both grids, so it survives every re-render.
+  function onGridClick(e){
+    var x = e.target.closest && e.target.closest('button.shot-x');
+    if(x) return removeOne(x);
     var btn = e.target.closest && e.target.closest('button.del');
-    if(!btn) return;
+    if(btn) return removeAll(btn);
+  }
+  slotGrid.addEventListener('click', onGridClick);
+  ventureGrid.addEventListener('click', onGridClick);
+
+  function removeOne(x){
+    var key = x.dataset.slot;
+
+    // Queued but unsaved: nothing has been uploaded, so just drop it.
+    if(x.dataset.queued !== undefined){
+      (queued[key] || []).splice(Number(x.dataset.queued), 1);
+      if(queued[key] && !queued[key].length) delete queued[key];
+      paintSlot(key);
+      photoNote('Removed from the batch.');
+      return;
+    }
+
+    if(!x.dataset.id || x.dataset.id === 'null'){
+      photoNote('That photo was saved before slideshows existed — use "Remove all" for this slot.');
+      return;
+    }
+    if(!confirm('Remove this photo from ' + slotLabel(key) + '?\n\nIt is permanently deleted from storage and cannot be undone.')) return;
+    x.disabled = true;
+    api('DELETE', '/api/media/' + encodeURIComponent(key) + '/photos/' + encodeURIComponent(x.dataset.id))
+      .then(function(){
+        photoNote('Photo removed from ' + slotLabel(key) + '.');
+        loadPhotos();
+      })
+      .catch(function(err){ x.disabled = false; photoNote(err.message); });
+  }
+
+  function removeAll(btn){
     var key = btn.dataset.slot;
-    var slot = ALL_SLOTS.filter(function(s){ return s.key === key; })[0];
-    var label = slot ? slot.label : key;
-    if(!confirm('Remove the '+label+' from the website?\n\nThis permanently deletes the photo from storage and cannot be undone.')) return;
+    var n = (live[key] || []).length;
+    if(!confirm('Remove all ' + n + ' photo' + (n === 1 ? '' : 's') + ' from ' + slotLabel(key) + '?\n\nThey are permanently deleted from storage and cannot be undone.')) return;
     btn.disabled = true;
     btn.textContent = 'Removing…';
     api('DELETE', '/api/media/' + encodeURIComponent(key))
       .then(function(){
-        delete photos[key];
-        document.getElementById('thumb-'+key).style.backgroundImage = 'none';
-        var input = slotGrid.querySelector('input[data-slot="'+key+'"]');
+        delete queued[key];
+        var input = document.querySelector('input[data-slot="'+key+'"]');
         if(input) input.value = '';
-        photoNote('Removed the '+label+'.');
+        photoNote('Cleared ' + slotLabel(key) + '.');
         btn.disabled = false;
-        btn.textContent = 'Delete';
+        btn.textContent = 'Remove all';
         loadPhotos();
       })
       .catch(function(err){
         btn.disabled = false;
-        btn.textContent = 'Delete';
+        btn.textContent = 'Remove all';
         photoNote(err.message);
       });
-  });
+  }
   // Photos straight off a phone or camera are often 5-10 MB, which is far
   // more than a website needs and big enough to blow past the request size
   // limit once base64 encoding adds ~37%. Downscale in the browser first:
@@ -384,55 +465,86 @@
     });
   }
 
-  slotGrid.addEventListener('change', function(e){
+  // Several files at once, resized one after another rather than all in
+  // parallel: a phone decoding eight 12-megapixel photos simultaneously will
+  // stall the tab, and the queue keeps the order the pictures were chosen in.
+  function onPick(e){
     var input = e.target;
     if(!input.dataset || !input.dataset.slot) return;
-    var file = input.files && input.files[0];
-    if(!file) return;
-    if(!/^image\/(jpeg|png|webp|gif)$/.test(file.type)){
-      photoNote('That file is not a JPEG, PNG, WebP or GIF.');
+    var key = input.dataset.slot;
+    var files = Array.prototype.slice.call(input.files || []);
+    input.value = '';                       // so the same file can be picked again
+    if(!files.length) return;
+
+    var bad = files.filter(function(f){ return !/^image\/(jpeg|png|webp|gif)$/.test(f.type); });
+    files = files.filter(function(f){ return /^image\/(jpeg|png|webp|gif)$/.test(f.type); });
+    if(bad.length) photoNote(bad.length + ' file(s) skipped — not a JPEG, PNG, WebP or GIF.');
+    if(!files.length) return;
+
+    queued[key] = queued[key] || [];
+    var room = MAX_PER_SLOT - ((live[key] || []).length + queued[key].length);
+    if(room <= 0){
+      photoNote(slotLabel(key) + ' already holds ' + MAX_PER_SLOT + ' photos. Remove one first.');
       return;
     }
-    var key = input.dataset.slot;
-    photoNote('Processing ' + file.name + '…');
-    shrinkImage(file).then(function(dataUrl){
-      photos[key] = dataUrl;
-      document.getElementById('thumb-'+key).style.backgroundImage = 'url('+dataUrl+')';
-      var kb = Math.round(dataUrl.length * 0.75 / 1024);
-      photoNote(file.name + ' ready (' + kb + ' KB after resizing).');
-    }).catch(function(err){
-      photoNote(err.message);
-    });
-  });
+    if(files.length > room){
+      photoNote('Only ' + room + ' more will fit in ' + slotLabel(key) + ' — taking the first ' + room + '.');
+      files = files.slice(0, room);
+    }
+
+    var i = 0;
+    (function next(){
+      if(i >= files.length){
+        paintSlot(key);
+        photoNote(files.length + ' photo' + (files.length === 1 ? '' : 's') + ' ready — press Save photos to publish.');
+        return;
+      }
+      photoNote('Processing ' + (i+1) + ' of ' + files.length + '…');
+      shrinkImage(files[i]).then(function(dataUrl){
+        queued[key].push(dataUrl);
+        paintSlot(key);
+        i++; next();
+      }).catch(function(err){
+        photoNote(files[i].name + ': ' + err.message);
+        i++; next();
+      });
+    })();
+  }
+  slotGrid.addEventListener('change', onPick);
+  ventureGrid.addEventListener('change', onPick);
+
   function onAll(sel, fn){
     var els = document.querySelectorAll(sel);
     for (var i = 0; i < els.length; i++) els[i].addEventListener('click', fn);
   }
 
   onAll('.clearPhotos', function(){
-    photos = {};
-    ALL_SLOTS.forEach(function(s){ document.getElementById('thumb-'+s.key).style.backgroundImage = 'none'; });
-    photoNote('Choices cleared.');
+    queued = {};
+    ALL_SLOTS.forEach(function(s){ paintSlot(s.key); });
+    photoNote('Unsaved choices cleared. Nothing on the site was touched.');
   });
+
   onAll('.savePhotos', function(){
-    var keys = Object.keys(photos);
+    var keys = Object.keys(queued).filter(function(k){ return queued[k] && queued[k].length; });
     if(!keys.length){ photoNote('Choose at least one picture first.'); return; }
-    // One request per photo rather than all in one body: a single oversized
-    // photo then can't fail the whole batch, and progress is visible.
+
+    // One request per slot. These ADD to the slot rather than replacing it, so
+    // saving twice builds up a slideshow instead of quietly discarding the
+    // first batch — which is what a replace would have done.
+    var total = keys.reduce(function(n, k){ return n + queued[k].length; }, 0);
     var i = 0;
     (function next(){
       if(i >= keys.length){
-        photoNote(keys.length + ' photo(s) saved — live on the home page now.');
-        photos = {};
+        photoNote(total + ' photo' + (total === 1 ? '' : 's') + ' saved — live on the site now.');
+        queued = {};
         loadPhotos();
         return;
       }
       var key = keys[i];
-      photoNote('Saving ' + (i+1) + ' of ' + keys.length + '…');
-      var one = {}; one[key] = photos[key];
-      api('PUT', '/api/media', one)
-        .then(function(){ i++; next(); })
-        .catch(function(err){ photoNote(key + ': ' + err.message); });
+      photoNote('Saving ' + slotLabel(key) + ' (' + (i+1) + ' of ' + keys.length + ')…');
+      api('POST', '/api/media/' + encodeURIComponent(key) + '/photos', { photos: queued[key] })
+        .then(function(){ delete queued[key]; i++; next(); })
+        .catch(function(err){ photoNote(slotLabel(key) + ': ' + err.message); loadPhotos(); });
     })();
   });
 

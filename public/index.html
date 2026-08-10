@@ -354,7 +354,12 @@
 
 <section id="founder" style="border-bottom:2px solid var(--color-divider)">
   <div style="max-width:1280px;margin:0 auto;padding:64px 40px;display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:56px;align-items:start">
-    <image-slot id="founder" shape="rect" style="width:100%;aspect-ratio:4/5" placeholder="Founder portrait — Prince"></image-slot>
+    <!-- id is founder-photo, not founder: the enclosing <section> already owns
+         "founder", and two elements sharing an id is invalid HTML that made
+         getElementById return the section — which would have replaced the whole
+         founder section with the photograph. Distinct ids remove the ambiguity
+         rather than relying on a carefully worded selector to work around it. -->
+    <image-slot id="founder-photo" shape="rect" style="width:100%;aspect-ratio:4/5" placeholder="Founder portrait — Prince"></image-slot>
     <div>
       <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--color-accent-700);font-weight:600;margin-bottom:8px">Who is building this</div>
       <div style="width:48px;height:2px;background:var(--color-accent);margin-bottom:14px"></div>
@@ -438,7 +443,8 @@
 })();
 </script>
 <script src="ventures-data.js"></script>
-<script src="sector-orbit.js?v=4"></script>
-<script src="site-media.js?v=11"></script>
+<script src="sector-orbit.js?v=5"></script>
+<script src="media-stage.js?v=1"></script>
+<script src="site-media.js?v=12"></script>
 </body>
 </html>

@@ -17,6 +17,13 @@ const router = express.Router(); // admin-only (mounted behind adminAuth)
 const publicRouter = express.Router(); // readable by site visitors
 
 const MAX_BYTES = 15 * 1024 * 1024; // generous cap for a hero/strip photo
+
+// A slot is a slideshow, not a single picture, so it needs a ceiling. Twelve is
+// enough to tell any of these stories and still small enough that a visitor on
+// mobile data is not made to download a photo album to read the homepage — the
+// slideshow only fetches each one as it comes round, but the cap is what stops
+// a slot growing without limit.
+const MAX_PHOTOS_PER_SLOT = 12;
 const EXT_BY_TYPE = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -43,6 +50,102 @@ const uploadVideo = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_VIDEO_BYTES },
 });
+
+// ---- Slot shape ------------------------------------------------------------
+//
+// A media doc holds `items: [{ id, url, storagePath, contentType }]`.
+//
+// The top-level url/storagePath/contentType are kept in step with items[0].
+// They are not redundant: every photo saved before this change is stored that
+// way and has no items array at all, and venture.html reads `.url` directly.
+// Mirroring means old records keep working untouched and nothing has to be
+// migrated by hand — readItems() below promotes a legacy doc to a one-item
+// slideshow on the fly.
+function readItems(data) {
+  if (!data) return [];
+  if (Array.isArray(data.items) && data.items.length) {
+    return data.items.filter(function (it) { return it && it.url; });
+  }
+  if (data.url) {
+    return [{
+      id: idFor(data.storagePath),
+      url: data.url,
+      storagePath: data.storagePath || null,
+      contentType: data.contentType || null,
+    }];
+  }
+  return [];
+}
+
+// A stable handle for one photo inside a slot, used by the delete route.
+// Derived from the storage filename rather than the array index, because an
+// index shifts the moment anything else in the slot is removed — and a delete
+// that acts on a stale index removes the wrong picture.
+function idFor(storagePath) {
+  if (!storagePath) return null;
+  const base = String(storagePath).split('/').pop() || '';
+  return base.replace(/\.[^.]+$/, '') || null;
+}
+
+// items[] plus the mirrored first-item fields, as one object to write.
+function slotDoc(items) {
+  const first = items[0] || null;
+  return {
+    items,
+    url: first ? first.url : null,
+    storagePath: first ? first.storagePath : null,
+    contentType: first ? first.contentType : null,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+}
+
+// Decode one "data:image/jpeg;base64,..." string, or return null with a reason.
+function decodeDataUrl(dataUrl) {
+  const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl || '');
+  if (!match) return { error: 'not an image' };
+  const [, contentType, base64] = match;
+  const ext = EXT_BY_TYPE[contentType];
+  if (!ext) return { error: 'unsupported type' };
+  const buffer = Buffer.from(base64, 'base64');
+  if (buffer.length > MAX_BYTES) return { error: 'too large' };
+  return { contentType, ext, buffer };
+}
+
+// Upload one decoded photo and return its item record.
+async function storePhoto(bucket, safeKey, decoded, seq) {
+  // Unique filename per upload, NOT a fixed `media/hero.jpg`.
+  //
+  // With a fixed name the signed URL never changed, so replacing a photo left
+  // every browser and CDN still holding the previous image under an identical
+  // URL — which is why a refreshed page showed the old photo first and only
+  // switched once the cache expired. A new name means a new URL, so a
+  // replacement is visible immediately and the file itself can still be
+  // cached hard. The counter distinguishes photos saved within the same
+  // millisecond, which is exactly what a multi-file upload does.
+  const stamp = Date.now().toString(36) + (seq ? '-' + seq : '');
+  const storagePath = `media/${safeKey}-${stamp}.${decoded.ext}`;
+  const file = bucket.file(storagePath);
+  await file.save(decoded.buffer, {
+    contentType: decoded.contentType,
+    metadata: { cacheControl: 'public, max-age=31536000' },
+  });
+  const [url] = await file.getSignedUrl({ action: 'read', expires: '01-01-2500' });
+  return { id: idFor(storagePath), url, storagePath, contentType: decoded.contentType };
+}
+
+// Remove files that are no longer referenced by any item in the slot. Called
+// only after the record has been updated, so a failure here leaves an orphaned
+// file rather than a broken photo.
+async function removeFiles(bucket, paths) {
+  for (const p of paths) {
+    if (!p) continue;
+    try {
+      await bucket.file(p).delete();
+    } catch (e) {
+      if (e.code !== 404) console.warn('Could not remove old media', p, e.message);
+    }
+  }
+}
 
 // ---- Public read -----------------------------------------------------------
 
@@ -72,10 +175,18 @@ publicRouter.get('/media', async (req, res) => {
     const out = {};
     snap.docs.forEach((d) => {
       const data = d.data() || {};
-      if (!data.url) return;
+      const items = readItems(data);
+      if (!items.length) return;
       out[d.id] = {
-        url: data.url,
-        contentType: data.contentType || null,
+        // items[] is what the slideshow reads. url/contentType stay at the top
+        // level so anything still expecting one picture keeps working.
+        url: items[0].url,
+        contentType: items[0].contentType || null,
+        items: items.map((it) => ({
+          id: it.id || idFor(it.storagePath),
+          url: it.url,
+          contentType: it.contentType || null,
+        })),
         updatedAt:
           data.updatedAt && data.updatedAt.toDate
             ? data.updatedAt.toDate().toISOString()
@@ -117,55 +228,24 @@ router.put('/media', async (req, res) => {
 
     const saved = [];
     for (const key of keys) {
-      const dataUrl = photos[key];
-      const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl || '');
-      if (!match) continue;
-      const [, contentType, base64] = match;
-      const ext = EXT_BY_TYPE[contentType];
-      if (!ext) continue;
-      const buffer = Buffer.from(base64, 'base64');
-      if (buffer.length > MAX_BYTES) {
+      const decoded = decodeDataUrl(photos[key]);
+      if (decoded.error === 'too large') {
         return res.status(400).json({ error: `${key}: photo exceeds the size limit.` });
       }
+      if (decoded.error) continue;
+
       const safeKey = String(key).replace(/[^a-zA-Z0-9_-]/g, '_');
 
-      // Unique filename per upload, NOT a fixed `media/hero.jpg`.
-      //
-      // With a fixed name the signed URL never changed, so replacing a photo
-      // left every browser and CDN still holding the previous image under an
-      // identical URL — which is why a refreshed page showed the old photo
-      // first and only switched once the cache expired. A new name means a
-      // new URL, so a replacement is visible immediately and the file itself
-      // can still be cached hard.
-      const stamp = Date.now().toString(36);
-      const storagePath = `media/${safeKey}-${stamp}.${ext}`;
-
-      // Note what the slot pointed at before, so it can be cleaned up after
-      // the new file is safely stored.
+      // Note what the slot held before, so those files can be cleaned up once
+      // the new one is safely stored and recorded.
       const prevSnap = await db.collection('media').doc(safeKey).get();
-      const prevPath =
-        prevSnap.exists && prevSnap.data() ? prevSnap.data().storagePath : null;
+      const prevPaths = readItems(prevSnap.exists ? prevSnap.data() : null)
+        .map((it) => it.storagePath);
 
-      const file = bucket.file(storagePath);
-      await file.save(buffer, { contentType, metadata: { cacheControl: 'public, max-age=31536000' } });
-      const [url] = await file.getSignedUrl({ action: 'read', expires: '01-01-2500' });
-      await db.collection('media').doc(safeKey).set({
-        url,
-        storagePath,
-        contentType,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      const item = await storePhoto(bucket, safeKey, decoded);
+      await db.collection('media').doc(safeKey).set(slotDoc([item]));
 
-      // Old file removed only after the record points at the new one, so a
-      // failure here leaves an unused file rather than a broken photo.
-      if (prevPath && prevPath !== storagePath) {
-        try {
-          await bucket.file(prevPath).delete();
-        } catch (e) {
-          if (e.code !== 404) console.warn('Could not remove old photo', prevPath, e.message);
-        }
-      }
-
+      await removeFiles(bucket, prevPaths.filter((p) => p !== item.storagePath));
       saved.push(safeKey);
     }
 
@@ -176,6 +256,128 @@ router.put('/media', async (req, res) => {
   } catch (err) {
     console.error('PUT /api/media failed:', err);
     res.status(500).json({ error: 'Could not save photos. Please try again.' });
+  }
+});
+
+// POST /api/media/:slot/photos — ADD photos to a slot, keeping what is there.
+//
+// Separate from PUT above rather than a flag on it, because the two are
+// genuinely different acts: PUT means "this slot is now this picture", and
+// getting an accidental replace when you meant to add would silently destroy
+// work. The names say which is which.
+router.post('/media/:slot/photos', async (req, res) => {
+  const slot = String(req.params.slot);
+  if (PHOTO_SLOTS.indexOf(slot) === -1) {
+    return res.status(400).json({ error: 'Unknown photo slot.' });
+  }
+
+  try {
+    init();
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+
+  try {
+    const list = Array.isArray(req.body && req.body.photos) ? req.body.photos : [];
+    if (!list.length) {
+      return res.status(400).json({ error: 'No photos were sent.' });
+    }
+
+    const db = admin.firestore();
+    const bucket = admin.storage().bucket();
+    const ref = db.collection('media').doc(slot);
+    const snap = await ref.get();
+    const existing = readItems(snap.exists ? snap.data() : null);
+
+    const room = MAX_PHOTOS_PER_SLOT - existing.length;
+    if (room <= 0) {
+      return res.status(400).json({
+        error: `That slot already holds ${MAX_PHOTOS_PER_SLOT} photos, the maximum. Remove one first.`,
+      });
+    }
+    if (list.length > room) {
+      return res.status(400).json({
+        error: `Only ${room} more photo${room === 1 ? '' : 's'} will fit in that slot (${MAX_PHOTOS_PER_SLOT} maximum).`,
+      });
+    }
+
+    // Decode everything BEFORE uploading anything, so a rejected file fails the
+    // request outright instead of leaving half a batch in storage.
+    const decoded = [];
+    for (let i = 0; i < list.length; i++) {
+      const d = decodeDataUrl(list[i]);
+      if (d.error === 'too large') {
+        return res.status(400).json({ error: `Photo ${i + 1} is larger than the 15 MB limit.` });
+      }
+      if (d.error) {
+        return res.status(400).json({ error: `Photo ${i + 1} is not a JPEG, PNG, WebP or GIF.` });
+      }
+      decoded.push(d);
+    }
+
+    const added = [];
+    for (let i = 0; i < decoded.length; i++) {
+      added.push(await storePhoto(bucket, slot, decoded[i], i + 1));
+    }
+
+    const items = existing.concat(added);
+    await ref.set(slotDoc(items));
+    res.json({ ok: true, added: added.length, total: items.length, items });
+  } catch (err) {
+    console.error('POST /api/media/:slot/photos failed:', err);
+    res.status(500).json({ error: 'Could not add the photos. Please try again.' });
+  }
+});
+
+// DELETE /api/media/:slot/photos/:id — remove ONE photo from a slot.
+//
+// Addressed by id (the storage filename), never by position: a position is
+// only valid against the list the admin page happened to be showing, and if
+// anything changed in between it would delete a different picture than the one
+// whose cross was clicked.
+router.delete('/media/:slot/photos/:id', async (req, res) => {
+  const slot = String(req.params.slot);
+  const id = String(req.params.id);
+  if (PHOTO_SLOTS.indexOf(slot) === -1) {
+    return res.status(400).json({ error: 'Unknown photo slot.' });
+  }
+
+  try {
+    init();
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+
+  try {
+    const db = admin.firestore();
+    const bucket = admin.storage().bucket();
+    const ref = db.collection('media').doc(slot);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      return res.status(404).json({ error: 'There are no photos in that slot.' });
+    }
+
+    const items = readItems(snap.data());
+    const gone = items.filter((it) => (it.id || idFor(it.storagePath)) === id);
+    if (!gone.length) {
+      return res.status(404).json({ error: 'That photo is no longer in this slot.' });
+    }
+    const kept = items.filter((it) => (it.id || idFor(it.storagePath)) !== id);
+
+    // Record first, file second. If the file delete fails the slot is already
+    // correct on the site and only an unused file is left behind, which is the
+    // harmless failure of the two.
+    if (kept.length) {
+      await ref.set(slotDoc(kept));
+    } else {
+      await ref.delete();
+    }
+    await removeFiles(bucket, gone.map((it) => it.storagePath));
+
+    res.json({ ok: true, remaining: kept.length, items: kept });
+  } catch (err) {
+    console.error('DELETE /api/media/:slot/photos/:id failed:', err);
+    res.status(500).json({ error: 'Could not remove the photo. Please try again.' });
   }
 });
 
@@ -325,19 +527,17 @@ router.delete('/media/:slot', async (req, res) => {
       return res.status(404).json({ error: 'There is no photo in that slot.' });
     }
 
-    const data = snap.data() || {};
+    // Every photo in the slot, not just the first one — a slot is a slideshow
+    // now, and clearing it while leaving the other files behind would quietly
+    // accumulate storage nobody can see or reach.
+    const items = readItems(snap.data());
+
     // File first, then the record — if the file delete fails the photo stays
     // listed so it can be retried, rather than leaving an unreachable file.
-    if (data.storagePath) {
-      try {
-        await bucket.file(data.storagePath).delete();
-      } catch (e) {
-        if (e.code !== 404) throw e;
-      }
-    }
+    await removeFiles(bucket, items.map((it) => it.storagePath));
 
     await ref.delete();
-    res.json({ ok: true, deleted: slot });
+    res.json({ ok: true, deleted: slot, removed: items.length });
   } catch (err) {
     console.error('DELETE /api/media/:slot failed:', err);
     res.status(500).json({ error: 'Could not remove the photo. Please try again.' });

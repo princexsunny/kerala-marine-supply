@@ -24,7 +24,7 @@
   // The payload is tiny and rarely changes, so it is kept in localStorage.
   // A repeat visit paints from that copy straight away and then quietly
   // refreshes in the background — so the wait happens once, not every load.
-  var CACHE_KEY = 'kms.media.v1';
+  var CACHE_KEY = 'kms.media.v2';   // v2: entries now carry items[] as well as url
 
   function readCache() {
     try {
@@ -59,6 +59,13 @@
   // on the page are skipped, which keeps this safe if the design changes again.
   var SLOT_TO_ELEMENT = {
     hero: 'hero',
+    founder: 'founder-photo',
+  };
+
+  // Older copies of index.html gave the founder picture area the same id as the
+  // section around it. Accepting both means a cached page, or one served mid
+  // deploy, still gets its portrait.
+  var SLOT_FALLBACK = {
     founder: 'founder',
   };
 
@@ -71,7 +78,9 @@
   // stay in the flow and inherit the slot's own box instead.
   function styleFor(slotEl) {
     var inline = slotEl.getAttribute('style') || '';
-    var css = inline + ';display:block;object-fit:cover;transition:opacity .45s ease;';
+    // The box only has to be the right shape and in the right place. Fitting
+    // and fading belong to the layers inside it, which media-stage.js draws.
+    var css = inline + ';display:block;';
     if (!/(^|;)\s*width\s*:/.test(inline)) css += 'width:100%;';
     // Without a height or a ratio the image would collapse; a ratio is the
     // better default because it survives a column resize.
@@ -84,103 +93,29 @@
     return css;
   }
 
-  // The hero shows the uploaded video when there is one, with the hero
-  // PHOTOGRAPH as its poster frame. That means the picture is on screen the
-  // instant it loads while the video is still buffering, instead of a black
-  // rectangle — the video then starts over the top of it.
-  function fillVideo(slotEl, video, posterUrl, slotKey) {
-    var el = document.createElement('video');
-    el.src = video.url;
-    if (posterUrl) el.poster = posterUrl;
-    el.muted = true;            // required for autoplay, and nothing should
-    el.defaultMuted = true;     // start making noise at a visitor uninvited
-    el.setAttribute('muted', '');
-    el.loop = true;
-    el.playsInline = true;
-    el.setAttribute('playsinline', '');
+  // Every picture area on the page is now a stage: it can hold one photograph,
+  // several, or a video followed by several. media-stage.js owns the
+  // crossfading, the dots and when to run; this file only decides what goes in.
+  function fillSlot(slotEl, entry, video, slotKey) {
+    var items = (entry && entry.items && entry.items.length)
+      ? entry.items
+      : (entry && entry.url ? [{ url: entry.url }] : []);
 
-    // No player chrome: this is hero artwork, not something to operate. The
-    // control bar, the picture-in-picture button and the browser's own hover
-    // overlay all get turned off, and pointer events are disabled so a stray
-    // click can't pause it.
-    el.controls = false;
-    el.removeAttribute('controls');
-    el.disablePictureInPicture = true;
-    el.setAttribute('disablepictureinpicture', '');
-    el.setAttribute('disableremoteplayback', '');
-    el.setAttribute('controlslist', 'nodownload nofullscreen noremoteplayback noplaybackrate');
+    var stage = window.KMSStage && window.KMSStage.mount({
+      target: slotEl,
+      boxStyle: styleFor(slotEl),
+      items: items,
+      // Only the hero carries the video. The founder portrait is a portrait.
+      video: slotKey === 'hero' ? video : null,
+      eager: slotKey === 'hero',
+      name: slotKey === 'hero' ? 'Kerala Marine Supply' : 'Prince',
+    });
 
-    // Buffer properly before starting, so it plays through rather than
-    // stuttering on the first loop.
-    el.preload = 'auto';
-
-    var reduced = false;
-    try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
-    el.autoplay = !reduced;
-    if (!reduced) el.setAttribute('autoplay', '');
-
-    // Background matches the page rather than black: with object-fit:cover
-    // there should be no bars, and if a frame ever does show through, off-white
-    // disappears into the layout where black would not.
-    el.style.cssText = styleFor(slotEl) +
-      'background:var(--color-neutral-200,#eceae7);pointer-events:none;';
-    el.setAttribute('data-kms-slot', slotKey);
-
-    // Fade in once there is a frame to show, the same way the photos do, so
-    // it eases in instead of snapping from poster to video.
-    el.style.opacity = '0';
-    var reveal = function () { el.style.opacity = '1'; };
-    el.addEventListener('loadeddata', reveal);
-    el.addEventListener('canplay', reveal);
-    el.addEventListener('error', reveal);
-    setTimeout(reveal, 2500);   // never leave it stuck invisible
-
-    var parent = slotEl.parentNode;
-    if (!parent) return;
-    parent.replaceChild(el, slotEl);
-
-    // Autoplay can still be refused (data saver, battery saver). With no
-    // controls there is nothing for the visitor to press, so fall back to the
-    // poster image — which is the hero photograph, and looks intentional.
-    if (!reduced && el.play) {
-      var pr = el.play();
-      if (pr && pr.catch) pr.catch(function () {});
+    if (stage) {
+      stage.setAttribute('data-kms-slot', slotKey);   // marks this slot as filled
+      return true;
     }
-  }
-
-  function fillPhoto(slotEl, url, slotKey) {
-    var img = document.createElement('img');
-    img.src = url;
-    img.alt = '';
-    // The hero sits at the top of the page, so it must load eagerly and with
-    // priority; lazy-loading the most visible image on the site delayed the
-    // very picture people were waiting for.
-    var aboveFold = slotKey === 'hero';
-    img.loading = aboveFold ? 'eager' : 'lazy';
-    img.decoding = 'async';
-    if (aboveFold) img.setAttribute('fetchpriority', 'high');
-
-    // cssText replaces the whole style attribute, so it has to be set BEFORE
-    // the opacity below — the other way round silently wiped the fade.
-    img.style.cssText = styleFor(slotEl);
-    img.setAttribute('data-kms-slot', slotKey);   // marks this slot as filled
-
-    // Fade in once decoded, so it arrives rather than snapping into place.
-    // A cached image can already be complete here, in which case there is
-    // nothing to wait for and it should simply be visible.
-    if (img.complete && img.naturalWidth) {
-      img.style.opacity = '1';
-    } else {
-      img.style.opacity = '0';
-      img.addEventListener('load', function () { img.style.opacity = '1'; });
-      img.addEventListener('error', function () { img.style.opacity = '1'; });
-      // Belt and braces: never leave a picture stuck invisible.
-      setTimeout(function () { img.style.opacity = '1'; }, 2500);
-    }
-
-    var parent = slotEl.parentNode;
-    if (!parent) return;
-    parent.replaceChild(img, slotEl);
+    return false;
   }
 
   function buildVideoSection(video) {
@@ -248,48 +183,28 @@
 
     Object.keys(SLOT_TO_ELEMENT).forEach(function (slot) {
       var entry = media[slot];
-      if (!entry || !entry.url) return;
+      var isHero = slot === 'hero';
+      var video = (media.video && media.video.url) ? media.video : null;
+      // The hero is worth building for a video alone, with no photo at all.
+      var hasSomething = (entry && entry.url) || (isHero && video);
+      if (!hasSomething) return;
       if (document.querySelector('[data-kms-slot="' + slot + '"]')) return;  // already filled
 
-      // Matched by TAG as well as id, deliberately. index.html carries both
-      // <section id="founder"> and <image-slot id="founder">, and
-      // getElementById returns the section — which would replace the whole
-      // founder section with the photograph.
-      var el = document.querySelector('image-slot#' + SLOT_TO_ELEMENT[slot]);
+      // Matched by TAG as well as id, deliberately — see the note on the
+      // founder slot's id in index.html for what that guards against.
+      var el = document.querySelector('image-slot#' + SLOT_TO_ELEMENT[slot]) ||
+               (SLOT_FALLBACK[slot] ? document.querySelector('image-slot#' + SLOT_FALLBACK[slot]) : null);
       if (!el) {
         pending++; // not rendered yet — try again on the next mutation
         return;
       }
       try {
-        // Hero: video wins if one has been uploaded, with the photo as poster.
-        if (slot === 'hero' && media.video && media.video.url) {
-          fillVideo(el, media.video, entry.url, slot);
-        } else {
-          fillPhoto(el, entry.url, slot);
-        }
+        fillSlot(el, entry, video, slot);
       } catch (e) {
         // One bad slot must not stop the others.
         if (window.console) console.warn('site-media: could not fill ' + slot, e);
       }
     });
-
-    if (media.video && media.video.url) {
-      try {
-        // With no hero photo uploaded, the loop above never runs for 'hero',
-        // so put the video straight into that slot here.
-        var heroSlot = document.querySelector('image-slot#' + SLOT_TO_ELEMENT.hero);
-        if (heroSlot && !document.querySelector('[data-kms-slot="hero"]')) {
-          fillVideo(heroSlot, media.video, null, 'hero');
-        } else if (!document.querySelector('[data-kms-slot="hero"]')) {
-          pending++;                      // hero not rendered yet — retry
-        }
-        // Only fall back to a section of its own if the hero can't take it,
-        // so the same clip never appears twice on the page.
-        if (!document.querySelector('video[data-kms-slot="hero"]')) placeVideo(media.video);
-      } catch (e) {
-        if (window.console) console.warn('site-media: could not place video', e);
-      }
-    }
 
     return pending === 0;
   }
@@ -299,7 +214,7 @@
   // this script first runs. Rather than guess at a delay, watch the DOM and
   // re-apply until everything the API gave us has landed.
   function applyWhenReady(media) {
-    if (apply(media)) return;
+    if (apply(media)) { finalise(media); return; }
 
     var observer = new MutationObserver(function () {
       if (apply(media)) done();
@@ -314,6 +229,21 @@
     function done() {
       clearTimeout(timer);
       observer.disconnect();
+      finalise(media);
+    }
+  }
+
+  // Run once the page has settled, never during the retry loop: the standalone
+  // video section is the fallback for a page with no hero picture area at all,
+  // and placing it early — while the hero simply had not rendered yet — is how
+  // the same clip would end up on the page twice.
+  function finalise(media) {
+    if (!media.video || !media.video.url) return;
+    if (document.querySelector('[data-kms-slot="hero"]')) return;   // hero took it
+    try {
+      placeVideo(media.video);
+    } catch (e) {
+      if (window.console) console.warn('site-media: could not place video', e);
     }
   }
 
@@ -324,6 +254,9 @@
       Object.keys(cached).forEach(function (k) {
         if (cached[k] && cached[k].url) preconnect(cached[k].url);
       });
+      // Bump the cache key when the payload shape changes, or a repeat visitor
+      // paints from a copy saved before items[] existed and sees one photo
+      // where there should now be a slideshow.
       applyWhenReady(cached);
     }
 
