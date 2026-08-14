@@ -206,7 +206,7 @@ Include a founder portrait image slot.
 |---|---|---|---|
 | 01 | Shalom Fisherman Finance | A daily calculator made for fishing boats. Enter the day's catch and expenses; it works out the crew share, the profit and the running balance. | /ledger-app.html |
 | 02 | Shalom Fishing Nets Online | The nets-and-gear storefront — selling to fishermen today. | https://shalom-marine-nets.onrender.com/ |
-| 03 | Shalom Fish Online | Two live builds of the fish marketplace — fishermen selling direct to buyers. | https://shalom-fish.onrender.com and https://fishko.onrender.com/ |
+| 03 | Shalom Fish Online | The live build of the fish marketplace — fishermen selling direct to buyers. | https://shalom-fish.onrender.com |
 
 ### Section: The ask — for investors · officials · partners
 
