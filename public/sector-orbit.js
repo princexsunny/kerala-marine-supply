@@ -10,10 +10,17 @@
 (function () {
   'use strict';
 
-  var R = 142;              // ring radius
+  // Proportions taken from the reference: the circles are small relative to
+  // the ring (0.28 of the radius) so the middle stays open enough to hold a
+  // two-line title, and the active one is half again the size of the rest.
+  // 195, not 178: the centre now carries eight stacked pieces (label, counter,
+  // a two-line title, rule, status, icon, chevron, hint) and at 178 the tallest
+  // of them came within a few pixels of the circles. The ring has to be opened
+  // up to hold them, which is also what the reference does.
+  var R = 195;              // ring radius
   var DOT = 50;             // circle diameter
-  var DOT_ACTIVE = 64;
-  var BOX = (R + DOT_ACTIVE / 2 + 6) * 2;   // square the ring needs
+  var DOT_ACTIVE = 76;
+  var BOX = (R + DOT_ACTIVE / 2 + 8) * 2;   // square the ring needs
   // Timing. The ring used to snap round in 620ms, which read as a flick rather
   // than a turn — twelve ventures went past faster than any of them could be
   // read. 1150ms with a soft settle is slow enough to follow the icon you were
@@ -68,7 +75,9 @@
     // like a still image. It is a border, so it is rotated as a whole.
     '.so-ring{position:absolute;inset:0;border-radius:50%;' +
     '  border:1px dashed var(--color-neutral-500,#a09b95);' +
-    '  margin:' + (DOT_ACTIVE / 2 + 6) + 'px;opacity:.55;animation:so-drift 60s linear infinite}' +
+    // Inset so the dashed line passes exactly through the circle centres,
+    // rather than close to them — computed, so it stays true if R changes.
+    '  margin:' + (BOX / 2 - R) + 'px;opacity:.5;animation:so-drift 60s linear infinite}' +
     '@keyframes so-drift{to{transform:rotate(360deg)}}' +
     '.so-disc{position:absolute;inset:0;border-radius:50%;margin:' + (DOT_ACTIVE / 2 + 18) + 'px;' +
     '  background:radial-gradient(circle at 50% 45%,rgba(236,48,19,.045),rgba(236,48,19,0) 70%)}' +
@@ -76,21 +85,30 @@
     // counter-rotated by the same angle so the icons stay upright while the
     // ring turns underneath them.
     '.so-spin{position:absolute;inset:0;transition:transform ' + SPIN_MS + 'ms ' + EASE + '}' +
+    // Inactive circles carry a dark icon, not a red one. With all twelve in
+    // red nothing stood out; keeping the accent for the active venture alone
+    // is what makes the top of the ring read as the selected one.
     '.so-item{position:absolute;left:50%;top:50%;width:' + DOT + 'px;height:' + DOT + 'px;margin:' +
     '  ' + (-DOT / 2) + 'px 0 0 ' + (-DOT / 2) + 'px;border-radius:50%;background:#fff;border:none;padding:0;' +
-    '  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--color-accent,#ec3013);' +
-    '  box-shadow:0 2px 8px rgba(32,30,29,.09),0 0 0 1px rgba(32,30,29,.07);' +
+    '  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--color-text,#201e1d);' +
+    '  box-shadow:0 4px 14px rgba(32,30,29,.07),0 1px 3px rgba(32,30,29,.06);' +
     // transform and opacity carry the depth falloff set in render(), and have
     // to ease over the same duration as the ring or the two come apart.
     '  transition:width ' + SPIN_MS + 'ms ' + EASE + ',height ' + SPIN_MS + 'ms ' + EASE + ',' +
     '    margin ' + SPIN_MS + 'ms ' + EASE + ',transform ' + SPIN_MS + 'ms ' + EASE + ',' +
     '    opacity ' + SPIN_MS + 'ms ' + EASE + ',box-shadow .28s ease}' +
-    '.so-item:hover{box-shadow:0 4px 14px rgba(32,30,29,.16),0 0 0 1px var(--color-accent,#ec3013)}' +
-    '.so-item svg{width:24px;height:24px;transition:width ' + SPIN_MS + 'ms ' + EASE + ',height ' + SPIN_MS + 'ms ' + EASE + '}' +
+    '.so-item:hover{box-shadow:0 6px 20px rgba(32,30,29,.14),0 0 0 1px rgba(236,48,19,.35);' +
+    '  color:var(--color-accent,#ec3013)}' +
+    '.so-item svg{width:23px;height:23px;transition:width ' + SPIN_MS + 'ms ' + EASE + ',height ' + SPIN_MS + 'ms ' + EASE + '}' +
+    // The active circle: white still, with the red ring drawn INSIDE it so the
+    // outline sits in from the edge with the icon floating clear of it, and a
+    // wide soft glow outside rather than a hard second border.
     '.so-item.on{width:' + DOT_ACTIVE + 'px;height:' + DOT_ACTIVE + 'px;margin:' +
     '  ' + (-DOT_ACTIVE / 2) + 'px 0 0 ' + (-DOT_ACTIVE / 2) + 'px;' +
-    '  box-shadow:0 0 0 2px var(--color-accent,#ec3013),0 0 0 6px rgba(236,48,19,.12),0 6px 16px rgba(236,48,19,.20)}' +
-    '.so-item.on svg{width:30px;height:30px}' +
+    '  color:var(--color-accent,#ec3013);' +
+    '  box-shadow:inset 0 0 0 2px var(--color-accent,#ec3013),' +
+    '    0 0 0 9px rgba(236,48,19,.055),0 10px 30px rgba(236,48,19,.20)}' +
+    '.so-item.on svg{width:32px;height:32px}' +
     '.so-item:focus-visible{outline:2px solid var(--color-accent,#ec3013);outline-offset:3px}' +
     // A halo that breathes behind whichever venture is at the top. Drawn on a
     // separate element rather than the button's own box-shadow so the pulse
@@ -98,32 +116,51 @@
     '.so-halo{position:absolute;left:50%;top:50%;width:' + (DOT_ACTIVE + 26) + 'px;' +
     '  height:' + (DOT_ACTIVE + 26) + 'px;margin:' + (-(DOT_ACTIVE + 26) / 2) + 'px 0 0 ' +
     '  ' + (-(DOT_ACTIVE + 26) / 2) + 'px;border-radius:50%;pointer-events:none;' +
-    '  border:1px solid rgba(236,48,19,.30);opacity:0;' +
+    // No border of its own: the active circle already carries a red ring and a
+    // glow, and a third outline around it looked busy. This is the breath only.
+    '  opacity:0;' +
     '  transition:transform ' + SPIN_MS + 'ms ' + EASE + ',opacity .5s ease;' +
     '  animation:so-breathe 3.4s ease-in-out infinite}' +
     '.so-halo.on{opacity:1}' +
-    '@keyframes so-breathe{0%,100%{box-shadow:0 0 0 0 rgba(236,48,19,.18)}' +
-    '  50%{box-shadow:0 0 0 9px rgba(236,48,19,0)}}' +
+    '@keyframes so-breathe{0%,100%{box-shadow:0 0 0 0 rgba(236,48,19,.16)}' +
+    '  50%{box-shadow:0 0 0 14px rgba(236,48,19,0)}}' +
     '.so-pip{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;' +
     '  background:var(--color-accent,#ec3013);opacity:.85;' +
     '  transition:opacity ' + SPIN_MS + 'ms ' + EASE + '}' +
     // Centre label: the ring is decorative without it — this is what tells you
     // which venture you are looking at.
-    '.so-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:' + (R * 1.25) + 'px;' +
+    '.so-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:' + Math.round(R * 1.25) + 'px;' +
     '  text-align:center}' +
     '.so-open{display:block;background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer;' +
     '  width:100%}' +
     '.so-open:hover .so-name{color:var(--color-accent,#ec3013)}' +
-    '.so-open:focus-visible{outline:2px solid var(--color-accent,#ec3013);outline-offset:6px}' +
-    '.so-wave{color:var(--color-accent,#ec3013);font-size:20px;line-height:1;font-weight:700;opacity:.55}' +
-    '.so-num{font-family:var(--font-heading,inherit);font-weight:800;font-size:11px;letter-spacing:.12em;' +
-    '  color:var(--color-accent,#ec3013);margin-top:12px}' +
-    '.so-name{font-family:var(--font-heading,inherit);font-weight:800;font-size:16px;line-height:1.2;' +
-    '  letter-spacing:-0.015em;margin-top:5px;color:var(--color-text,#201e1d)}' +
-    '.so-status{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;' +
-    '  color:var(--color-neutral-500,#a09b95);margin-top:6px}' +
-    '.so-hint{font-size:10px;letter-spacing:.12em;text-transform:uppercase;' +
-    '  color:var(--color-neutral-500,#a09b95);margin-top:14px;white-space:nowrap;opacity:.9}' +
+    '.so-open:focus-visible{outline:2px solid var(--color-accent,#ec3013);outline-offset:8px;border-radius:6px}' +
+    // "VENTURE  05 / 12" — the counter tells you where you are in the twelve
+    // without having to count circles.
+    '.so-eyebrow{font-size:9.5px;letter-spacing:.28em;text-transform:uppercase;font-weight:700;' +
+    '  color:var(--color-neutral-500,#a09b95)}' +
+    '.so-count{font-family:var(--font-heading,inherit);font-weight:800;font-size:21px;letter-spacing:.02em;' +
+    '  color:var(--color-neutral-500,#a09b95);margin-top:5px;line-height:1}' +
+    '.so-count .now{color:var(--color-accent,#ec3013)}' +
+    // 19px, not 22: "Shipbuilding & Vessel Manufacturing" is the longest name
+    // of the twelve and has to fall on two lines, not three.
+    '.so-name{font-family:var(--font-heading,inherit);font-weight:800;font-size:19px;line-height:1.15;' +
+    '  letter-spacing:-0.02em;margin-top:11px;color:var(--color-text,#201e1d);' +
+    // Two lines' worth of room whether the name needs it or not, so the rest
+    // of the panel does not jump up and down as the ring turns past the short
+    // names ("Boat Yard") and the long ones.
+    '  min-height:44px;display:flex;align-items:center;justify-content:center;' +
+    '  transition:color .25s ease}' +
+    '.so-rule{width:26px;height:2px;background:var(--color-accent,#ec3013);margin:11px auto 0;border-radius:2px}' +
+    '.so-status{font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;' +
+    '  color:var(--color-neutral-500,#a09b95);margin-top:11px}' +
+    // The active venture's own icon, large and in the accent, as the piece of
+    // artwork at the centre of the ring.
+    '.so-glyph{display:flex;justify-content:center;margin-top:15px;color:var(--color-accent,#ec3013)}' +
+    '.so-glyph svg{width:38px;height:38px}' +
+    '.so-chev{margin-top:13px;color:var(--color-accent,#ec3013);opacity:.5;line-height:1;font-size:13px}' +
+    '.so-hint{font-size:9px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;' +
+    '  color:var(--color-neutral-500,#a09b95);margin-top:7px;white-space:nowrap}' +
     // The name in the middle changes the moment the ring starts moving, which
     // read as a glitch against a turn that now takes over a second. It lifts
     // and fades instead, and is swapped while it is invisible.
@@ -151,17 +188,25 @@
   wrap.className = 'so-wrap';
   wrap.innerHTML = '<div class="so-disc"></div><div class="so-ring"></div><div class="so-spin"></div>' +
     '<div class="so-mid"><button type="button" class="so-open">' +
-    '<div class="so-wave">≈</div><div class="so-num"></div><div class="so-name"></div>' +
-    '<div class="so-status"></div></button>' +
-    '<div class="so-hint"></div></div>';
+      '<div class="so-eyebrow">Venture</div>' +
+      '<div class="so-count"><span class="now"></span><span class="of"></span></div>' +
+      '<div class="so-name"></div>' +
+      '<div class="so-rule"></div>' +
+      '<div class="so-status"></div>' +
+      '<div class="so-glyph"></div>' +
+    '</button>' +
+    '<div class="so-chev">&#9662;</div><div class="so-hint"></div></div>';
   fit.appendChild(wrap);
   host.appendChild(fit);
 
   // A phone has no wheel, so the desktop hint would be a lie there.
   var coarse = false;
   try { coarse = window.matchMedia('(pointer: coarse)').matches; } catch (e) {}
+  // Kept to two actions rather than the reference's single "scroll to explore":
+  // turning the ring and opening a venture are different things, and dropping
+  // the second would hide the only way through to the venture pages.
   wrap.querySelector('.so-hint').textContent =
-    coarse ? 'Swipe sideways · tap to open' : 'Scroll · click to open';
+    coarse ? 'Swipe · tap to open' : 'Scroll · click to open';
 
   // Shrink to whatever width the column actually has, and reserve exactly the
   // height the shrunken ring occupies.
@@ -177,9 +222,11 @@
   else window.addEventListener('resize', resize);
 
   var spin = wrap.querySelector('.so-spin');
-  var midNum = wrap.querySelector('.so-num');
+  var midNow = wrap.querySelector('.so-count .now');
+  var midOf = wrap.querySelector('.so-count .of');
   var midName = wrap.querySelector('.so-name');
   var midStatus = wrap.querySelector('.so-status');
+  var midGlyph = wrap.querySelector('.so-glyph');
   var items = [];
   var hoverTimer = null;
   var introDone = false;
@@ -197,7 +244,8 @@
 
   // Marked so the centre text can be faded out and back rather than swapped
   // under the reader's eye halfway through a turn.
-  [midNum, midName, midStatus].forEach(function (el) { el.classList.add('so-label'); });
+  var labels = [wrap.querySelector('.so-count'), midName, midStatus, midGlyph];
+  labels.forEach(function (el) { el.classList.add('so-label'); });
 
   wrap.querySelector('.so-open').addEventListener('click', function () {
     location.href = 'venture.html?v=' + V[active].slug;
@@ -287,16 +335,20 @@
   var labelTimer = null;
   function setLabel(v) {
     var write = function () {
-      midNum.textContent = v.num;
+      midNow.textContent = v.num;
+      midOf.textContent = ' / ' + String(N).padStart(2, '0');
       midName.textContent = v.name.replace(/^Shalom /, '');
       midStatus.textContent = v.status;
+      midGlyph.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+        (ICONS[v.icon] || '') + '</svg>';
     };
     if (reduced || midName.textContent === '') { write(); return; }
     clearTimeout(labelTimer);
-    [midNum, midName, midStatus].forEach(function (el) { el.classList.add('swap'); });
+    labels.forEach(function (el) { el.classList.add('swap'); });
     labelTimer = setTimeout(function () {
       write();
-      [midNum, midName, midStatus].forEach(function (el) { el.classList.remove('swap'); });
+      labels.forEach(function (el) { el.classList.remove('swap'); });
     }, 300);
   }
 
