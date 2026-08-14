@@ -51,7 +51,10 @@
   if (!V.length) return;
   var N = V.length;
   var STEP = 360 / N;
-  var active = 0;
+  // -1, not 0: the frame loop writes the centre panel only when the venture at
+  // the top CHANGES. Starting at 0 meant the first frame agreed with itself and
+  // the panel was never filled in — the ring came up with an empty middle.
+  var active = -1;
 
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
   function mod(n, m) { return ((n % m) + m) % m; }
@@ -84,7 +87,7 @@
     // One rotating layer holds every circle and dot; each circle is
     // counter-rotated by the same angle so the icons stay upright while the
     // ring turns underneath them.
-    '.so-spin{position:absolute;inset:0;transition:transform ' + SPIN_MS + 'ms ' + EASE + '}' +
+    '.so-spin{position:absolute;inset:0}' +
     // Inactive circles carry a dark icon, not a red one. With all twelve in
     // red nothing stood out; keeping the accent for the active venture alone
     // is what makes the top of the ring read as the selected one.
@@ -92,23 +95,28 @@
     '  ' + (-DOT / 2) + 'px 0 0 ' + (-DOT / 2) + 'px;border-radius:50%;background:#fff;border:none;padding:0;' +
     '  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--color-text,#201e1d);' +
     '  box-shadow:0 4px 14px rgba(32,30,29,.07),0 1px 3px rgba(32,30,29,.06);' +
-    // transform and opacity carry the depth falloff set in render(), and have
-    // to ease over the same duration as the ring or the two come apart.
-    '  transition:width ' + SPIN_MS + 'ms ' + EASE + ',height ' + SPIN_MS + 'ms ' + EASE + ',' +
-    '    margin ' + SPIN_MS + 'ms ' + EASE + ',transform ' + SPIN_MS + 'ms ' + EASE + ',' +
-    '    opacity ' + SPIN_MS + 'ms ' + EASE + ',box-shadow .28s ease}' +
+    // NO transition on transform or opacity. Those two are now rewritten every
+    // animation frame by the loop below, and a CSS transition on a property
+    // being set 60 times a second makes it lag a frame behind itself — which
+    // is what stuttering rotation actually is. Only the things that change on
+    // a class toggle are eased here.
+    '  transition:box-shadow .3s ease,color .3s ease;' +
+    '  will-change:transform,opacity}' +
     '.so-item:hover{box-shadow:0 6px 20px rgba(32,30,29,.14),0 0 0 1px rgba(236,48,19,.35);' +
     '  color:var(--color-accent,#ec3013)}' +
-    '.so-item svg{width:23px;height:23px;transition:width ' + SPIN_MS + 'ms ' + EASE + ',height ' + SPIN_MS + 'ms ' + EASE + '}' +
+    '.so-item svg{width:26px;height:26px}' +
     // The active circle: white still, with the red ring drawn INSIDE it so the
     // outline sits in from the edge with the icon floating clear of it, and a
     // wide soft glow outside rather than a hard second border.
-    '.so-item.on{width:' + DOT_ACTIVE + 'px;height:' + DOT_ACTIVE + 'px;margin:' +
-    '  ' + (-DOT_ACTIVE / 2) + 'px 0 0 ' + (-DOT_ACTIVE / 2) + 'px;' +
-    '  color:var(--color-accent,#ec3013);' +
+    //
+    // Its SIZE is not set here. Growing it with width/height would relayout
+    // twelve elements every frame; the loop scales it with a transform
+    // instead, which the compositor handles on its own and which grows
+    // smoothly as a circle approaches the top rather than popping when it
+    // arrives.
+    '.so-item.on{color:var(--color-accent,#ec3013);' +
     '  box-shadow:inset 0 0 0 2px var(--color-accent,#ec3013),' +
     '    0 0 0 9px rgba(236,48,19,.055),0 10px 30px rgba(236,48,19,.20)}' +
-    '.so-item.on svg{width:32px;height:32px}' +
     '.so-item:focus-visible{outline:2px solid var(--color-accent,#ec3013);outline-offset:3px}' +
     // A halo that breathes behind whichever venture is at the top. Drawn on a
     // separate element rather than the button's own box-shadow so the pulse
@@ -125,8 +133,7 @@
     '@keyframes so-breathe{0%,100%{box-shadow:0 0 0 0 rgba(236,48,19,.16)}' +
     '  50%{box-shadow:0 0 0 14px rgba(236,48,19,0)}}' +
     '.so-pip{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;' +
-    '  background:var(--color-accent,#ec3013);opacity:.85;' +
-    '  transition:opacity ' + SPIN_MS + 'ms ' + EASE + '}' +
+    '  background:var(--color-accent,#ec3013);opacity:.85}' +
     // Centre label: the ring is decorative without it — this is what tells you
     // which venture you are looking at.
     '.so-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:' + Math.round(R * 1.25) + 'px;' +
@@ -228,8 +235,10 @@
   var midStatus = wrap.querySelector('.so-status');
   var midGlyph = wrap.querySelector('.so-glyph');
   var items = [];
+  var pips = [];
   var hoverTimer = null;
   var introDone = false;
+  var held = false;     // a cursor or finger is resting on the ring
 
   var reduced = false;
   try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
@@ -281,55 +290,131 @@
     spin.appendChild(b);
     items.push(b);
 
-    // Marker dot halfway to the next venture.
-    var da = ((i + 0.5) * STEP - 90) * Math.PI / 180;
+    // Marker dot halfway to the next venture. Positioned by the loop, like the
+    // circles — the container is no longer rotated, because rotating it would
+    // spin the icons upside down as they travelled round.
     var pip = document.createElement('span');
     pip.className = 'so-pip';
-    pip.style.transform = 'translate(' + (Math.cos(da) * R).toFixed(1) + 'px,' + (Math.sin(da) * R).toFixed(1) + 'px)';
     spin.appendChild(pip);
+    pips.push(pip);
   });
 
-  // Turns accumulate rather than wrapping at 360, so going from the last
-  // venture to the first keeps rotating forward instead of unwinding the
-  // whole ring backwards.
-  var turn = 0;
+  // ---- the rotation ---------------------------------------------------------
+  //
+  // The ring used to move by handing a new angle to a CSS transition, which
+  // meant it could only ever go in fixed hops: still, then a hop, then still
+  // again. Turning it continuously that way is not possible — a transition
+  // restarted every frame never gets anywhere.
+  //
+  // So the angle is now a number this file owns, advanced every animation
+  // frame. Idle, it drifts forward on its own. A scroll, a swipe or an arrow
+  // key eases it to a chosen venture and then hands it back to the drift.
+  // Because nothing is waiting on a transition to finish, a gesture can
+  // interrupt the drift, or another gesture, at any point without a jump.
 
-  // How far round the ring an item currently sits from the top, 0 to 6.
-  function distanceFromTop(i) {
-    var k = mod(i - active, N);
-    return Math.min(k, N - k);
-  }
+  var TURN_MS = 96000;                  // a full revolution when left alone: 8s per venture
+  var DRIFT = 360 / TURN_MS;            // degrees per millisecond
+  var RESUME_AFTER = 2600;              // pause after you touch it, before it drifts again
+  var ACTIVE_SCALE = DOT_ACTIVE / DOT;  // 1.52 — the active circle's size, as a scale
 
-  function render() {
-    spin.style.transform = 'rotate(' + (-turn * STEP) + 'deg)';
-    items.forEach(function (el, i) {
-      var on = i === active;
-      el.classList.toggle('on', on);
-      el.tabIndex = on ? 0 : -1;
-      el.setAttribute('aria-current', on ? 'true' : 'false');
+  var rot = 0;          // ring rotation in degrees; falling = turning forwards
+  var tweenFrom = 0, tweenTo = 0, tweenStart = 0, tweening = false;
+  var holdUntil = 0;    // drift is suspended until this timestamp
+  var frame = null;
+  var awake = true;     // on screen and tab in front
 
-      // Depth. Circles further from the top sit back a little — slightly
-      // smaller and softer — so the ring reads as a wheel turning towards you
-      // rather than twelve flat buttons on a circle. It also puts the eye
-      // where the label is.
-      var d = distanceFromTop(i);
-      var scale = on ? 1 : Math.max(0.80, 1 - d * 0.045);
-      // Undo the ring's rotation so icons stay upright.
-      var a = (i * STEP - 90) * Math.PI / 180;
+  // Which venture is at the top right now, straight from the angle.
+  function activeFromRot() { return mod(Math.round(-rot / STEP), N); }
+
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function place(now) {
+    for (var i = 0; i < items.length; i++) {
+      // Where this circle actually is on screen, this frame.
+      var deg = i * STEP - 90 + rot;
+      var a = deg * Math.PI / 180;
+
+      // k is how many venture-widths it sits from the top: 0 at the top, 1 at
+      // the next position round, and so on. Everything below is a curve on k,
+      // so size and weight change smoothly as a circle travels rather than
+      // switching the moment it becomes "the active one".
+      var k = Math.abs(((deg + 90) % 360 + 540) % 360 - 180) / 180 * (N / 2);
+      var boost = Math.max(0, 1 - k);          // 1 at the top, 0 one position away
+      var depth = Math.min(k, N / 2) / (N / 2); // 0 at the top, 1 at the far side
+      var scale = (1 - 0.18 * depth) * (1 + (ACTIVE_SCALE - 1) * boost);
+
+      var el = items[i];
       el.style.transform =
-        'translate(' + (Math.cos(a) * R).toFixed(1) + 'px,' + (Math.sin(a) * R).toFixed(1) + 'px) ' +
-        'rotate(' + (turn * STEP) + 'deg) ' +
+        'translate(' + (Math.cos(a) * R).toFixed(2) + 'px,' + (Math.sin(a) * R).toFixed(2) + 'px) ' +
         'scale(' + scale.toFixed(3) + ')';
       // Held back until the entrance animation has finished, because that
       // animation owns opacity while it runs.
-      if (introDone) el.style.opacity = on ? '1' : String(Math.max(0.55, 1 - d * 0.075));
-    });
+      if (introDone) el.style.opacity = (1 - 0.42 * depth).toFixed(3);
 
-    halo.classList.toggle('on', true);
+      var on = k < 0.5;
+      if (on !== el.__on) {                    // touch the DOM only when it changes
+        el.__on = on;
+        el.classList.toggle('on', on);
+        el.tabIndex = on ? 0 : -1;
+        el.setAttribute('aria-current', on ? 'true' : 'false');
+      }
+    }
+    for (var j = 0; j < pips.length; j++) {
+      var pa = ((j + 0.5) * STEP - 90 + rot) * Math.PI / 180;
+      pips[j].style.transform =
+        'translate(' + (Math.cos(pa) * R).toFixed(2) + 'px,' + (Math.sin(pa) * R).toFixed(2) + 'px)';
+    }
 
-    var v = V[active];
-    setLabel(v);
+    var nowActive = activeFromRot();
+    if (nowActive !== active) {
+      active = nowActive;
+      setLabel(V[active]);
+    }
   }
+
+  var last = 0;
+  function tick(now) {
+    frame = null;
+    var dt = last ? Math.min(now - last, 64) : 16;   // a backgrounded tab can hand back a huge gap
+    last = now;
+
+    if (tweening) {
+      var t = Math.min(1, (now - tweenStart) / SPIN_MS);
+      rot = tweenFrom + (tweenTo - tweenFrom) * easeOut(t);
+      if (t >= 1) { tweening = false; holdUntil = now + RESUME_AFTER; }
+    } else if (awake && !held && now >= holdUntil && !reduced) {
+      rot -= DRIFT * dt;
+    }
+
+    place(now);
+    schedule();
+  }
+
+  function schedule() {
+    if (frame || reduced) return;
+    // Nothing to draw when it is off screen, in a background tab, or sitting
+    // still under a resting cursor. A ring animating where nobody can see it
+    // is pure battery.
+    if (!awake) return;
+    if (!tweening && held) return;
+    frame = requestAnimationFrame(tick);
+  }
+
+  function wake() { last = 0; schedule(); }
+
+  // Ease to a particular venture, then let the drift take over again.
+  function tweenTowards(targetRot) {
+    // Reduced motion runs no frame loop at all, so there is nothing to ease
+    // with — go straight there instead of setting a tween that never advances.
+    if (reduced) { rot = targetRot; tweening = false; place(0); return; }
+    tweenFrom = rot;
+    tweenTo = targetRot;
+    tweenStart = (window.performance && performance.now) ? performance.now() : Date.now();
+    tweening = true;
+    wake();
+  }
+
+  function render() { place(0); }
 
   // Fade the centre text out, change it while nobody can see it, fade it back.
   var labelTimer = null;
@@ -352,8 +437,22 @@
     }, 300);
   }
 
-  function go(i) { turn += i - active; active = mod(i, N); render(); }
-  function step(d) { turn += d; active = mod(active + d, N); render(); }
+  // Bring venture i to the top by the shorter way round, so jumping from 12 to
+  // 01 turns one position forward instead of eleven backwards.
+  function go(i) {
+    var current = -rot / STEP;
+    var diff = mod(i - current, N);
+    if (diff > N / 2) diff -= N;
+    tweenTowards(rot - diff * STEP);
+  }
+
+  // One venture forward or back from wherever the ring happens to be — which,
+  // mid-drift, is usually part-way between two of them. Rounding first is what
+  // makes a scroll land on a venture rather than an arbitrary angle.
+  function step(d) {
+    var at = Math.round(-rot / STEP);
+    tweenTowards(-(at + d) * STEP);
+  }
 
   var lastWheel = 0;
   wrap.addEventListener('wheel', function (e) {
@@ -369,8 +468,16 @@
   }, { passive: false });
 
   wrap.addEventListener('keydown', function (e) {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); step(1); items[active].focus(); }
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); step(-1); items[active].focus(); }
+    var d = 0;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') d = 1;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') d = -1;
+    if (!d) return;
+    e.preventDefault();
+    // Focus the venture being moved TO. `active` is only updated on the next
+    // frame, so reading it here would focus the one just left behind.
+    var to = mod(Math.round(-rot / STEP) + d, N);
+    step(d);
+    items[to].focus();
   });
 
   // Touch: a SIDEWAYS swipe turns the ring. Up and down are left alone so the
@@ -396,9 +503,41 @@
     wrap.addEventListener(t, function () { startX = null; startY = null; axis = null; });
   });
 
+  // ---- when to run ----------------------------------------------------------
+  //
+  // The drift stops the moment nobody is watching it, and picks up again from
+  // wherever it left off.
+
+  wrap.addEventListener('pointerenter', function (e) {
+    if (e.pointerType === 'touch') return;   // a finger is a gesture, not a pause
+    held = true;
+  });
+  wrap.addEventListener('pointerleave', function () { held = false; wake(); });
+  wrap.addEventListener('focusin', function () { held = true; });
+  wrap.addEventListener('focusout', function () { held = false; wake(); });
+
+  document.addEventListener('visibilitychange', function () {
+    awake = !document.hidden && onScreen;
+    wake();
+  });
+
+  var onScreen = true;
+  if (window.IntersectionObserver) {
+    onScreen = false;                        // assume not, until told otherwise
+    awake = false;
+    new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        onScreen = en.isIntersecting;
+        awake = onScreen && !document.hidden;
+        wake();
+      });
+    }, { threshold: 0.12 }).observe(wrap);
+  }
+
   // ---- first paint ---------------------------------------------------------
 
   render();
+  wake();
 
   // The twelve circles come in one after another, starting at the top and
   // going round. Skipped entirely under reduced motion, where the ring should
@@ -411,7 +550,10 @@
     wrap.querySelectorAll('.so-pip').forEach(function (el, i) {
       el.style.animationDelay = (i * 45 + 120) + 'ms';
     });
-    var last = (N - 1) * 45 + 550 + 60;
+    // NOT `last` — that is the frame loop's timestamp, and reusing the name
+    // here is the same `var` in this scope. It would have been overwritten
+    // with a duration, throwing the very first frame's timing out.
+    var introEnds = (N - 1) * 45 + 550 + 60;
     setTimeout(function () {
       wrap.classList.remove('intro');
       items.forEach(function (el) { el.style.animationDelay = ''; });
@@ -419,7 +561,7 @@
       // finishes, the animation is what owns opacity on these elements.
       introDone = true;
       render();
-    }, last);
+    }, introEnds);
   } else {
     introDone = true;
     render();
