@@ -16,6 +16,9 @@
   .brandmark-wave{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);height:26px;width:auto;max-width:none;opacity:.22;pointer-events:none;user-select:none;z-index:0}
   .navlink{font-size:13px;font-weight:600;color:var(--color-text)}
   .navlink:hover{color:var(--color-accent-700)}
+  /* The two names carry the whole footer line, so they sit in the text colour
+     against the muted grey around them rather than blending into it. */
+  .founders strong{color:var(--color-text);font-weight:700;letter-spacing:0}
   @media(max-width:560px){.hdr-call{font-size:0}
                           .hdr-call::after{content:"Call";font-size:13px}}
   @media(max-width:640px){.g4{grid-template-columns:1fr 1fr !important}.g3{grid-template-columns:1fr !important}.g2{grid-template-columns:1fr !important}}
@@ -364,7 +367,8 @@
       <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--color-accent-700);font-weight:600;margin-bottom:8px">Who is building this</div>
       <div style="width:48px;height:2px;background:var(--color-accent);margin-bottom:14px"></div>
       <h2 style="font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-0.01em;margin:0 0 18px">Aircraft-grade discipline, applied to problems he met with his own nets.</h2>
-      <p style="font-size:16px;line-height:1.6;color:var(--color-neutral-800);max-width:64ch;margin:0 0 36px">Prince spent eight years as an aircraft mechanic in Trivandrum and Dubai, then five years as a vessel owner and fisherman on this coast. Every venture here began as a problem he hit himself, at sea — not as an idea on paper.</p>
+      <p style="font-size:16px;line-height:1.6;color:var(--color-neutral-800);max-width:64ch;margin:0 0 20px">Prince spent eight years as an aircraft mechanic in Trivandrum and Dubai, then five years as a vessel owner and fisherman on this coast. Every venture here began as a problem he hit himself, at sea — not as an idea on paper.</p>
+      <p class="founders" style="font-size:14px;line-height:1.6;color:var(--color-neutral-800);margin:0 0 36px">Founded by <strong>Prince Sunny</strong> &amp; <strong>Jini Prince</strong>.</p>
       <div class="g2" style="display:grid;grid-template-columns:repeat(2,1fr);gap:28px 32px">
         <div><h3 style="font-size:15px;font-weight:800;margin:0 0 8px">Solve what we lived</h3><p style="font-size:14px;line-height:1.55;color:var(--color-neutral-800);margin:0">Fuel carried by can, nets that cannot be switched, no yard within reach. We build for those, because we paid for them.</p></div>
         <div><h3 style="font-size:15px;font-weight:800;margin:0 0 8px">Build capability locally</h3><p style="font-size:14px;line-height:1.55;color:var(--color-neutral-800);margin:0">Trivandrum should be able to service and eventually build its own vessels, instead of sending every repair out of the district.</p></div>
@@ -424,7 +428,7 @@
 <footer>
   <div style="max-width:1280px;margin:0 auto;padding:24px 40px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;font-size:12px;letter-spacing:0.04em;color:var(--color-neutral-800)">
     <span>© 2026 Kerala Marine Supply</span>
-    <span>Founded by Prince — aircraft mechanic &amp; fisherman</span>
+    <span class="founders">Founded by <strong>Prince Sunny</strong> &amp; <strong>Jini Prince</strong></span>
     <span>keralamarinesupply.in</span>
     <a href="admin.html">Admin</a>
   </div>
