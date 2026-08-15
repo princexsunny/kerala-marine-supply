@@ -25,7 +25,13 @@ window.KMS_VENTURES = [
     status: 'Running now',
     icon: 'fish',
     summary: 'Fishermen selling fresh fish direct to consumers, restaurants and retailers online.',
-    link: { href: 'https://shalom-fish.onrender.com/', label: 'Visit the store' },
+    // Two live addresses, so `links` rather than `link`. The rest of the
+    // ventures still use the single `link`; KMS_LINKS() at the foot of this
+    // file smooths over the difference so no page has to know which is which.
+    links: [
+      { href: 'https://shalom-fish.onrender.com/', label: 'Visit the store' },
+      { href: 'https://fishko.onrender.com/', label: 'FISHKO — cut at six, at your door by nine' },
+    ],
     brief:
       'A marketplace putting fishermen in direct contact with consumers, restaurants, hotels, ' +
       'exporters and wholesalers. Two builds are already live.',
@@ -334,3 +340,15 @@ window.KMS_VENTURES = [
 // be hand-written HTML, which is exactly how their order, numbering and status
 // drifted away from the data in the first place. One list, one truth.
 window.KMS_VISIBLE = window.KMS_VENTURES.filter(function (v) { return !v.hidden; });
+
+// A venture's websites, always as a list.
+//
+// Most have one and carry `link`; Fish Online trades under two names and
+// carries `links`. Everything that draws a button calls this instead of
+// reaching for either field, so adding a second address to any other venture
+// later needs no change anywhere else.
+window.KMS_LINKS = function (v) {
+  if (!v) return [];
+  if (v.links && v.links.length) return v.links.filter(function (l) { return l && l.href; });
+  return (v.link && v.link.href) ? [v.link] : [];
+};

@@ -239,17 +239,24 @@
       }).join('') + '</ul>'
     : '';
 
-  // The built-in link is the fallback; a link saved in the admin overrides it.
-  // Rendered after the fetch below, so an admin change shows without a code edit.
-  function linkButton(link) {
+  // The built-in links are the fallback; a link saved in the admin overrides
+  // the first of them. Rendered after the fetch below, so an admin change shows
+  // without a code edit.
+  //
+  // `first` decides the styling only: a venture with two addresses gets one
+  // solid button and one outlined, so the row does not read as two equally
+  // urgent instructions.
+  function linkButton(link, first) {
     if (!link || !link.href) return '';
     var external = /^https?:/i.test(link.href);
     return '<a href="' + encodeURI(link.href) + '"' +
            (external ? ' target="_blank" rel="noopener"' : '') +
-           ' class="btn btn-primary" style="font-size:14px">' +
+           ' class="btn ' + (first ? 'btn-primary' : 'btn-secondary') + ' vlink"' +
+           ' style="font-size:14px">' +
            esc(link.label || 'Visit website') + (external ? ' ↗' : ' →') + '</a>';
   }
-  var linkBtn = linkButton(v.link);
+  var vLinks = (window.KMS_LINKS ? window.KMS_LINKS(v) : (v.link ? [v.link] : []));
+  var linkBtn = vLinks.map(function (l, i) { return linkButton(l, i === 0); }).join('');
 
   // ---- the operating plan, for the ventures that have one -------------------
   //
@@ -375,8 +382,12 @@
     .then(function (m) {
       var saved = m && m[v.slug];
       if (!saved || !saved.href) return;
-      var holder = document.querySelector('.hero .btn.btn-primary');
-      var html = linkButton(saved);
+      // Replaces the FIRST website button, and only that one. A venture with a
+      // second address keeps it — the admin field is "this venture's website",
+      // not "this venture's only link", and silently dropping the other would
+      // lose an address nobody meant to remove.
+      var holder = document.querySelector('.hero .vlink');
+      var html = linkButton(saved, true);
       if (holder) holder.outerHTML = html;
       else {
         var row = document.querySelector('.hero div[style*="display:flex"]');

@@ -382,8 +382,13 @@
   grid.innerHTML = V.map(function (v) {
     // A venture with somewhere to go shows where; the rest show how far along
     // they are. Both sit in the same corner of the card.
-    var foot = v.link && v.link.href
-      ? '<span class="vcta">' + esc(v.link.label) + (/^https?:/i.test(v.link.href) ? ' ↗' : ' →') + '</span>'
+    //
+    // Only the first address, even where a venture has two: the card is a
+    // doorway to the venture's own page, and a second link here would compete
+    // with the card itself for the same click.
+    var links = window.KMS_LINKS ? window.KMS_LINKS(v) : (v.link ? [v.link] : []);
+    var foot = links.length
+      ? '<span class="vcta">' + esc(links[0].label) + (/^https?:/i.test(links[0].href) ? ' ↗' : ' →') + '</span>'
       : '<span class="vstat">' + esc(v.status) + '</span>';
     return '<a class="vcard" href="venture.html?v=' + encodeURIComponent(v.slug) + '">' +
              '<svg class="vicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
