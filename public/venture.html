@@ -40,6 +40,70 @@
   .allgrid a:hover{background:var(--color-neutral-200);color:var(--color-accent-700)}
   .allgrid a.on{color:var(--color-accent);}
   .allgrid .n{font-family:var(--font-heading);font-weight:800;font-size:11px;color:var(--color-neutral-500)}
+
+  /* --- The operating plan, when a venture has one ------------------------- */
+  .plan{border-top:2px solid var(--color-divider);padding:44px 0 8px}
+  .plan-head{display:flex;align-items:center;gap:26px;flex-wrap:wrap;margin-bottom:8px}
+  /* The mark is flat colour on white, so it sits on its own white card rather
+     than floating on the page's off-white and showing a pale rectangle. */
+  .plan-logo{background:#fff;border:1px solid var(--color-divider);border-radius:10px;
+             padding:14px 18px;flex:none}
+  .plan-logo img{height:44px;width:auto;display:block}
+  .plan-strap{font-size:13px;color:var(--color-neutral-700);margin:6px 0 0}
+  .plan-intro{font-size:16.5px;line-height:1.6;color:var(--color-neutral-800);max-width:68ch;margin:20px 0 0}
+  /* Not a footnote. These are targets, and a reader has to know that before
+     they read a single number below. */
+  .plan-caveat{margin:18px 0 0;padding:13px 16px;border-left:3px solid var(--color-accent);
+               background:var(--color-neutral-200);font-size:13.5px;line-height:1.55;
+               color:var(--color-neutral-800);max-width:68ch}
+  .stage{margin-top:40px}
+  .stage-label{font-size:11px;letter-spacing:0.2em;text-transform:uppercase;font-weight:700;
+               color:var(--color-accent-700)}
+  .stage h3{font-size:clamp(21px,2.6vw,27px);font-weight:800;letter-spacing:-0.02em;margin:8px 0 10px}
+  .stage-aim{font-size:15.5px;line-height:1.6;color:var(--color-neutral-800);max-width:64ch;margin:0 0 24px}
+  .pblocks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+  .pblock{border:1px solid var(--color-divider);border-radius:10px;padding:20px 20px 18px;
+          background:var(--color-bg)}
+  .pblock.wide{grid-column:1/-1}
+  .pblock h4{font-size:12px;letter-spacing:0.14em;text-transform:uppercase;font-weight:700;
+             color:var(--color-accent-700);margin:0 0 14px}
+  .pblock p{font-size:14.5px;line-height:1.65;color:var(--color-neutral-800);margin:0}
+  .ptable{width:100%;border-collapse:collapse}
+  .ptable th{font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-neutral-500);
+             font-weight:700;text-align:left;padding:0 0 8px;border-bottom:1px solid var(--color-divider)}
+  .ptable th:last-child,.ptable td:last-child{text-align:right}
+  .ptable td{font-size:14px;line-height:1.5;padding:9px 0;border-bottom:1px solid var(--color-divider);
+             color:var(--color-neutral-800);vertical-align:top}
+  .ptable tr:last-child td{border-bottom:none}
+  .ptable td:last-child{font-weight:700;color:var(--color-text);white-space:nowrap;padding-left:14px}
+  /* The row that is the conclusion of the ones above it. */
+  .ptable tr.sum td{border-top:2px solid var(--color-divider);color:var(--color-text);font-weight:700}
+  .plist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px}
+  .plist li{font-size:14.5px;line-height:1.5;color:var(--color-neutral-800);
+            padding-left:18px;position:relative}
+  .plist li::before{content:"";position:absolute;left:0;top:8px;width:6px;height:6px;border-radius:50%;
+                    background:var(--color-accent);opacity:.75}
+  .pblock.dont .plist li::before{border-radius:1px;background:var(--color-neutral-500);opacity:.6}
+  .psteps{margin:0;padding:0;list-style:none;counter-reset:ps}
+  .psteps li{position:relative;padding:0 0 16px 40px;counter-increment:ps}
+  .psteps li:last-child{padding-bottom:0}
+  .psteps li::before{content:counter(ps);position:absolute;left:0;top:0;width:26px;height:26px;
+                     border-radius:50%;background:var(--color-accent-100,rgba(236,48,19,.09));
+                     color:var(--color-accent-700);font-family:var(--font-heading);font-weight:800;
+                     font-size:11.5px;display:flex;align-items:center;justify-content:center}
+  /* The line down the left, so the steps read as one sequence. */
+  .psteps li:not(:last-child)::after{content:"";position:absolute;left:13px;top:30px;bottom:2px;
+                                     width:1px;background:var(--color-divider)}
+  .psteps .t{display:block;font-weight:700;font-size:14px;color:var(--color-text);margin-bottom:3px}
+  .psteps .d{display:block;font-size:14px;line-height:1.55;color:var(--color-neutral-800)}
+  .pnote{margin:14px 0 0;font-size:13px;line-height:1.55;color:var(--color-neutral-700);
+         padding-top:12px;border-top:1px solid var(--color-divider)}
+  .pdocs{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}
+  @media(max-width:860px){
+    .pblocks{grid-template-columns:1fr}
+    .plan{padding-top:34px}
+    .plan-head{gap:16px}
+  }
   @media(max-width:860px){
     .hero{grid-template-columns:1fr;gap:28px;padding:36px 0 32px}
     .blocks{grid-template-columns:1fr}
@@ -116,6 +180,7 @@
 </footer>
 
 <script src="ventures-data.js"></script>
+<script src="venture-plans.js?v=1"></script>
 <script src="media-stage.js?v=1"></script>
 <script>
 (function () {
@@ -186,6 +251,84 @@
   }
   var linkBtn = linkButton(v.link);
 
+  // ---- the operating plan, for the ventures that have one -------------------
+  //
+  // Driven entirely by venture-plans.js. Nothing about any particular venture
+  // is written into this page: a venture with no plan simply gets no section,
+  // and a plan added later renders without touching this file.
+
+  function block(b) {
+    var wide = (b.kind === 'table' && b.rows && b.rows.length > 6) ||
+               (b.kind === 'steps' && b.items && b.items.length > 5);
+    var body = '';
+
+    if (b.kind === 'table') {
+      body = '<table class="ptable">' +
+        (b.head && (b.head[0] || b.head[1])
+          ? '<thead><tr>' + b.head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead>'
+          : '') +
+        '<tbody>' + b.rows.map(function (r) {
+          // A row whose label starts with an arrow is the total of the ones
+          // above it, and is ruled off as such.
+          var sum = /^\s*→/.test(r[0]);
+          return '<tr' + (sum ? ' class="sum"' : '') + '>' +
+                 r.map(function (c) { return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>';
+        }).join('') + '</tbody></table>';
+
+    } else if (b.kind === 'list') {
+      body = '<ul class="plist">' +
+        b.items.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>';
+
+    } else if (b.kind === 'steps') {
+      body = '<ol class="psteps">' + b.items.map(function (s) {
+        return '<li><span class="t">' + esc(s.t) + '</span><span class="d">' + esc(s.d) + '</span></li>';
+      }).join('') + '</ol>';
+
+    } else {
+      body = '<p>' + esc(b.text) + '</p>';
+    }
+
+    // "What it will not do" lists get square, grey markers rather than red
+    // dots — they are not a feature list and should not read like one.
+    var dont = /not do|does not|will not/i.test(b.title || '');
+    return '<div class="pblock' + (wide ? ' wide' : '') + (dont ? ' dont' : '') + '">' +
+             '<h4>' + esc(b.title) + '</h4>' + body +
+             (b.note ? '<p class="pnote">' + esc(b.note) + '</p>' : '') +
+           '</div>';
+  }
+
+  function planHtml(v) {
+    var p = (window.KMS_PLANS || {})[v.slug];
+    if (!p) return '';
+    var b = p.brand || {};
+    return '<section class="plan">' +
+      '<div class="plan-head">' +
+        (b.logo ? '<div class="plan-logo"><img src="' + encodeURI(b.logo) + '" alt="' + esc(b.name || '') + '"></div>' : '') +
+        '<div>' +
+          '<div class="stage-label">The plan</div>' +
+          (b.tagline ? '<div class="plan-strap">' + esc(b.tagline) +
+            (b.strap ? ' · ' + esc(b.strap) : '') + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+      (p.intro ? '<p class="plan-intro">' + esc(p.intro) + '</p>' : '') +
+      (p.caveat ? '<p class="plan-caveat">' + esc(p.caveat) + '</p>' : '') +
+      (p.stages || []).map(function (s) {
+        return '<div class="stage">' +
+          '<div class="stage-label">' + esc(s.label) + '</div>' +
+          '<h3>' + esc(s.title) + '</h3>' +
+          (s.aim ? '<p class="stage-aim">' + esc(s.aim) + '</p>' : '') +
+          '<div class="pblocks">' + (s.blocks || []).map(block).join('') + '</div>' +
+        '</div>';
+      }).join('') +
+      ((p.docs && p.docs.length)
+        ? '<div class="pdocs">' + p.docs.map(function (d) {
+            return '<a class="btn btn-secondary" style="font-size:13px" href="' +
+                   encodeURI(d.href) + '">' + esc(d.label) + '</a>';
+          }).join('') + '</div>'
+        : '') +
+    '</section>';
+  }
+
   document.getElementById('main').innerHTML =
     '<div class="hero">' +
       '<div>' +
@@ -212,6 +355,8 @@
       '<div class="block"><h2>Jobs it creates</h2><p>' + esc(v.jobs) + '</p>' + roleList + '</div>' +
       '<div class="block" style="grid-column:1/-1"><h2>What it unlocks next</h2><p>' + esc(v.next) + '</p></div>' +
     '</div>' +
+
+    planHtml(v) +
 
     '<div class="nextnav">' +
       '<a href="venture.html?v=' + prev.slug + '">← ' + esc(prev.num + ' ' + prev.name) + '</a>' +
