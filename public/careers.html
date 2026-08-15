@@ -120,7 +120,9 @@
 <script src="ventures-data.js"></script>
 <script>
 (function(){
-  var V = window.KMS_VENTURES || [];
+  // Only the ventures currently shown. Advertising jobs for a venture that is
+  // not on the site would leave an applicant with nothing to read about it.
+  var V = window.KMS_VISIBLE || window.KMS_VENTURES || [];
   var wrap = document.getElementById('roleGroups');
   if (!wrap || !V.length) return;
 

@@ -265,6 +265,7 @@
     </div>
   </div>
 
+<script src="ventures-data.js"></script>
 <script>
 (function(){
   var SLOTS = [
@@ -272,21 +273,36 @@
     { key: 'founder', label: 'Founder portrait', hint: 'Prince, in the founder section.' },
   ];
 
-  // One photograph per venture page (venture.html?v=...).
-  var VENTURE_SLOTS = [
-    { key: 'venture1',  label: '01 · Fishing Net Online',   hint: 'Nets, the storefront, an order going out.' },
-    { key: 'venture2',  label: '02 · Machine Manufacturing', hint: 'A winch, hauler or the workshop.' },
-    { key: 'venture3',  label: '03 · Fisherman Finance',     hint: 'The calculator in use on a boat.' },
-    { key: 'venture4',  label: '04 · Boat Yard',             hint: 'Chirayinkeezhu — the slipway or the build.' },
-    { key: 'venture5',  label: '05 · Marine Fuels',          hint: 'Refuelling, cans, or the site.' },
-    { key: 'venture6',  label: '06 · Shipbuilding',          hint: 'A hull under construction.' },
-    { key: 'venture7',  label: '07 · Fishing Gear',          hint: 'Ropes, hooks, floats, safety gear.' },
-    { key: 'venture8',  label: '08 · Fish Online',           hint: 'The catch, or a sale being made.' },
-    { key: 'venture9',  label: '09 · Marine Engineering',    hint: 'Machinery being installed or modified.' },
-    { key: 'venture10', label: '10 · Marine Spare Parts',    hint: 'Engines, pumps, propellers on the shelf.' },
-    { key: 'venture11', label: '11 · Cold Chain',            hint: 'Ice, cold store or refrigerated transport.' },
-    { key: 'venture12', label: '12 · Seafood Export',        hint: 'Processing, packing or despatch.' },
-  ];
+  // One set of photographs per venture page (venture.html?v=...).
+  //
+  // Built from ventures-data.js rather than typed out again, so the numbering
+  // and the order here can never disagree with the site. Note what this list
+  // does NOT do: renumber the slot keys. A venture keeps the key it has always
+  // had — Fish Online is still 'venture8' even though it is now shown first —
+  // because the key is where its photographs are stored. Renumbering the keys
+  // to match the display order would have quietly moved every uploaded photo
+  // onto a different venture's page.
+  var HINTS = {
+    'fishing-net-online':           'Nets, the storefront, an order going out.',
+    'marine-machine-manufacturing': 'A winch, hauler or the workshop.',
+    'fisherman-finance':            'The calculator in use on a boat.',
+    'boat-yard':                    'Chirayinkeezhu — the slipway or the build.',
+    'marine-fuels':                 'Refuelling, cans, or the site.',
+    'shipbuilding':                 'A hull under construction.',
+    'fishing-gear':                 'Ropes, hooks, floats, safety gear.',
+    'fish-online':                  'The catch, or a sale being made.',
+    'marine-engineering':           'Machinery being installed or modified.',
+    'marine-spare-parts':           'Engines, pumps, propellers on the shelf.',
+    'cold-chain':                   'Ice, cold store or refrigerated transport.',
+    'seafood-export':               'Processing, packing or despatch.',
+  };
+  var VENTURE_SLOTS = (window.KMS_VISIBLE || []).map(function (v) {
+    return {
+      key: v.photo,
+      label: v.num + ' · ' + v.name.replace(/^Shalom /, ''),
+      hint: HINTS[v.slug] || '',
+    };
+  });
 
   // Everything below treats both groups identically.
   var ALL_SLOTS = SLOTS.concat(VENTURE_SLOTS);

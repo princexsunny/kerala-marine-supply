@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Venture — Kerala Marine Supply</title>
-<meta name="description" content="One of twelve connected marine ventures under the Shalom name in Trivandrum, Kerala.">
+<meta name="description" content="One of ten connected marine ventures under the Shalom name in Trivandrum, Kerala.">
 <link rel="stylesheet" href="styles-modernist.css">
 <style>
   body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)}
@@ -101,7 +101,7 @@
 
 <section style="border-top:2px solid var(--color-divider);background:var(--color-neutral-200)">
   <div class="wrap" style="max-width:1280px;padding-top:34px;padding-bottom:34px">
-    <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--color-accent-700);font-weight:700;margin-bottom:16px">All twelve ventures</div>
+    <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--color-accent-700);font-weight:700;margin-bottom:16px">All ten ventures</div>
     <div class="allgrid" id="allgrid"></div>
   </div>
 </section>
@@ -131,18 +131,32 @@
     wrench: '<path d="M15.5 6.5a4.5 4.5 0 1 0 3.6 7.2L21 16l-3 3-2.3-2.3A4.5 4.5 0 0 0 15.5 6.5z"/><path d="M9.5 10L4 15.5 6.5 18 12 12.5"/>',
     prop:   '<circle cx="12" cy="12" r="2.4"/><path d="M12 9.6q-1.5-6 3.5-7.1 1.6 5.3-3.5 7.1zm0 4.8q1.5 6-3.5 7.1-1.6-5.3 3.5-7.1zm2.4 0q6 1.5 7.1-3.5-5.3-1.6-7.1 3.5zm-4.8 0Q3.6 15.9 2.5 10.9q5.3-1.6 7.1 3.5z"/>',
     truck:  '<rect x="2" y="7" width="12" height="10" rx="1"/><path d="M14 10h4l3.5 3.5V17H14z"/><circle cx="7" cy="19.5" r="1.6"/><circle cx="17.5" cy="19.5" r="1.6"/><path d="M6 10v4M4 12h4"/>',
+    coldtruck: '<rect x="2" y="7" width="12" height="10" rx="1"/><path d="M14 10h4l3.5 3.5V17H14z"/><circle cx="7" cy="19.5" r="1.6"/><circle cx="17.5" cy="19.5" r="1.6"/><path d="M8 9.4v5.2M5.7 10.7l4.6 2.6M10.3 10.7l-4.6 2.6"/>',
+    net:    '<path d="M4 4h16l-3.2 10.5a5 5 0 0 1-9.6 0z"/><path d="M6.2 8h11.6M7.4 12h9.2M4.9 4.6 10 15M19.1 4.6 14 15M12 4v12"/>',
     export: '<rect x="3" y="8" width="12" height="11" rx="1"/><path d="M3 12h12M8 8V5.5h5V8"/><path d="M17.5 12.5a5 5 0 1 1-3.5 8.2"/><path d="M17.5 15v3h3"/>',
   };
 
-  var V = window.KMS_VENTURES || [];
+  // ALL of them here, not just the shown ones: a hidden venture's own page
+  // still has to render if someone follows an old link straight to it. What it
+  // must not do is appear in the rail or the prev/next below, which read
+  // KMS_VISIBLE instead.
+  var ALL = window.KMS_VENTURES || [];
+  var V = window.KMS_VISIBLE || ALL;
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 
   var slug = new URLSearchParams(location.search).get('v') || '';
   var idx = -1;
   for (var i = 0; i < V.length; i++) if (V[i].slug === slug) idx = i;
-  // Unknown or missing ?v= lands on the first venture rather than a blank page.
-  if (idx === -1) idx = 0;
-  var v = V[idx];
+
+  var v;
+  if (idx === -1) {
+    // Not in the shown list. It may still be a real venture that is simply not
+    // on the site at the moment — render it, but step prev/next around the
+    // shown ones so the reader is returned to the site proper.
+    for (var j = 0; j < ALL.length; j++) if (ALL[j].slug === slug) v = ALL[j];
+    idx = 0;
+  }
+  if (!v) v = V[idx];        // unknown or missing ?v= lands on the first, not a blank page
   var prev = V[(idx - 1 + V.length) % V.length];
   var next = V[(idx + 1) % V.length];
 

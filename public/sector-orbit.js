@@ -44,10 +44,16 @@
     wrench: '<path d="M15.5 6.5a4.5 4.5 0 1 0 3.6 7.2L21 16l-3 3-2.3-2.3A4.5 4.5 0 0 0 15.5 6.5z"/><path d="M9.5 10L4 15.5 6.5 18 12 12.5"/>',
     prop:   '<circle cx="12" cy="12" r="2.4"/><path d="M12 9.6q-1.5-6 3.5-7.1 1.6 5.3-3.5 7.1zm0 4.8q1.5 6-3.5 7.1-1.6-5.3 3.5-7.1zm2.4 0q6 1.5 7.1-3.5-5.3-1.6-7.1 3.5zm-4.8 0Q3.6 15.9 2.5 10.9q5.3-1.6 7.1 3.5z"/>',
     truck:  '<rect x="2" y="7" width="12" height="10" rx="1"/><path d="M14 10h4l3.5 3.5V17H14z"/><circle cx="7" cy="19.5" r="1.6"/><circle cx="17.5" cy="19.5" r="1.6"/><path d="M6 10v4M4 12h4"/>',
+    // A refrigerated lorry: the snowflake is what tells cold chain apart from
+    // ordinary haulage at icon size.
+    coldtruck: '<rect x="2" y="7" width="12" height="10" rx="1"/><path d="M14 10h4l3.5 3.5V17H14z"/><circle cx="7" cy="19.5" r="1.6"/><circle cx="17.5" cy="19.5" r="1.6"/><path d="M8 9.4v5.2M5.7 10.7l4.6 2.6M10.3 10.7l-4.6 2.6"/>',
+    // A hanging net, so the nets shop is not another shopping trolley.
+    net:    '<path d="M4 4h16l-3.2 10.5a5 5 0 0 1-9.6 0z"/><path d="M6.2 8h11.6M7.4 12h9.2M4.9 4.6 10 15M19.1 4.6 14 15M12 4v12"/>',
     export: '<rect x="3" y="8" width="12" height="11" rx="1"/><path d="M3 12h12M8 8V5.5h5V8"/><path d="M17.5 12.5a5 5 0 1 1-3.5 8.2"/><path d="M17.5 15v3h3"/>',
   };
 
-  var V = window.KMS_VENTURES || [];
+  // The shown ventures only — a hidden one must not take a place on the ring.
+  var V = window.KMS_VISIBLE || window.KMS_VENTURES || [];
   if (!V.length) return;
   var N = V.length;
   var STEP = 360 / N;
