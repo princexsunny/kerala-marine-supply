@@ -529,7 +529,19 @@
   table.rels thead th{font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint)}
   table.rels .n{text-align:right;font-family:"IBM Plex Mono",monospace}
   table.rels tfoot th{border-bottom:none;border-top:2px solid var(--line);font-weight:700}
-  col.w-rdate{width:9.5rem} col.w-ramt{width:8.5rem} col.w-rbtn{width:2.6rem}
+  col.w-rdate{width:9.5rem} col.w-ramt{width:8.5rem} col.w-rbtns{width:8.2rem}
+  table.rels td.rowbtns .g{display:flex;gap:.3rem;justify-content:flex-end;align-items:center}
+  table.rels tr.locked{background:var(--sunken)}
+  /* The card heading and its Save control on one line. */
+  .cardhead{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .cardhead h2{margin:0}
+  .cardhead .g{display:flex;gap:.4rem;align-items:center}
+  /* A locked field still shows its value — it is a record, not a hidden one —
+     but reads as settled rather than as something waiting to be typed into. */
+  .terms input:disabled,.terms .seg button:disabled{
+    background:var(--sunken);color:var(--ink);opacity:1;cursor:default;
+    border-color:var(--line-soft)}
+  .terms.is-locked label{color:var(--ink-faint)}
   table.rels input[type=date]{width:100%}
   /* How much of the sanction has actually landed. */
   .relbars{margin-top:.75rem}
@@ -713,7 +725,10 @@
     </div>
 
     <section class="card">
-      <h2 id="loanTitle">Loan terms</h2>
+      <div class="cardhead">
+        <h2 id="loanTitle">Loan terms</h2>
+        <div class="g" id="termsLock"></div>
+      </div>
       <div class="terms">
         <div class="fld"><label for="lName">Loan name</label>
           <input type="text" id="lName" class="txtfield"></div>
@@ -754,7 +769,7 @@
         <p class="note" id="relNote"></p>
         <div class="scroll">
           <table class="rels">
-            <colgroup><col class="w-rdate"><col><col class="w-ramt"><col class="w-rbtn"></colgroup>
+            <colgroup><col class="w-rdate"><col><col class="w-ramt"><col class="w-rbtns"></colgroup>
             <thead><tr>
               <th>Date received</th><th>What it was for</th><th class="n">Amount</th><th></th>
             </tr></thead>
@@ -938,7 +953,8 @@
        one actual release with the date it landed. */
     var releases = (Array.isArray(L.releases) ? L.releases : []).map(function(r){
       r = r || {};
-      return {id: r.id || ("R" + (++loanSeq)), amt: num(r.amt), date: String(r.date || ""), note: String(r.note || "")};
+      return {id: r.id || ("R" + (++loanSeq)), amt: num(r.amt), date: String(r.date || ""),
+              note: String(r.note || ""), locked: !!r.locked};
     });
     var ladder = Array.isArray(L.ladder) && L.ladder.length ? L.ladder : (seed.ladder || null);
     var method = ["ladder","equal","emi"].indexOf(L.method) >= 0 ? L.method : (ladder ? "ladder" : "equal");
@@ -958,6 +974,10 @@
       method: method,
       ladder: ladder,
       releases: releases,
+      /* Same idea as a stage row: once the terms have been typed off the
+         sanction letter they should not move because a finger brushed a field.
+         Saved is the normal state; Edit is the deliberate act. */
+      locked: !!L.locked,
       paid: paid
     };
   }
@@ -1028,7 +1048,8 @@
       return;
     }
     n.textContent = (lastSaved ? "Last saved at " + lastSaved.toLocaleTimeString() + ". " : "")
-      + "Fill a row in, then press Save on that row — it locks so the record cannot be changed by accident. Press Edit to reopen it.";
+      + "Everything is kept as you type. Press Save on a stage row, a release, or the loan terms "
+      + "to lock that record so it cannot be changed by accident — Edit reopens it.";
   }
 
   function totalCost(){ return heads().reduce(function(a,h){ return a + h.amount; }, 0); }
@@ -1452,6 +1473,10 @@
         body.appendChild(tr);
       });
     }
+    var noDate = !firstDrawISO(L);
+    document.getElementById("termsNote").textContent = noDate
+      ? "No date of first drawal yet, so the dates in the schedule below cannot be worked out. Everything else is."
+      : (document.getElementById("termsNote").textContent || "");
     document.getElementById("loanNote").textContent =
       "Interest each month is the opening balance × " + L.rate + "% ÷ 12. "
       + "Enter what you actually paid and the date; a row turns Paid once the amount covers the total due."
@@ -2048,34 +2073,63 @@
       tr0.appendChild(td0); body.appendChild(tr0);
     }
 
-    order.forEach(function(r){
-      var tr = el("tr");
+    order.forEach(function(r, ri){
+      var tr = el("tr", r.locked ? "locked" : null);
 
-      var d = el("input"); d.type = "date"; d.value = r.date;
-      d.setAttribute("aria-label", "Date this money was received");
-      d.onchange = function(){ r.date = d.value; save(); renderLoan(); renderReleases(); };
-      cell(tr, null).appendChild(d);
+      if(r.locked){
+        cell(tr, null).appendChild(el("span", null, r.date ? dShow(new Date(r.date + "T00:00:00")) : "No date"));
+        var nt = cell(tr, null);
+        nt.appendChild(el("span", r.note ? null : "muted", r.note || "—"));
+        nt.appendChild(el("span", "savedtag", "Saved"));
+        cell(tr, "n").appendChild(el("span", "lockval", fmt(r.amt)));
+      }else{
+        var d = el("input"); d.type = "date"; d.value = r.date;
+        d.setAttribute("aria-label", "Date this money was received");
+        d.onchange = function(){ r.date = d.value; save(); renderLoan(); renderReleases(); };
+        cell(tr, null).appendChild(d);
 
-      var t = el("input"); t.type = "text"; t.className = "txtfield"; t.value = r.note;
-      t.placeholder = "e.g. first instalment against the shed";
-      t.setAttribute("aria-label", "What this release was for");
-      t.oninput = function(){ r.note = t.value; save(); };
-      cell(tr, null).appendChild(t);
+        var t = el("input"); t.type = "text"; t.className = "txtfield"; t.value = r.note;
+        t.placeholder = "e.g. first instalment against the shed";
+        t.setAttribute("aria-label", "What this release was for");
+        t.oninput = function(){ r.note = t.value; save(); };
+        cell(tr, null).appendChild(t);
 
-      cell(tr, "n").appendChild(moneyInput("n act",
-        function(){ return r.amt; },
-        function(v){ r.amt = v; renderLoan(); renderReleases(); },
-        "Amount received"));
+        cell(tr, "n").appendChild(moneyInput("n act",
+          function(){ return r.amt; },
+          function(v){ r.amt = v; renderLoan(); renderReleases(); },
+          "Amount received"));
+      }
 
+      var btns = cell(tr, "rowbtns");
+      var g = el("div", "g");
+      if(r.locked){
+        var ed = el("button", "rowedit", "Edit");
+        ed.type = "button";
+        ed.setAttribute("aria-label", "Edit release " + (ri + 1));
+        ed.onclick = function(){ r.locked = false; save(); renderReleases(); toast("Release reopened for editing."); };
+        g.appendChild(ed);
+      }else{
+        var ok = el("button", "rowsave", "Save");
+        ok.type = "button";
+        ok.setAttribute("aria-label", "Save release " + (ri + 1));
+        ok.onclick = function(){
+          if(!r.amt){ toast("Type the amount before saving this release.", true); return; }
+          r.locked = true; save(); renderLoan(); renderReleases();
+          toast(money(r.amt) + " saved to the record.");
+        };
+        g.appendChild(ok);
+      }
       var x = el("button", "del", "✕");
       x.type = "button"; x.title = "Remove this release";
-      x.setAttribute("aria-label", "Remove this release");
+      x.setAttribute("aria-label", "Remove release " + (ri + 1));
       x.onclick = function(){
+        if(r.locked && !confirm("Remove this saved release of " + money(r.amt) + "?")) return;
         L.releases = L.releases.filter(function(o){ return o !== r; });
         save(); renderLoan(); renderReleases();
         toast("Release removed.");
       };
-      cell(tr, "n").appendChild(x);
+      g.appendChild(x);
+      btns.appendChild(g);
 
       body.appendChild(tr);
     });
@@ -2109,6 +2163,9 @@
     }
   }
 
+  /* Locking the TERMS does not lock the releases: money carries on arriving
+     long after the sanction letter has been typed in. Each release locks on
+     its own row. */
   function bindLoanFields(){
     var L = state.loans[state.active];
 
@@ -2188,6 +2245,50 @@
     Array.prototype.forEach.call(document.querySelectorAll("#lFilter button"), function(b){
       b.setAttribute("aria-pressed", String(b.dataset.f === state.filter));
     });
+
+    /* ---- Save / Edit for the whole terms block ---------------------------
+       These come off the sanction letter and then stop changing. Locked is the
+       resting state; Edit is a deliberate act. Everything still auto-saves as
+       it is typed — this stops a stray keystroke rewriting a settled record.
+       LAST in this function on purpose: lines above set `disabled` on the years
+       field and the ladder button for their own reasons, and running before
+       them meant the ladder button quietly came back to life on a locked
+       record. Whatever this does has to be the final word. */
+    (function(){
+      var box = document.getElementById("termsLock");
+      var terms = document.querySelectorAll(".terms");
+      var fields = document.querySelectorAll(".terms input, .terms .seg button");
+
+      Array.prototype.forEach.call(terms, function(t){ t.classList.toggle("is-locked", !!L.locked); });
+      Array.prototype.forEach.call(fields, function(f){ f.disabled = !!L.locked; });
+
+      box.textContent = "";
+      if(L.locked){
+        box.appendChild(el("span", "savedtag", "Saved"));
+        var ed = el("button", "rowedit", "Edit terms");
+        ed.type = "button";
+        ed.onclick = function(){
+          L.locked = false; save(); bindLoanFields(); renderLoan();
+          toast("Loan terms reopened for editing.");
+        };
+        box.appendChild(ed);
+      }else{
+        var ok = el("button", "rowsave", "Save terms");
+        ok.type = "button";
+        ok.onclick = function(){
+          if(!L.amount){ toast("Enter the sanctioned amount before saving.", true); return; }
+          /* The drawal date is NOT required. A sanction letter arrives before
+             any money does, and refusing to record the terms until a date
+             exists would mean the letter could not be entered on the day it
+             came. It is flagged below instead. */
+          L.locked = true; save(); bindLoanFields(); renderLoan();
+          toast(firstDrawISO(L)
+            ? "Loan terms saved and locked."
+            : "Loan terms saved. Add the date of first drawal when the money comes.");
+        };
+        box.appendChild(ok);
+      }
+    })();
 
     /* Drawn last: the releases table is bound to this loan, so it has to be
        rebuilt whenever the fields are. */
