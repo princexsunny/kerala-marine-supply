@@ -545,6 +545,31 @@
   .terms.is-locked label{color:var(--ink-faint)}
   table.rels input[type=date]{width:100%}
 
+  /* ── Spending ledger ──────────────────────────────────────────────────── */
+  table.spend{width:100%;border-collapse:collapse;min-width:46rem}
+  table.spend th,table.spend td{padding:.5rem .55rem;border-bottom:1px solid var(--line-soft);
+    text-align:left;font-size:.86rem;vertical-align:middle}
+  table.spend thead th{font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-faint);border-bottom:1px solid var(--line)}
+  table.spend .n{text-align:right;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+  table.spend tfoot th{border-bottom:none;border-top:2px solid var(--line);font-weight:700;font-size:.88rem}
+  table.spend tr.locked{background:var(--sunken)}
+  table.spend td.rowbtns .g{display:flex;gap:.3rem;justify-content:flex-end}
+  table.spend input[type=date]{width:100%}
+  table.spend input[type=text]{width:100%;padding:.28rem .4rem;border:1px solid var(--field-line);
+    border-radius:.25rem;background:var(--field);font-family:inherit;font-size:.82rem}
+  table.spend select{width:100%;padding:.28rem .3rem;font-size:.82rem}
+  col.w-sdate{width:9.5rem} col.w-scat{width:12rem} col.w-ssrc{width:8rem}
+  col.w-samt{width:8.5rem} col.w-sbtn{width:8rem} col.w-sbar{width:9rem}
+  /* Which pocket it came out of, at a glance. */
+  .src{display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;font-weight:700;
+    letter-spacing:.05em;text-transform:uppercase;border-radius:99px;padding:.12rem .5rem}
+  .src.kfc{background:var(--kfc-bg);color:var(--kfc)}
+  .src.own{background:var(--own-bg);color:var(--own)}
+  .bbar{height:.45rem;border-radius:99px;background:var(--track);overflow:hidden}
+  .bbar span{display:block;height:100%;border-radius:99px;background:var(--m-kfc)}
+  .bbar span.over{background:var(--brand)}
+
   /* ── Papers attached to this record ───────────────────────────────────── */
   .docnote{font-size:.74rem;color:var(--ink-faint);letter-spacing:.01em;align-self:center}
   .docs{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.55rem;width:100%}
@@ -611,6 +636,7 @@
 
   <div class="tabs" id="tabs" role="tablist">
     <button type="button" role="tab" data-view="stages" aria-selected="true">Project stages</button>
+    <button type="button" role="tab" data-view="spend" aria-selected="false">Spending</button>
     <button type="button" role="tab" data-view="loan" aria-selected="false">Loan &amp; repayment</button>
   </div>
 
@@ -731,6 +757,55 @@
   </section>
 
   </div><!-- /viewStages -->
+
+  <div class="view" id="viewSpend" hidden>
+    <div class="card">
+      <div class="strip" id="spendStrip"></div>
+    </div>
+
+    <section class="card">
+      <div class="cardhead">
+        <h2>What has actually been spent</h2>
+        <button type="button" class="ghost primary" id="addSpend">+ Add an entry</button>
+      </div>
+      <p class="note">
+        The stages above record what was <em>funded</em>. This records what was
+        <em>spent</em>, and on what. The two are not the same thing, and the gap between
+        them is money sitting in the account.
+      </p>
+      <div class="scroll">
+        <table class="spend">
+          <colgroup>
+            <col class="w-sdate"><col class="w-scat"><col><col class="w-ssrc"><col class="w-samt"><col class="w-sbtn">
+          </colgroup>
+          <thead><tr>
+            <th>Date</th><th>Category</th><th>What it was for</th>
+            <th>Paid from</th><th class="n">Amount</th><th></th>
+          </tr></thead>
+          <tbody id="spendBody"></tbody>
+          <tfoot><tr>
+            <th>Total spent</th><th></th><th></th><th></th>
+            <th class="n" id="spendTotal">—</th><th></th>
+          </tr></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Against the budget</h2>
+      <div class="scroll">
+        <table class="spend">
+          <colgroup><col><col class="w-samt"><col class="w-samt"><col class="w-samt"><col class="w-sbar"></colgroup>
+          <thead><tr>
+            <th>Category</th><th class="n">Budget</th><th class="n">Spent</th>
+            <th class="n">Left</th><th></th>
+          </tr></thead>
+          <tbody id="budgetBody"></tbody>
+        </table>
+      </div>
+      <p class="note" id="budgetNote"></p>
+    </section>
+  </div>
 
   <div class="view" id="viewLoan" hidden>
 
@@ -874,6 +949,8 @@
   var KFC_LOAN = 7000000;
   var PCT_FIXED = 0.8128;
   var OWNER = "Shalom Marine Services";
+  /* "Shalom Marine Services money" will not fit in a pill or a narrow column. */
+  var OWNER_SHORT = "Own";
   var DEFAULTS = [
     {id:"building",  label:"Building cost",               amount:1700000},
     {id:"machinery", label:"Plant & machinery",           amount:6897050},
@@ -907,16 +984,38 @@
       stages: (h && Array.isArray(h.stages)) ? h.stages.map(normStage) : []
     };
   }
+  /* One line of actual expenditure. Kept on the PROJECT, beside its cost heads,
+     because a second yard would have its own spending and its own budget. */
+  var spendSeq = 0;
+  function normSpend(x, headIds){
+    x = x || {};
+    var head = String(x.head || "");
+    /* A category that no longer exists — a cost head was renamed or removed —
+       is emptied rather than left pointing at nothing, so the entry shows up as
+       uncategorised instead of silently vanishing from every total. */
+    if(headIds && headIds.indexOf(head) === -1) head = "";
+    return {
+      id: x.id || ("E" + (++spendSeq)),
+      date: String(x.date || ""),
+      head: head,
+      note: String(x.note || ""),
+      src: x.src === "own" ? "own" : "kfc",
+      amt: num(x.amt),
+      locked: !!x.locked
+    };
+  }
   function normProject(P, i){
     P = P || {};
     var heads = Array.isArray(P.heads) && P.heads.length
       ? P.heads.map(normHead)
       : freshHeads(i > 0);
+    var ids = heads.map(function(h){ return h.id; });
     return {
       id: P.id || ("P" + (++projSeq)),
       name: String(P.name || (i > 0 ? "Project " + (i+1) : "Shalom Marine Services — boat yard")),
       kfcLoan: P.kfcLoan === undefined ? (i > 0 ? 0 : KFC_LOAN) : num(P.kfcLoan),
-      heads: heads
+      heads: heads,
+      spend: (Array.isArray(P.spend) ? P.spend : []).map(function(x){ return normSpend(x, ids); })
     };
   }
   function freshProjects(){ return [normProject(null, 0)]; }
@@ -953,7 +1052,7 @@
     if(!p || (!Array.isArray(p.heads) && !Array.isArray(p.projects))) return false;
     state.unit = p.unit === "rupee" ? "rupee" : "lakh";
     state.basis = p.basis === "pct" ? "pct" : "fixed";
-    state.view = p.view === "loan" ? "loan" : "stages";
+    state.view = ["loan","spend","stages"].indexOf(p.view) >= 0 ? p.view : "stages";
     state.loans = normLoans(p.loans || (p.loan ? [p.loan] : null));
     state.active = Math.min(Math.max(0, Math.round(num(p.active))), state.loans.length - 1);
     state.filter = ["next","unpaid","paid","all"].indexOf(p.filter) >= 0 ? p.filter : "next";
@@ -1317,6 +1416,9 @@
     registerStrips();
     updaters.push(renderGraphs);
     updaters.push(renderLoan);
+    /* Redrawn with everything else, because the budget column is the cost
+       heads' amounts and those can change on the stages tab. */
+    updaters.push(renderSpend);
     refresh();
     stamp();
     Array.prototype.forEach.call(document.querySelectorAll("textarea.txt"), grow);
@@ -2161,6 +2263,31 @@
       });
     });
     rows.push([]);
+    /* The spending ledger, under the stages it is meant to be read against. */
+    if(spendOf().length){
+      rows.push([]);
+      rows.push(["WHAT WAS ACTUALLY SPENT"]);
+      rows.push(["Date","Category","What it was for","Paid from","Amount"]);
+      spendOf().slice().sort(function(a,b){ return (a.date||"") < (b.date||"") ? -1 : 1; })
+        .forEach(function(e){
+          rows.push([e.date || "(no date)", e.head ? headLabel(e.head) : "Uncategorised",
+                     e.note || "", e.src === "kfc" ? "KFC money" : "Own money", Math.round(e.amt)]);
+        });
+      rows.push(["Total spent","","","",Math.round(spentTotal())]);
+      rows.push([]);
+      rows.push(["AGAINST THE BUDGET"]);
+      rows.push(["Category","Budget","Spent","Left"]);
+      var by = spentByHead();
+      heads().forEach(function(h){
+        rows.push([h.label, Math.round(h.amount), Math.round(by[h.id] || 0),
+                   Math.round(h.amount - (by[h.id] || 0))]);
+      });
+      if((by[""] || 0) > 0.5) rows.push(["Uncategorised","",Math.round(by[""]),""]);
+      rows.push(["TOTAL", Math.round(totalCost()), Math.round(spentTotal()),
+                 Math.round(totalCost() - spentTotal())]);
+      rows.push([]);
+    }
+
     var pg = progressNow();
     rows.push(["TOTAL OF STAGES","",Math.round(tA),Math.round(tK),Math.round(tA-tK),Math.round(tR),Math.round(tC),
                Math.round(tK-tR),Math.round((tA-tK)-tC),"",
@@ -2514,6 +2641,7 @@
   /* ── tabs ── */
   function syncView(){
     document.getElementById("viewStages").hidden = state.view !== "stages";
+    document.getElementById("viewSpend").hidden  = state.view !== "spend";
     document.getElementById("viewLoan").hidden   = state.view !== "loan";
     Array.prototype.forEach.call(document.querySelectorAll("#tabs button"), function(b){
       b.setAttribute("aria-selected", String(b.dataset.view === state.view));
@@ -2540,6 +2668,216 @@
     var b = e.target.closest("button"); if(!b) return;
     state.basis = b.dataset.basis; syncSegs(); save(); render();
   });
+
+  /* ───────── the spending ledger ─────────
+     The stages record what was FUNDED. This records what was SPENT. Keeping
+     them apart is the point: money received and money laid out are different
+     facts, and the difference between the two is cash still in the account. */
+  function spendOf(){ return proj().spend || (proj().spend = []); }
+
+  function spentByHead(){
+    var by = {};
+    heads().forEach(function(h){ by[h.id] = 0; });
+    by[""] = 0;
+    spendOf().forEach(function(e){
+      if(by[e.head] === undefined) by[e.head] = 0;
+      by[e.head] += e.amt;
+    });
+    return by;
+  }
+  function spentTotal(){ return spendOf().reduce(function(a,e){ return a + e.amt; }, 0); }
+  function spentFrom(src){
+    return spendOf().reduce(function(a,e){ return a + (e.src === src ? e.amt : 0); }, 0);
+  }
+
+  function headLabel(id){
+    var h = heads().filter(function(x){ return x.id === id; })[0];
+    return h ? h.label : "";
+  }
+
+  function renderSpend(){
+    var body = document.getElementById("spendBody");
+    if(!body) return;
+    body.textContent = "";
+
+    /* Newest first — the entry just added is the one being checked. Undated
+       rows stay at the top so a half-typed line does not disappear. */
+    var rows = spendOf().slice().sort(function(a,b){
+      if(!a.date) return -1;
+      if(!b.date) return 1;
+      return a.date < b.date ? 1 : a.date > b.date ? -1 : 0;
+    });
+
+    if(!rows.length){
+      var tr0 = el("tr");
+      var td0 = el("td", "muted", "Nothing recorded yet. Add what has been paid out and what for.");
+      td0.colSpan = 6; tr0.appendChild(td0); body.appendChild(tr0);
+    }
+
+    rows.forEach(function(e, i){
+      var tr = el("tr", e.locked ? "locked" : null);
+
+      if(e.locked){
+        cell(tr, null).appendChild(el("span", null, e.date ? dShow(new Date(e.date + "T00:00:00")) : "No date"));
+        cell(tr, null).appendChild(el("span", e.head ? null : "muted", e.head ? headLabel(e.head) : "Uncategorised"));
+        var nt = cell(tr, null);
+        nt.appendChild(el("span", e.note ? null : "muted", e.note || "—"));
+        nt.appendChild(el("span", "savedtag", "Saved"));
+        cell(tr, null).appendChild(el("span", "src " + e.src, e.src === "kfc" ? "KFC" : OWNER_SHORT));
+        cell(tr, "n").appendChild(el("span", "lockval", fmt(e.amt)));
+      }else{
+        var d = el("input"); d.type = "date"; d.value = e.date;
+        d.setAttribute("aria-label", "Date of this payment");
+        d.onchange = function(){ e.date = d.value; save(); renderSpend(); };
+        cell(tr, null).appendChild(d);
+
+        var sel = el("select");
+        sel.setAttribute("aria-label", "Category");
+        var blank = el("option", null, "— choose —"); blank.value = ""; sel.appendChild(blank);
+        heads().forEach(function(h){
+          var o = el("option", null, h.label); o.value = h.id;
+          if(h.id === e.head) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.onchange = function(){ e.head = sel.value; save(); renderSpend(); };
+        cell(tr, null).appendChild(sel);
+
+        var t = el("input"); t.type = "text"; t.value = e.note;
+        t.placeholder = "e.g. steel for the rail beam, from Mathew Traders";
+        t.setAttribute("aria-label", "What this payment was for");
+        t.oninput = function(){ e.note = t.value; save(); };
+        cell(tr, null).appendChild(t);
+
+        var ssel = el("select");
+        ssel.setAttribute("aria-label", "Paid from");
+        [["kfc","KFC money"],["own",OWNER_SHORT + " money"]].forEach(function(p){
+          var o = el("option", null, p[1]); o.value = p[0];
+          if(p[0] === e.src) o.selected = true;
+          ssel.appendChild(o);
+        });
+        ssel.onchange = function(){ e.src = ssel.value; save(); renderSpend(); };
+        cell(tr, null).appendChild(ssel);
+
+        cell(tr, "n").appendChild(moneyInput("n act",
+          function(){ return e.amt; },
+          function(v){ e.amt = v; renderSpend(); },
+          "Amount paid"));
+      }
+
+      var btns = cell(tr, "rowbtns");
+      var g = el("div", "g");
+      if(e.locked){
+        var ed = el("button", "rowedit", "Edit");
+        ed.type = "button";
+        ed.setAttribute("aria-label", "Edit entry " + (i+1));
+        ed.onclick = function(){ e.locked = false; save(); renderSpend(); toast("Entry reopened."); };
+        g.appendChild(ed);
+      }else{
+        var ok = el("button", "rowsave", "Save");
+        ok.type = "button";
+        ok.setAttribute("aria-label", "Save entry " + (i+1));
+        ok.onclick = function(){
+          if(!e.amt){ toast("Type the amount before saving.", true); return; }
+          if(!e.head){ toast("Choose a category before saving.", true); return; }
+          e.locked = true; save(); renderSpend();
+          toast(money(e.amt) + " recorded against " + headLabel(e.head) + ".");
+        };
+        g.appendChild(ok);
+      }
+      var x = el("button", "del", "✕");
+      x.type = "button"; x.title = "Remove this entry";
+      x.setAttribute("aria-label", "Remove entry " + (i+1));
+      x.onclick = function(){
+        if(e.locked && !confirm("Remove this saved entry of " + money(e.amt) + "?")) return;
+        proj().spend = spendOf().filter(function(o){ return o !== e; });
+        save(); renderSpend();
+        toast("Entry removed.");
+      };
+      g.appendChild(x);
+      btns.appendChild(g);
+      body.appendChild(tr);
+    });
+
+    document.getElementById("spendTotal").textContent = spendOf().length ? money(spentTotal()) : "—";
+    renderBudget();
+    renderSpendStrip();
+  }
+
+  function renderBudget(){
+    var body = document.getElementById("budgetBody");
+    if(!body) return;
+    body.textContent = "";
+    var by = spentByHead();
+
+    heads().forEach(function(h){
+      var spent = by[h.id] || 0, left = h.amount - spent;
+      var tr = el("tr");
+      cell(tr, null, h.label);
+      cell(tr, "n", fmt(h.amount));
+      cell(tr, "n", fmt(spent));
+      var lc = cell(tr, "n", fmt(left));
+      lc.className = "n " + (left < -0.5 ? "due" : "clear");
+      var bar = el("div", "bbar");
+      var fill = el("span");
+      var pctv = h.amount > 0 ? Math.min(100, spent / h.amount * 100) : 0;
+      fill.style.width = pctv + "%";
+      if(spent > h.amount + 0.5) fill.className = "over";
+      bar.appendChild(fill);
+      cell(tr, null).appendChild(bar);
+      body.appendChild(tr);
+    });
+
+    /* Anything whose category was removed still has to be visible, or the
+       columns would stop adding up with no explanation. */
+    if(by[""] > 0.5){
+      var tr2 = el("tr");
+      cell(tr2, "muted", "Uncategorised");
+      cell(tr2, "n", "—");
+      cell(tr2, "n", fmt(by[""]));
+      cell(tr2, "n", "—");
+      cell(tr2, null, "");
+      body.appendChild(tr2);
+    }
+
+    var budget = totalCost(), spent = spentTotal();
+    var note = document.getElementById("budgetNote");
+    if(!spendOf().length){
+      note.className = "note";
+      note.textContent = "Nothing spent has been recorded yet, so this is the plan only.";
+    }else if(spent > budget + 0.5){
+      note.className = "note warn";
+      note.textContent = money(spent - budget) + " has been spent above the budget of " + money(budget) + ".";
+    }else{
+      note.className = "note";
+      note.textContent = money(spent) + " spent of a " + money(budget) + " budget — "
+        + money(budget - spent) + " left, on the categories as they stand.";
+    }
+  }
+
+  function renderSpendStrip(){
+    var box = document.getElementById("spendStrip");
+    if(!box) return;
+    box.textContent = "";
+    var t = totalsNow();
+    var funded = t.funded, spent = spentTotal();
+    function stat(cls, k, v, p){
+      var d = el("div", "stat " + cls);
+      d.appendChild(el("div", "k", k));
+      d.appendChild(el("div", "v", v));
+      d.appendChild(el("div", "p", p));
+      box.appendChild(d);
+    }
+    stat("t2", "Funded so far", money(funded), "Received plus what you put in");
+    stat("t6", "Spent so far", money(spent), spendOf().length + (spendOf().length === 1 ? " entry" : " entries"));
+    /* The number that matters and that neither table shows on its own. */
+    var held = funded - spent;
+    stat(held < -0.5 ? "t8" : "t7", held < -0.5 ? "Spent beyond the funding" : "Still in hand",
+         money(Math.abs(held)),
+         held < -0.5 ? "Paid out of your own pocket, or not yet recorded"
+                     : "Funded but not yet paid out");
+    stat("t3", "From KFC money", money(spentFrom("kfc")),
+         "Of " + money(t.recd) + " received");
+  }
 
   /* ───────── papers attached to this record ─────────
      Deliberately NOT a new store. These go through the site's existing
@@ -2634,6 +2972,14 @@
         .then(function(){ i++; next(); });
     })();
   }
+
+  document.getElementById("addSpend").addEventListener("click", function(){
+    /* Dated today and charged to KFC money by default: that is what most
+       entries are, and a default that is usually right is one less field. */
+    spendOf().push(normSpend({date: todayISO(), src: "kfc"}, heads().map(function(h){ return h.id; })));
+    save(); renderSpend();
+    toast("Entry added — choose the category and type the amount.");
+  });
 
   document.getElementById("addDoc").addEventListener("click", function(){
     document.getElementById("docIn").click();
