@@ -544,6 +544,21 @@
     border-color:var(--line-soft)}
   .terms.is-locked label{color:var(--ink-faint)}
   table.rels input[type=date]{width:100%}
+
+  /* ── Papers attached to this record ───────────────────────────────────── */
+  .docnote{font-size:.74rem;color:var(--ink-faint);letter-spacing:.01em;align-self:center}
+  .docs{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.55rem;width:100%}
+  .docs:empty{display:none}
+  .doc{display:inline-flex;align-items:center;gap:.45rem;max-width:22rem;
+       border:1px solid var(--line);border-radius:.3rem;background:var(--card);
+       padding:.3rem .4rem .3rem .55rem;font-size:.78rem}
+  .doc a{color:var(--ink);text-decoration:none;overflow:hidden;text-overflow:ellipsis;
+         white-space:nowrap;font-weight:600}
+  .doc a:hover{color:var(--brand);text-decoration:underline}
+  .doc .sz{color:var(--ink-faint);font-size:.7rem;font-variant-numeric:tabular-nums;flex:none}
+  .doc .del{flex:none}
+  .doc.busy{opacity:.55}
+  @media (max-width:640px){ .doc{max-width:100%} }
   /* How much of the sanction has actually landed. */
   .relbars{margin-top:.75rem}
   .relbar{height:.5rem;border-radius:99px;background:var(--track);overflow:hidden}
@@ -624,6 +639,14 @@
           <button type="button" class="ghost" id="openBtn">Open backup</button>
           <button type="button" class="ghost" id="printBtn">Print full sheet</button>
         </div>
+      </div>
+      <div class="ctl" style="flex-basis:100%">
+        <span>Papers for this record</span>
+        <div class="btnrow">
+          <button type="button" class="ghost" id="addDoc">+ Attach a file</button>
+          <span class="docnote" id="docNote">The sanction letter, quotations, release advices, bills.</span>
+        </div>
+        <div class="docs" id="docList"></div>
       </div>
     </div>
     <p class="note" id="autoNote"></p>
@@ -843,6 +866,7 @@
 
 <div id="toast" role="status" aria-live="polite"></div>
 <input type="file" id="fileIn" accept=".json,application/json" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+<input type="file" id="docIn" multiple style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
 
 <script>
 (function(){
@@ -2517,6 +2541,108 @@
     state.basis = b.dataset.basis; syncSegs(); save(); render();
   });
 
+  /* ───────── papers attached to this record ─────────
+     Deliberately NOT a new store. These go through the site's existing
+     document library — /api/documents, admin-only, Firebase Storage behind it
+     — under one category. That means the sanction letter filed here also
+     appears in the admin document list, there is one place files live, and
+     nothing new had to be built to hold them.
+     They are attached to the RECORD, not to a stage: a sanction letter or a
+     release advice is evidence for the whole sheet. */
+  var DOC_CATEGORY = "Boat yard funding";
+  var docsLoaded = false;
+
+  function fileSize(n){
+    if(!n && n !== 0) return "";
+    if(n < 1024) return n + " B";
+    if(n < 1024*1024) return Math.round(n/1024) + " KB";
+    return (Math.round(n/1024/1024*10)/10) + " MB";
+  }
+
+  function renderDocs(list){
+    var box = document.getElementById("docList");
+    if(!box) return;
+    box.textContent = "";
+    (list || []).forEach(function(doc){
+      var d = el("span","doc");
+      var a = el("a", null, doc.name || "file");
+      a.href = doc.url; a.target = "_blank"; a.rel = "noopener";
+      a.title = doc.name || "";
+      d.appendChild(a);
+      if(doc.size) d.appendChild(el("span","sz", fileSize(doc.size)));
+      var x = el("button","del","✕");
+      x.type = "button"; x.title = "Remove this file";
+      x.setAttribute("aria-label","Remove " + (doc.name || "this file"));
+      x.onclick = function(){
+        if(!confirm("Remove " + (doc.name || "this file") + " from the record?\n\nIt is deleted from storage and cannot be undone.")) return;
+        d.className = "doc busy"; x.disabled = true;
+        fetch("/api/documents/" + encodeURIComponent(doc.id), {method:"DELETE", credentials:"same-origin"})
+          .then(function(r){ if(!r.ok) throw new Error("Could not remove it."); })
+          .then(function(){ toast("File removed."); loadDocs(true); })
+          .catch(function(err){ d.className = "doc"; x.disabled = false; toast(err.message, true); });
+      };
+      d.appendChild(x);
+      box.appendChild(d);
+    });
+    var note = document.getElementById("docNote");
+    if(note){
+      note.textContent = (list && list.length)
+        ? list.length + (list.length === 1 ? " file attached." : " files attached.")
+        : "The sanction letter, quotations, release advices, bills.";
+    }
+  }
+
+  function loadDocs(force){
+    if(!canSync()) return;
+    if(docsLoaded && !force) return;
+    docsLoaded = true;
+    fetch("/api/documents", {credentials:"same-origin", cache:"no-store"})
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(all){
+        renderDocs((all || []).filter(function(x){ return x.category === DOC_CATEGORY; }));
+      })
+      .catch(function(){ /* offline — the note simply stays as it was */ });
+  }
+
+  /* Uploaded one at a time rather than all at once: a phone sending four
+     photographs of a bill in parallel is how a request times out, and doing
+     them in turn means one failure does not take the others with it. */
+  function uploadDocs(files){
+    var list = Array.prototype.slice.call(files || []);
+    if(!list.length) return;
+    if(!canSync()){ toast("This browser cannot reach the server.", true); return; }
+    var i = 0, ok = 0;
+    (function next(){
+      if(i >= list.length){
+        toast(ok ? (ok + (ok === 1 ? " file attached." : " files attached.")) : "Nothing was attached.", !ok);
+        loadDocs(true);
+        return;
+      }
+      var f = list[i];
+      toast("Uploading " + f.name + " (" + (i+1) + " of " + list.length + ")…");
+      var fd = new FormData();
+      fd.append("category", DOC_CATEGORY);
+      fd.append("file", f);
+      fetch("/api/documents", {method:"POST", credentials:"same-origin", body:fd})
+        .then(function(r){
+          return r.json().catch(function(){ return {}; }).then(function(j){
+            if(!r.ok) throw new Error(j.error || (f.name + " could not be uploaded."));
+          });
+        })
+        .then(function(){ ok++; })
+        .catch(function(err){ toast(err.message, true); })
+        .then(function(){ i++; next(); });
+    })();
+  }
+
+  document.getElementById("addDoc").addEventListener("click", function(){
+    document.getElementById("docIn").click();
+  });
+  document.getElementById("docIn").addEventListener("change", function(){
+    uploadDocs(this.files);
+    this.value = "";   // so the same file can be picked again
+  });
+
   /* A manual push, for the case that matters: the connection dropped, the note
      said so, and it is now back. Nothing is lost without it — the queued push
      retries on the next change — but waiting for that is not a comfortable
@@ -2548,6 +2674,7 @@
      whether it holds something newer. Doing it in this order means the page is
      usable instantly and still ends up showing the authoritative record. */
   try{ pullFromServer(); }catch(e){ srvState = "offline"; srvMsg = "sync unavailable"; stamp(); }
+  try{ loadDocs(); }catch(e){}
 
   /* A last push on the way out, for the change made in the second before the
      tab was closed. keepalive lets it complete after the page has gone. */
