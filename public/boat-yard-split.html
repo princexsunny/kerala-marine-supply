@@ -618,7 +618,8 @@
       <div class="ctl">
         <span>Save &amp; restore</span>
         <div class="btnrow">
-          <button type="button" class="ghost primary" id="saveJson">Save backup file</button>
+          <button type="button" class="ghost primary" id="pushNowBtn">Save to server now</button>
+          <button type="button" class="ghost" id="saveJson">Save backup file</button>
           <button type="button" class="ghost" id="saveCsv">Export table</button>
           <button type="button" class="ghost" id="openBtn">Open backup</button>
           <button type="button" class="ghost" id="printBtn">Print full sheet</button>
@@ -1037,21 +1038,153 @@
     state.filter = "next";
   }
 
+  /* ───────── where the record actually lives ─────────
+     localStorage is a cache, not storage. It belongs to one browser on one
+     device; "clear browsing data" wipes it; and Safari on iPhone and iPad
+     deletes a site's local storage after seven days without a visit. A loan
+     record kept only there is one cleared cache away from being rebuilt from
+     bank statements.
+     So the server is the record and the browser is the copy. Every change is
+     written locally at once (instant, works offline) and pushed to the server
+     a moment later. On opening, whichever copy is newer wins. */
+  var RECORD = "boat-yard-split";
   var storageOK = true, lastSaved = null;
+  var srvState = "unknown";   // unknown | saving | saved | offline | error
+  var srvAt = null, srvMsg = "", pushTimer = null, pushing = false, pushAgain = false;
+
   function save(){
-    try{ localStorage.setItem(KEY, JSON.stringify(state)); lastSaved = new Date(); }
-    catch(e){ storageOK = false; }
+    try{
+      localStorage.setItem(KEY, JSON.stringify(state));
+      lastSaved = new Date();
+      localStorage.setItem(KEY + ".at", lastSaved.toISOString());
+    }catch(e){ storageOK = false; }
+    queuePush();
     stamp();
+  }
+
+  /* Batched: typing a figure fires save() on every keystroke, and each one
+     does not need its own request. */
+  function queuePush(){
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushNow, 1200);
+  }
+
+  /* Everything below has to survive fetch not existing at all. An unguarded
+     call throws a ReferenceError during boot, and because this runs from the
+     bottom of the script that would take the ENTIRE page down — no table, no
+     figures — over a feature that is only meant to be a safety net. */
+  function canSync(){ return typeof fetch === "function"; }
+
+  function pushNow(){
+    if(!canSync()){ srvState = "offline"; srvMsg = "this browser cannot reach the server"; stamp(); return; }
+    if(pushing){ pushAgain = true; return; }   // one in flight; fold this into the next
+    pushing = true;
+    srvState = "saving"; stamp();
+    var body = JSON.stringify({state: state});
+    fetch("/api/records/" + RECORD, {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      credentials: "same-origin",
+      body: body
+    }).then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(j){
+        if(!r.ok) throw new Error(j.error || ("Save failed (" + r.status + ")"));
+        return j;
+      });
+    }).then(function(j){
+      srvState = "saved"; srvAt = new Date(); srvMsg = "";
+    }).catch(function(err){
+      /* Offline, asleep, or signed out. The local copy is still good, so this
+         is a warning and not a failure — but it has to SAY so, because a page
+         that looks saved and is not is the worst of both. */
+      srvState = "offline";
+      srvMsg = (err && err.message) || "";
+    }).then(function(){
+      pushing = false;
+      stamp();
+      if(pushAgain){ pushAgain = false; queuePush(); }
+    });
+  }
+
+  /* Called once at startup, after the local copy has been read. */
+  function pullFromServer(){
+    if(!canSync()){
+      srvState = "offline"; srvMsg = "this browser cannot reach the server";
+      stamp();
+      return Promise.resolve();
+    }
+    return fetch("/api/records/" + RECORD, {credentials: "same-origin", cache: "no-store"})
+      .then(function(r){
+        if(r.status === 401 || r.status === 403) throw new Error("signed out");
+        if(!r.ok) throw new Error("server " + r.status);
+        return r.json();
+      })
+      .then(function(j){
+        if(!j || !j.found || !j.state){
+          /* Nothing on the server yet. If there is something here, put it
+             there — that is the whole point. */
+          srvState = "saved"; srvAt = null;
+          if(state.projects && state.projects.length) pushNow();
+          return;
+        }
+        var localAt = null;
+        try{
+          var raw = localStorage.getItem(KEY + ".at");
+          if(raw) localAt = new Date(raw);
+        }catch(e){}
+        var srvTime = j.savedAt ? new Date(j.savedAt) : null;
+
+        /* Newer wins. Without a local timestamp — a browser that has never
+           saved here — the server copy is plainly the one to trust. */
+        var takeServer = !localAt || (srvTime && srvTime > localAt);
+        if(takeServer && adopt(j.state)){
+          srvState = "saved"; srvAt = srvTime;
+          bindProjectFields(); bindLoanFields(); render();
+          toast("Loaded the saved record from the server.");
+        }else{
+          srvState = "saved"; srvAt = srvTime;
+          /* The local copy is ahead — push it so the two agree. */
+          queuePush();
+        }
+      })
+      .catch(function(err){
+        srvState = "offline";
+        srvMsg = String((err && err.message) || "");
+      })
+      .then(stamp);
   }
   function stamp(){
     var n = document.getElementById("autoNote");
-    if(!storageOK){
-      n.textContent = "This browser is not storing entries automatically — use Save backup file before you close the page.";
-      return;
+    if(!n) return;
+    var t = function(d){ return d ? d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : ""; };
+
+    /* The first line is only ever about WHERE the record is. Getting this
+       wrong in the reassuring direction is the one thing this page must not
+       do, so "offline" is stated plainly rather than softened. */
+    var where, cls = "note";
+    if(srvState === "saved"){
+      where = "Saved on the server" + (srvAt ? " at " + t(srvAt) : "")
+            + " — it will be here on any device you sign in from.";
+    }else if(srvState === "saving"){
+      where = "Saving to the server…";
+    }else if(srvState === "offline"){
+      where = "NOT saved to the server" + (srvMsg ? " (" + srvMsg + ")" : "")
+            + ". It is kept on this device only for now, and will go up by itself "
+            + "when the connection comes back. Use Save backup file if you are closing the page.";
+      cls = "note warn";
+    }else{
+      where = "Checking the server…";
     }
-    n.textContent = (lastSaved ? "Last saved at " + lastSaved.toLocaleTimeString() + ". " : "")
-      + "Everything is kept as you type. Press Save on a stage row, a release, or the loan terms "
-      + "to lock that record so it cannot be changed by accident — Edit reopens it.";
+
+    if(!storageOK){
+      where += " This browser is also refusing to keep a local copy, so do take a backup file.";
+      cls = "note warn";
+    }
+
+    n.className = cls;
+    n.textContent = where
+      + (lastSaved ? " Last change " + t(lastSaved) + "." : "")
+      + " Press Save on a stage row, a release, or the loan terms to lock that record — Edit reopens it.";
   }
 
   function totalCost(){ return heads().reduce(function(a,h){ return a + h.amount; }, 0); }
@@ -1911,36 +2044,30 @@
     return card;
   }
 
-  /* ───────── save / restore ───────── */
-  var downloads = null, dlReady = false;
-  function ensureDownloads(){
-    if(dlReady) return Promise.resolve(downloads);
-    if(!(window.claude && typeof window.claude.use === "function")){ dlReady = true; return Promise.resolve(null); }
-    return window.claude.use("downloads").then(function(d){ downloads = d; dlReady = true; return d; })
-      .catch(function(){ dlReady = true; return null; });
-  }
-  function report(err){
-    var code = err && err.code;
-    if(code === "declined") toast("Save cancelled.");
-    else if(code === "rate_limited") toast("A save prompt is already open — try again in a moment.", true);
-    else if(code === "too_large") toast("That file is too large to save.", true);
-    else toast("Could not save the file.", true);
-  }
-  function offer(filename, data, fallbackName){
-    return ensureDownloads().then(function(d){
-      if(!d){ toast("Saving files is not available in this view.", true); return; }
-      return d.save({filename:filename, data:data}).then(function(){
-        toast("Saved as " + filename);
-      }).catch(function(err){
-        var code = err && err.code;
-        if((code === "extension_not_enabled" || code === "rejected_extension") && fallbackName){
-          return d.save({filename:fallbackName, data:data})
-            .then(function(){ toast("Saved as " + fallbackName); })
-            .catch(report);
-        }
-        report(err);
-      });
-    });
+  /* ───────── save / restore ─────────
+     This used to call window.claude.use("downloads") — an API that exists only
+     inside the tool this page was drafted in. On the live site window.claude is
+     undefined, so every Save backup and every CSV export answered "Saving files
+     is not available in this view". There was, in other words, no working way
+     to get a copy of the record out of the browser at all.
+     A Blob and a download link work in every browser. */
+  function offer(filename, data){
+    try{
+      var blob = new Blob([data], {type: /\.csv$/i.test(filename) ? "text/csv;charset=utf-8" : "application/json"});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      /* Freed on a later tick — revoking immediately can cancel the download
+         in some browsers before it has read the blob. */
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+      toast("Saved as " + filename);
+    }catch(e){
+      toast("This browser would not let the file be saved.", true);
+    }
+    return Promise.resolve();
   }
 
   function csvCell(v){
@@ -2390,6 +2517,24 @@
     state.basis = b.dataset.basis; syncSegs(); save(); render();
   });
 
+  /* A manual push, for the case that matters: the connection dropped, the note
+     said so, and it is now back. Nothing is lost without it — the queued push
+     retries on the next change — but waiting for that is not a comfortable
+     thing to ask of someone looking at a loan record. */
+  document.getElementById("pushNowBtn").addEventListener("click", function(){
+    if(!canSync()){ toast("This browser cannot reach the server.", true); return; }
+    clearTimeout(pushTimer);
+    toast("Saving to the server…");
+    pushNow();
+    /* Report the outcome rather than the attempt. */
+    var t0 = Date.now();
+    (function poll(){
+      if(pushing && Date.now() - t0 < 15000) return setTimeout(poll, 200);
+      if(srvState === "saved") toast("Saved on the server.");
+      else toast("Could not reach the server — kept on this device.", true);
+    })();
+  });
+
   document.addEventListener("keydown", function(e){
     if((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === "s"){
       e.preventDefault();
@@ -2398,5 +2543,27 @@
   });
 
   load(); syncSegs(); syncView(); bindProjectFields(); bindLoanFields(); render();
+
+  /* The local copy is on screen within milliseconds; the server is then asked
+     whether it holds something newer. Doing it in this order means the page is
+     usable instantly and still ends up showing the authoritative record. */
+  try{ pullFromServer(); }catch(e){ srvState = "offline"; srvMsg = "sync unavailable"; stamp(); }
+
+  /* A last push on the way out, for the change made in the second before the
+     tab was closed. keepalive lets it complete after the page has gone. */
+  window.addEventListener("pagehide", function(){
+    if(!canSync()) return;
+    if(!pushTimer && !pushing) return;
+    clearTimeout(pushTimer);
+    try{
+      fetch("/api/records/" + RECORD, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        credentials: "same-origin",
+        keepalive: true,
+        body: JSON.stringify({state: state})
+      });
+    }catch(e){}
+  });
 })();
 </script>
