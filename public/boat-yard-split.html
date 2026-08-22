@@ -1,0 +1,1834 @@
+<title>Boat Yard Stage Split</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+
+<style>
+  /* ───────── Modernist: white paper, black rule, one red.
+     Committed single light theme — the page prints and reads the same everywhere. */
+  :root{
+    color-scheme:light;
+    --ink:#0f0f0e; --ink-soft:#44443f; --ink-faint:#7c7a73;
+    --ground:#ffffff; --card:#ffffff; --sunken:#f7f6f3;
+    --line:#d5d2ca; --line-soft:#eae7e0;
+    /* the one sharp accent — buttons, badge, alerts only */
+    --brand:#b3141c;
+    /* categories: KFC reads teal, Shalom Marine Services reads sand.
+       Planned = light tint, actually funded = the deeper tint of the same colour. */
+    --kfc:#1f5a67; --kfc-bg:#e9f2f4; --kfc-bg2:#d4e7ec; --kfc-line:#6ba0ac;
+    --own:#7d5023; --own-bg:#fbf3e6; --own-bg2:#f4e5c9; --own-line:#c79a5c;
+    --res-bg:#f2f1ed;
+    --act:#44443f; --act-bg:#f5f5f2;
+    --flag:#b3141c; --flag-bg:#fbeae8;
+    --ok:#2e6b4a; --ok-bg:#e9f2ec;
+    /* chart marks — validated: lightness band, chroma floor, CVD ΔE 17.4, contrast all PASS */
+    --m-kfc:#0084a0; --m-own:#bd7414; --track:#ececE6;
+    /* one light tint per box */
+    --t1:#eef1f3; --t2:#e6f1f4; --t3:#fbf2e4; --t4:#d8ecf1;
+    --t5:#f7ead0; --t6:#eeeaf6; --t7:#e7f2ec; --t8:#fdeceb; --t9:#f2f0e6;
+    --loan:#4b3f8f; --loan-bg:#eeeaf6;
+    --field:#ffffff; --field-line:#c2bfb6;
+    --onaccent:#ffffff;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"Archivo","Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size:15.5px; font-weight:500; line-height:1.5; margin:0;
+    padding:clamp(1.2rem,4vw,3.25rem) clamp(.8rem,4vw,2rem) 5rem;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:78rem;margin:0 auto;display:flex;flex-direction:column;gap:2.25rem}
+  .printonly{display:none}
+
+  /* labels — grotesque, uppercase, tracked */
+  .eyebrow,.ctl > span,.stat .k,thead th,.headamt label,.savedtag,.pill,
+  .rowsave,.rowedit,.ghost,.seg button,.flagnote .t{
+    font-family:"Archivo","Helvetica Neue",Arial,sans-serif;
+    text-transform:uppercase;letter-spacing:.09em;font-weight:600;
+  }
+  .eyebrow{font-size:.68rem;color:var(--ink-faint);margin:0}
+
+  header{border-bottom:3px solid var(--ink);padding-bottom:1.1rem}
+  h1{
+    font-family:"Instrument Serif",Georgia,"Times New Roman",serif;
+    font-weight:400;font-size:clamp(2.1rem,6vw,3.6rem);line-height:.98;
+    margin:.5rem 0 0;letter-spacing:-.015em;text-wrap:balance;
+  }
+  h2{
+    font-family:"Archivo",Helvetica,Arial,sans-serif;
+    font-weight:700;font-size:1.08rem;margin:0;letter-spacing:-.005em;text-wrap:balance;
+  }
+  .lede{color:var(--ink-soft);margin:.75rem 0 0;max-width:60ch;font-size:.95rem;font-weight:500}
+
+  .card{
+    background:var(--card);border:2px solid var(--ink);border-top:3px solid var(--ink);
+    border-radius:0;padding:clamp(.9rem,2.5vw,1.35rem);
+    display:flex;flex-direction:column;gap:1rem;
+  }
+
+  .controls{display:flex;flex-wrap:wrap;gap:.85rem 1.6rem;align-items:flex-end}
+  .ctl{display:flex;flex-direction:column;gap:.4rem}
+  .ctl > span{font-size:.64rem;font-weight:700;color:var(--ink-faint)}
+  .btnrow{display:flex;gap:.4rem;flex-wrap:wrap}
+  .seg{display:flex;border:1px solid var(--ink);border-radius:0;overflow:hidden;background:var(--field)}
+  .seg button{
+    font-size:.7rem;font-weight:700;color:var(--ink-soft);background:transparent;border:0;
+    padding:.48rem .8rem;cursor:pointer;white-space:nowrap;
+  }
+  .seg button + button{border-left:1px solid var(--ink)}
+  .seg button[aria-pressed="true"]{background:var(--brand);color:var(--onaccent)}
+  .seg button:focus-visible{outline:2px solid var(--brand);outline-offset:-3px}
+  .ghost{
+    font-size:.7rem;font-weight:700;color:var(--ink);background:var(--field);
+    border:1px solid var(--ink);border-radius:0;padding:.48rem .8rem;cursor:pointer;white-space:nowrap;
+  }
+  .ghost:hover{background:var(--ink);color:var(--card)}
+  .ghost:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .ghost.primary{background:var(--brand);color:var(--onaccent);border-color:var(--brand)}
+  .ghost.primary:hover{background:var(--ink);border-color:var(--ink);color:var(--card)}
+
+  .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(10.5rem,1fr));gap:0;border-left:2px solid var(--ink)}
+  .stat{
+    border:2px solid var(--ink);border-left:0;border-radius:0;
+    padding:.7rem .9rem;background:var(--card);
+  }
+  .stat.t1{background:var(--t1)} .stat.t2{background:var(--t2)} .stat.t3{background:var(--t3)}
+  .stat.t4{background:var(--t4)} .stat.t5{background:var(--t5)} .stat.t6{background:var(--t6)}
+  .stat.t7{background:var(--t7)} .stat.t8{background:var(--t8)} .stat.t9{background:var(--t9)}
+  .stat.kfc{background:var(--kfc-bg)}
+  .stat.kfc2{background:var(--kfc-bg2)}
+  .stat.own{background:var(--own-bg)}
+  .stat.own2{background:var(--own-bg2)}
+  .stat.act{background:var(--act-bg)}
+  .stat.good{background:var(--ok-bg)}
+  .stat .k{font-size:.6rem;font-weight:700;color:var(--ink-soft);display:block}
+  .stat.kfc .k,.stat.kfc2 .k{color:var(--kfc)} .stat.own .k,.stat.own2 .k{color:var(--own)}
+  .stat.act .k{color:var(--act)} .stat.good .k{color:var(--ok)}
+  .stat .v{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:700;
+    font-size:clamp(1rem,2.5vw,1.3rem);font-variant-numeric:tabular-nums;
+    margin-top:.2rem;white-space:nowrap;
+  }
+  .stat.kfc .v,.stat.kfc2 .v{color:var(--kfc)} .stat.own .v,.stat.own2 .v{color:var(--own)}
+  .stat.act .v{color:var(--ink)} .stat.good .v{color:var(--ink)}
+  .stat .p{font-size:.7rem;color:var(--ink-faint);font-variant-numeric:tabular-nums;letter-spacing:0;text-transform:none;font-weight:500}
+
+  /* tables always fit the card — no sideways scrolling */
+  .scroll{overflow-x:visible;margin:0;padding:0}
+  table{border-collapse:collapse;width:100%;min-width:0;table-layout:fixed}
+  th,td{padding:.5rem .45rem;border-bottom:1.5px solid var(--line);text-align:left;vertical-align:top;
+        overflow-wrap:anywhere}
+  thead th{
+    font-size:.61rem;font-weight:700;color:var(--ink-soft);
+    border-bottom:2.5px solid var(--ink);vertical-align:bottom;padding-bottom:.35rem;
+  }
+  thead tr.grp th{
+    text-align:center;font-size:.58rem;font-weight:700;letter-spacing:.16em;
+    border-bottom:1px solid var(--line-soft);padding-bottom:.15rem;
+  }
+  th.n,td.n{text-align:right;font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:600;font-variant-numeric:tabular-nums;vertical-align:middle;overflow-wrap:normal;word-break:normal}
+  th.n{font-family:"Archivo",Helvetica,Arial,sans-serif}
+  .c-kfc{background:var(--kfc-bg)}  .c-kfc2{background:var(--kfc-bg2)}
+  .c-own{background:var(--own-bg)}  .c-own2{background:var(--own-bg2)}
+  .c-act{background:var(--act-bg)}  .c-res{background:var(--res-bg)}
+  td.c-kfc,td.c-kfc2{color:var(--kfc)}
+  td.c-own,td.c-own2{color:var(--own)}
+  /* a hairline opens each category */
+  td.c-kfc,th.c-kfc,td.c-kfc2,th.c-kfc2{border-left:2px solid var(--kfc)}
+  td.c-own2,th.c-own2{border-right:2px solid var(--own)}
+  /* category banner */
+  thead tr.grp th.gh{
+    background:var(--ink);color:var(--ground);
+    padding:.32rem .5rem;border-bottom:0;
+  }
+  td.pos{font-weight:700}
+  td.pos.clear{color:var(--ok)}
+  td.pos.due{color:var(--brand)}
+  tr.tot td{border-top:2.5px solid var(--ink);border-bottom:none;font-weight:800;padding-top:.55rem}
+  tr.tot td.n{font-weight:700}
+  td .idx{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.72rem;color:var(--ink-faint);font-weight:700;margin-right:.55rem}
+
+  /* column widths — stage table (8 cols) and summary table (6 cols) */
+  td.subj,th.subj{width:25%}
+  table.stages col.subj{width:25%}
+  table.stages col.w-amt{width:10%}
+  table.stages col.w-kfc{width:11%}
+  table.stages col.w-own{width:12%}
+  table.stages col.w-rec{width:11.5%}
+  table.stages col.w-con{width:12%}
+  table.stages col.w-left{width:10%}
+  table.stages col.w-btn{width:8.5%}
+  table.summary col.w-s1{width:26%}
+  table.summary col.w-s2{width:14%}
+  table.summary col.w-s3{width:15%}
+  table.summary col.w-s4{width:17%}
+  table.summary col.w-s5{width:14%}
+  table.summary col.w-s6{width:14%}
+  input,textarea.txt{max-width:100%}
+
+  .subjtext{font-size:.9rem;font-weight:600;line-height:1.38;white-space:pre-wrap;overflow-wrap:anywhere;padding:.15rem 0}
+  .subjtext.empty{color:var(--ink-faint);font-style:italic}
+  textarea.txt{
+    font-family:"Archivo",Helvetica,Arial,sans-serif;font-size:.9rem;font-weight:500;line-height:1.38;
+    background:var(--field);color:var(--ink);
+    border:1px solid var(--field-line);border-radius:0;
+    padding:.32rem .45rem;width:100%;min-height:2.6rem;resize:vertical;display:block;
+  }
+  textarea.txt:focus{outline:2px solid var(--brand);outline-offset:-2px;border-color:var(--brand)}
+
+  input{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.86rem;font-weight:600;
+    background:var(--field);color:var(--ink);
+    border:1px solid var(--field-line);border-radius:0;
+    padding:.3rem .4rem;width:100%;min-width:0;
+  }
+  input.n{text-align:right;font-variant-numeric:tabular-nums}
+  input.act{border-color:var(--act)}
+  input:focus{outline:2px solid var(--brand);outline-offset:-2px;border-color:var(--brand)}
+  input::placeholder{color:var(--ink-faint);opacity:.65}
+
+  tr.locked{background:var(--sunken)}
+  tr.locked td{border-bottom-color:var(--line)}
+  .lockval{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-weight:600}
+  .savedtag{
+    display:inline-block;font-size:.55rem;color:var(--card);background:var(--ink);
+    border-radius:0;padding:.12rem .4rem;margin-top:.35rem;
+  }
+
+  td.rowbtns{white-space:nowrap;vertical-align:middle}
+  td.rowbtns .g{display:flex;gap:.25rem;align-items:center;justify-content:flex-end}
+  .rowsave{
+    background:var(--brand);border:1px solid var(--brand);color:var(--onaccent);cursor:pointer;
+    font-weight:700;font-size:.62rem;line-height:1;padding:.4rem .6rem;border-radius:0;white-space:nowrap;
+  }
+  .rowsave:hover{background:var(--ink);border-color:var(--ink);color:var(--card)}
+  .rowsave:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .rowedit{
+    background:transparent;border:1px solid var(--ink);color:var(--ink);cursor:pointer;
+    font-weight:700;font-size:.62rem;line-height:1;padding:.4rem .6rem;border-radius:0;white-space:nowrap;
+  }
+  .rowedit:hover{background:var(--ink);color:var(--card)}
+  .rowedit:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .del{background:transparent;border:0;color:var(--ink-faint);cursor:pointer;font-size:1rem;line-height:1;padding:.26rem .38rem;border-radius:0}
+  .del:hover{color:var(--card);background:var(--brand)}
+  .del:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+
+  .headbar{display:flex;flex-wrap:wrap;gap:.6rem 1rem;align-items:center;justify-content:space-between;
+           border-bottom:2px solid var(--ink);padding-bottom:.75rem}
+  .headbar .name{display:flex;align-items:center;gap:.7rem}
+  .badge{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:600;font-size:.78rem;
+    width:1.55rem;height:1.55rem;display:grid;place-items:center;border-radius:0;
+    background:var(--brand);color:var(--onaccent);flex:none;
+  }
+  .headamt{display:flex;align-items:center;gap:.5rem}
+  .headamt label{font-size:.6rem;color:var(--ink-faint)}
+  .headamt input{max-width:9.5rem}
+
+  .foot{display:flex;flex-wrap:wrap;gap:.5rem .9rem;align-items:center;justify-content:space-between}
+  .pill{
+    font-size:.62rem;font-weight:700;padding:.34rem .65rem;border-radius:0;border:1px solid;
+    font-variant-numeric:tabular-nums;
+  }
+  .pill.ok{color:var(--onaccent);background:var(--ok);border-color:var(--ok)}
+  .pill.warn{color:var(--onaccent);background:var(--brand);border-color:var(--brand)}
+  .pill.idle{color:var(--ink-faint);background:transparent;border-color:var(--line)}
+
+  .note{font-size:.86rem;font-weight:500;color:var(--ink-soft);margin:0;max-width:74ch}
+  .note strong{color:var(--ink);font-weight:700}
+  .flagnote{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:0;padding:1rem 1.2rem}
+  .flagnote .t{font-size:.62rem;color:var(--brand);margin:0 0 .4rem}
+  footer{color:var(--ink-faint);font-size:.8rem;border-top:1px solid var(--line);padding-top:1rem;max-width:74ch}
+
+  #toast{
+    position:fixed;left:50%;bottom:1.5rem;transform:translateX(-50%) translateY(1rem);
+    background:var(--ink);color:var(--ground);
+    font-family:"Archivo",Helvetica,Arial,sans-serif;font-size:.72rem;font-weight:600;
+    letter-spacing:.06em;padding:.7rem 1.2rem;border-radius:0;
+    opacity:0;pointer-events:none;transition:opacity .16s ease, transform .16s ease;z-index:50;
+    max-width:90vw;text-align:center;
+  }
+  #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.bad{background:var(--brand);color:var(--onaccent)}
+
+  /* ───────── tabs ───────── */
+  .tabs{display:flex;gap:0;border-bottom:3px solid var(--ink)}
+  .tabs button{
+    font-family:"Archivo",Helvetica,Arial,sans-serif;
+    font-size:.72rem;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+    background:transparent;color:var(--ink-faint);
+    border:2px solid transparent;border-bottom:0;border-radius:0;
+    padding:.6rem 1.2rem;cursor:pointer;margin-bottom:-3px;
+  }
+  .tabs button:hover{color:var(--ink)}
+  .tabs button[aria-selected="true"]{
+    background:var(--ink);color:var(--ground);border-color:var(--ink);
+  }
+  .tabs button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .view{display:flex;flex-direction:column;gap:2.25rem}
+  .view[hidden]{display:none}
+
+
+  /* ───────── loan ───────── */
+  .terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:.9rem}
+  .fld{display:flex;flex-direction:column;gap:.3rem}
+  .fld label{
+    font-family:"Archivo",Helvetica,Arial,sans-serif;
+    font-size:.6rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint);
+  }
+  .fld .ro{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:600;font-size:.9rem;
+    padding:.3rem 0;
+  }
+  input[type="date"]{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.82rem;font-weight:600;
+    background:var(--field);color:var(--ink);
+    border:1px solid var(--field-line);border-radius:0;padding:.28rem .4rem;width:100%;
+  }
+  input[type="date"]:focus{outline:2px solid var(--brand);outline-offset:-2px;border-color:var(--brand)}
+
+  table.loan{font-size:.84rem}
+  table.loan col.l-n{width:5%}
+  table.loan col.l-date{width:11%}
+  table.loan col.l-open{width:13%}
+  table.loan col.l-prin{width:12%}
+  table.loan col.l-int{width:11%}
+  table.loan col.l-due{width:13%}
+  table.loan col.l-paid{width:13%}
+  table.loan col.l-pdate{width:13%}
+  table.loan col.l-stat{width:9%}
+  tr.moro td{background:var(--t9)}
+  tr.thisrow td{box-shadow:inset 0 0 0 2px var(--brand)}
+  .st{
+    font-family:"Archivo",Helvetica,Arial,sans-serif;
+    font-size:.56rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    padding:.2rem .45rem;border:1px solid;display:inline-block;white-space:nowrap;
+  }
+  .st.paid{color:var(--onaccent);background:var(--ok);border-color:var(--ok)}
+  .st.part{color:var(--own);background:var(--own-bg2);border-color:var(--own)}
+  .st.due{color:var(--ink-soft);background:var(--sunken);border-color:var(--line)}
+  .st.late{color:var(--onaccent);background:var(--brand);border-color:var(--brand)}
+
+  input.headname{
+    font-family:"Archivo",Helvetica,Arial,sans-serif;font-size:1.02rem;font-weight:700;
+    border:1px solid transparent;background:transparent;padding:.2rem .3rem;
+    min-width:8rem;max-width:22rem;width:auto;
+  }
+  input.headname:hover{border-color:var(--line)}
+  input.headname:focus{border-color:var(--brand);background:var(--field)}
+  .headbar .name .del{margin-left:.1rem}
+
+  .loanbar{display:flex;flex-wrap:wrap;gap:.7rem 1.2rem;align-items:center;justify-content:space-between}
+  .chips{display:flex;flex-wrap:wrap;gap:.4rem}
+  .chip{
+    font-family:"Archivo",Helvetica,Arial,sans-serif;
+    font-size:.66rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    background:var(--field);color:var(--ink-soft);
+    border:2px solid var(--line);border-radius:0;padding:.45rem .8rem;cursor:pointer;
+  }
+  .chip:hover{border-color:var(--ink);color:var(--ink)}
+  .chip.on{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+  .chip:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  input.txtfield{
+    font-family:"Archivo",Helvetica,Arial,sans-serif;font-size:.9rem;font-weight:600;
+  }
+  input:disabled,button:disabled{opacity:.42;cursor:not-allowed}
+  tr.moro td:first-child{color:var(--ink-faint)}
+
+  /* ───────── charts ───────── */
+  .gpanel{display:flex;flex-direction:column;gap:.55rem}
+  .gtitle{
+    font-family:"Archivo",Helvetica,Arial,sans-serif;
+    font-size:.6rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-soft);margin:0;padding-bottom:.3rem;border-bottom:2px solid var(--ink);
+  }
+  .legend{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;align-items:center}
+  .legend span{
+    display:inline-flex;align-items:center;gap:.42rem;
+    font-family:"Archivo",Helvetica,Arial,sans-serif;
+    font-size:.6rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);
+  }
+  .legend i{width:.85rem;height:.85rem;display:block;flex:none}
+  .sw-kfc{background:var(--m-kfc)} .sw-own{background:var(--m-own)}
+  .sw-track{background:var(--track);border:1px solid var(--line)}
+
+  .grow{display:grid;grid-template-columns:13rem 1fr 5.5rem;gap:.7rem;align-items:center}
+  .grow.sub{grid-template-columns:13rem 1fr 5.5rem}
+  .grow.tot{border-top:2.5px solid var(--ink);padding-top:.5rem;margin-top:.25rem}
+  .glab{
+    font-size:.78rem;font-weight:600;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  }
+  .grow.sub .glab{font-size:.72rem;font-weight:500;color:var(--ink-soft);padding-left:.8rem;
+                  border-left:2px solid var(--line)}
+  .grow.tot .glab{font-weight:800;text-transform:uppercase;letter-spacing:.08em;font-size:.68rem}
+  .gtrack{
+    position:relative;height:18px;background:var(--track);
+    border:1px solid var(--line);display:flex;gap:2px;overflow:hidden;
+  }
+  .grow.sub .gtrack{height:12px}
+  .grow.tot .gtrack{height:24px}
+  .gseg{height:100%;flex:none;cursor:default;transition:filter .12s ease}
+  .gseg:hover{filter:brightness(1.12)}
+  .gseg.s-kfc{background:var(--m-kfc)}
+  .gseg.s-own{background:var(--m-own)}
+  .gval{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.75rem;font-weight:700;
+    font-variant-numeric:tabular-nums;text-align:right;color:var(--ink);
+  }
+  .gval.zero{color:var(--ink-faint)}
+  .gval.full{color:var(--ok)}
+  .ghead{
+    font-family:"Archivo",Helvetica,Arial,sans-serif;
+    font-size:.58rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--ink);margin:.7rem 0 .35rem;padding-bottom:.15rem;
+    border-bottom:1.5px solid var(--line);
+  }
+  .ghead:first-child{margin-top:.15rem}
+  .gempty{font-size:.8rem;color:var(--ink-faint);margin:0}
+  #gtip{
+    position:fixed;pointer-events:none;z-index:60;
+    background:var(--ink);color:var(--ground);
+    padding:.45rem .6rem;font-size:.72rem;line-height:1.45;
+    opacity:0;transition:opacity .1s ease;max-width:16rem;
+  }
+  #gtip.on{opacity:1}
+  #gtip b{font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:700}
+  #gtip em{font-style:normal;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:.6rem;display:block;opacity:.75}
+
+  /* ───────── narrower screens: tighten, then stack ───────── */
+  @media screen and (max-width:76rem){
+    body{font-size:15px}
+    th,td{padding:.42rem .35rem}
+    thead th{font-size:.56rem;letter-spacing:.06em}
+    thead tr.grp th{font-size:.54rem;letter-spacing:.1em}
+    input,.lockval,td.n{font-size:.8rem}
+    .subjtext,textarea.txt{font-size:.85rem}
+    .rowsave,.rowedit{font-size:.58rem;padding:.34rem .4rem;letter-spacing:.04em}
+    td.subj,th.subj{width:23%}
+  }
+  @media screen and (max-width:60rem){
+    /* one record per block — labels move inline, nothing runs off the edge */
+    table,tbody,tr,td{display:block;width:100%}
+    thead{display:none}
+    table{table-layout:auto}
+    tbody tr{
+      border:2px solid var(--ink);border-top:3px solid var(--ink);
+      padding:.6rem .7rem;margin-bottom:.7rem;
+    }
+    tbody tr.tot{border-top:4px solid var(--ink);background:var(--sunken)}
+    tbody tr:last-child{margin-bottom:0}
+    td{
+      border:0;padding:.28rem 0;display:flex;align-items:baseline;gap:1rem;
+      justify-content:space-between;text-align:right;
+    }
+    td + td{border-top:1.5px solid var(--line)}
+    td::before{
+      content:attr(data-l);
+      font-family:"Archivo",Helvetica,Arial,sans-serif;
+      font-size:.58rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+      color:var(--ink-soft);text-align:left;flex:1 1 auto;
+    }
+    td.c-kfc::before,td.c-kfc2::before{color:var(--kfc)}
+    td.c-own::before,td.c-own2::before{color:var(--own)}
+    td.subj{display:block;text-align:left}
+    td.subj::before{display:block;margin-bottom:.3rem}
+    td.n,td.rowbtns{width:100%}
+    td.n > *{flex:0 0 auto}
+    /* column tints become a left rule when stacked */
+    .c-kfc,.c-own,.c-act,.c-res{background:transparent}
+    .c-kfc2{background:var(--kfc-bg)} .c-own2{background:var(--own-bg)}
+    td.c-kfc,td.c-own,td.c-act,td.c-kfc2,td.c-own2,td.c-res{
+      border-left:3px solid var(--line);border-right:0;padding-left:.5rem;
+    }
+    td.c-kfc,td.c-kfc2{border-left-color:var(--kfc)}
+    td.c-own,td.c-own2{border-left-color:var(--own)}
+    td.c-act{border-left-color:var(--act)}
+    td.c-res{border-left-color:var(--ink)}
+    td.rowbtns::before{content:""}
+    td.rowbtns .g{justify-content:flex-end;flex:0 0 auto}
+    input,textarea.txt{max-width:11rem}
+    td.subj input,td.subj textarea.txt{max-width:none}
+    tr.tot td{border-top:0;padding-top:.28rem}
+    tr.tot td + td{border-top:1px solid var(--line-soft)}
+    .strip{border-left:0;gap:0}
+    .stat{border-left:2px solid var(--ink)}
+    .headbar{align-items:flex-start}
+    h1{font-size:clamp(1.9rem,8vw,2.6rem)}
+  }
+  @media screen and (max-width:52rem){
+    .grow,.grow.sub{grid-template-columns:1fr 4.5rem;gap:.3rem .7rem}
+    .glab{grid-column:1 / -1}
+    .grow.sub .glab{padding-left:.6rem}
+  }
+  @media screen and (max-width:34rem){
+    body{padding:1rem .7rem 4rem}
+    .card{padding:.8rem .7rem}
+    .btnrow{width:100%}
+    .ghost{flex:1 1 auto;text-align:center}
+    input,textarea.txt{max-width:9rem}
+    td.subj input,td.subj textarea.txt{max-width:none}
+  }
+
+  @media print{
+    @page{ size:A4 landscape; margin:10mm; }
+    :root{
+      --ground:#fff; --card:#fff; --sunken:#f2f1ed; --ink:#000; --ink-soft:#333; --ink-faint:#555;
+      --line:#999; --line-soft:#ccc; --field:#fff; --onaccent:#fff;
+      --brand:#b3141c;
+      --kfc:#1c4f5a; --kfc-bg:#e9f2f4; --kfc-bg2:#dbeaee; --kfc-line:#7aa8b2;
+      --own:#6f4720; --own-bg:#fbf4e8; --own-bg2:#f5e8d2; --own-line:#c9a06a; --res-bg:#f2f1ed;
+      --act:#333; --act-bg:#f4f4f1; --ok:#26603f; --ok-bg:#eaf2ed; --flag:#b3141c; --flag-bg:#fbeae8;
+    }
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    body{background:#fff;padding:0;font-size:9.5pt;line-height:1.32}
+    .wrap{max-width:none;gap:8pt}
+    .controls,#toast,.rowbtns,.btnrow,.addrow,#fileIn{display:none !important}
+    .printonly{display:block}
+    header{border-bottom:3pt solid #000;padding-bottom:6pt}
+    header h1{font-size:21pt}
+    .lede,.flagnote,footer{font-size:8pt}
+    .card{border:1.5pt solid #000;border-top:3pt solid #000;padding:7pt;gap:7pt;break-inside:auto}
+    h2{font-size:11pt}
+    .scroll{overflow:visible !important;margin:0;padding:0}
+    table{min-width:0 !important;width:100% !important;table-layout:fixed;font-size:8.2pt}
+    th,td{padding:2.5pt 3pt;word-break:normal;overflow-wrap:anywhere}
+    thead{display:table-header-group}
+    tr{break-inside:avoid}
+    td.subj,th.subj{width:26%;min-width:0}
+    .subjtext{font-size:8.2pt;line-height:1.28}
+    input,textarea{
+      border:none !important;background:transparent !important;padding:0 !important;
+      color:#000 !important;font-size:8.2pt !important;min-width:0 !important;
+      resize:none !important;overflow:visible !important;
+    }
+    textarea.txt{min-height:0 !important;height:auto !important}
+    .strip{grid-template-columns:repeat(4,1fr);border-left:1.5pt solid #000}
+    .stat{padding:4pt 6pt;border:1.5pt solid #000;border-left:0}
+    .stat .v{font-size:9.5pt}
+    .stat .k,.stat .p{font-size:6.2pt}
+    .savedtag{background:#000;color:#fff}
+    tr.locked{background:#f4f4f2}
+    #gtip{display:none}
+    .gtrack{border:1px solid #999}
+    .grow{grid-template-columns:11rem 1fr 4.5rem;gap:5pt}
+    .glab{font-size:8pt}
+    .gval{font-size:8pt}
+  }
+  @media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">KFC/MCB, TVM/777/2025-26 · 22.12.2025 · Shalom Marine Services</p>
+    <h1>Stage-wise split &amp; funding record</h1>
+    <p class="printonly eyebrow" id="printStamp"></p>
+  </header>
+
+  <div class="tabs" id="tabs" role="tablist">
+    <button type="button" role="tab" data-view="stages" aria-selected="true">Project stages</button>
+    <button type="button" role="tab" data-view="loan" aria-selected="false">Loan &amp; repayment</button>
+  </div>
+
+  <div class="card">
+    <div class="controls">
+      <div class="ctl">
+        <span>Working in</span>
+        <div class="seg" id="unitSeg">
+          <button type="button" data-unit="lakh" aria-pressed="true">₹ lakh</button>
+          <button type="button" data-unit="rupee" aria-pressed="false">₹ rupees</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <span>KFC funding basis</span>
+        <div class="seg" id="basisSeg">
+          <button type="button" data-basis="fixed" aria-pressed="true">Fixed ₹70.00 lakh</button>
+          <button type="button" data-basis="pct" aria-pressed="false">Fixed 81.28%</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <span>Save &amp; restore</span>
+        <div class="btnrow">
+          <button type="button" class="ghost primary" id="saveJson">Save backup file</button>
+          <button type="button" class="ghost" id="saveCsv">Export table</button>
+          <button type="button" class="ghost" id="openBtn">Open backup</button>
+          <button type="button" class="ghost" id="printBtn">Print full sheet</button>
+        </div>
+      </div>
+    </div>
+    <p class="note" id="autoNote"></p>
+  </div>
+
+  <div class="view" id="viewStages">
+
+  <div class="card">
+    <div class="loanbar">
+      <div class="chips" id="projChips"></div>
+      <div class="btnrow">
+        <button type="button" class="ghost" id="addProj">+ Add project</button>
+        <button type="button" class="ghost" id="delProj">Remove this project</button>
+      </div>
+    </div>
+    <div class="terms">
+      <div class="fld"><label for="pName">Project name</label>
+        <input type="text" id="pName" class="txtfield"></div>
+      <div class="fld"><label for="pLoan">KFC loan for this project</label>
+        <input type="text" inputmode="decimal" id="pLoan" class="n"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="strip">
+      <div class="stat t1"><div class="k">Cost of project</div><div class="v" id="sTotal">—</div><div class="p">Plan</div></div>
+      <div class="stat t2"><div class="k">KFC term loan</div><div class="v" id="sKfc">—</div><div class="p" id="sKfcPct">—</div></div>
+      <div class="stat t3"><div class="k">Shalom Marine Services</div><div class="v" id="sOwn">—</div><div class="p" id="sOwnPct">—</div></div>
+    </div>
+    <div class="strip">
+      <div class="stat t4"><div class="k">Received from KFC</div><div class="v" id="sRecd">—</div><div class="p" id="sRecdPct">—</div></div>
+      <div class="stat t5"><div class="k">Shalom Marine Services put in</div><div class="v" id="sContrib">—</div><div class="p" id="sContribPct">—</div></div>
+      <div class="stat t6"><div class="k">Total funded so far</div><div class="v" id="sFunded">—</div><div class="p">Received plus contribution</div></div>
+      <div class="stat t7"><div class="k">Still to fund</div><div class="v" id="sDue">—</div><div class="p">On stages entered</div></div>
+    </div>
+  </div>
+
+  <section class="card">
+    <h2>Cost of the project</h2>
+    <div class="scroll">
+      <table class="summary">
+        <colgroup>
+          <col class="w-s1"><col class="w-s2"><col class="w-s3">
+          <col class="w-s4"><col class="w-s5"><col class="w-s6">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Particulars</th>
+            <th class="n">Amount</th>
+            <th class="n c-kfc">KFC <span id="hKfcPct">81.28%</span></th>
+            <th class="n c-own">Shalom Marine Services <span id="hOwnPct">18.72%</span></th>
+            <th class="n">Total</th>
+            <th>Stages</th>
+          </tr>
+        </thead>
+        <tbody id="summaryBody"></tbody>
+      </table>
+    </div>
+    <p class="note">The <strong>Amount</strong> column is editable. Plant &amp; machinery is pre-filled with ₹68,97,050, the total printed in the letter; the four invoices in the annexure actually add to ₹69,53,732.</p>
+  </section>
+
+  <section id="heads" style="display:flex;flex-direction:column;gap:1.25rem"></section>
+
+  <section class="card">
+    <h2>Funding progress</h2>
+    <div class="legend">
+      <span><i class="sw-kfc"></i>Received from KFC</span>
+      <span><i class="sw-own"></i>Shalom Marine Services put in</span>
+      <span><i class="sw-track"></i>Still to fund</span>
+    </div>
+    <div class="gpanel">
+      <p class="gtitle">By cost head</p>
+      <div id="gHeads"></div>
+    </div>
+    <div class="gpanel">
+      <p class="gtitle">By stage</p>
+      <div id="gStages"></div>
+    </div>
+  </section>
+
+  </div><!-- /viewStages -->
+
+  <div class="view" id="viewLoan" hidden>
+
+    <div class="card">
+      <div class="loanbar">
+        <div class="chips" id="loanChips"></div>
+        <div class="btnrow">
+          <button type="button" class="ghost" id="addLoan">+ Add loan</button>
+          <button type="button" class="ghost" id="delLoan">Remove this loan</button>
+        </div>
+      </div>
+      <div class="strip">
+        <div class="stat t2"><div class="k">All loans — sanctioned</div><div class="v" id="aAmt">—</div><div class="p" id="aCount">—</div></div>
+        <div class="stat t4"><div class="k">All loans — outstanding</div><div class="v" id="aOut">—</div><div class="p">Principal still owed</div></div>
+        <div class="stat t3"><div class="k">All loans — paid</div><div class="v" id="aPaid">—</div><div class="p">Principal plus interest</div></div>
+        <div class="stat t8"><div class="k">All loans — overdue</div><div class="v" id="aLate">—</div><div class="p" id="aLateN">—</div></div>
+      </div>
+    </div>
+
+    <section class="card">
+      <h2 id="loanTitle">Loan terms</h2>
+      <div class="terms">
+        <div class="fld"><label for="lName">Loan name</label>
+          <input type="text" id="lName" class="txtfield"></div>
+        <div class="fld"><label for="lAmt">Amount sanctioned</label>
+          <input type="text" inputmode="decimal" id="lAmt" class="n"></div>
+        <div class="fld"><label for="lRate">Interest rate % per year</label>
+          <input type="text" inputmode="decimal" id="lRate" class="n"></div>
+        <div class="fld"><label for="lDraw">Date of first drawal</label>
+          <input type="date" id="lDraw"></div>
+      </div>
+
+      <div class="terms">
+        <div class="fld"><label for="lMoro">Moratorium — months before instalment 1</label>
+          <input type="text" inputmode="numeric" id="lMoro" class="n"></div>
+        <div class="fld"><label>During the moratorium</label>
+          <div class="seg" id="lMoroMode">
+            <button type="button" data-m="serve" aria-pressed="true">Pay interest</button>
+            <button type="button" data-m="cap" aria-pressed="false">Add to loan</button>
+          </div>
+        </div>
+        <div class="fld"><label for="lYears">Repayment period — years</label>
+          <input type="text" inputmode="decimal" id="lYears" class="n"></div>
+        <div class="fld"><label>Repayment method</label>
+          <div class="seg" id="lMethod">
+            <button type="button" data-x="ladder" aria-pressed="true">As sanctioned</button>
+            <button type="button" data-x="equal" aria-pressed="false">Equal principal</button>
+            <button type="button" data-x="emi" aria-pressed="false">EMI</button>
+          </div>
+        </div>
+      </div>
+      <p class="note" id="termsNote"></p>
+    </section>
+
+    <div class="card">
+      <div class="strip">
+        <div class="stat t2"><div class="k">Sanctioned</div><div class="v" id="kDrawn">—</div><div class="p" id="kTenure">—</div></div>
+        <div class="stat t7"><div class="k">Principal repaid</div><div class="v" id="kPrin">—</div><div class="p" id="kPrinPct">—</div></div>
+        <div class="stat t6"><div class="k">Interest paid</div><div class="v" id="kInt">—</div><div class="p">On settled instalments</div></div>
+        <div class="stat t4"><div class="k">Outstanding principal</div><div class="v" id="kOut">—</div><div class="p">Still owed to KFC</div></div>
+      </div>
+      <div class="strip">
+        <div class="stat t3"><div class="k">Total paid</div><div class="v" id="kPaid">—</div><div class="p">Principal plus interest</div></div>
+        <div class="stat t1"><div class="k">Next payment due</div><div class="v" id="kNext">—</div><div class="p" id="kNextDate">—</div></div>
+        <div class="stat t8"><div class="k">Overdue</div><div class="v" id="kLate">—</div><div class="p" id="kLateN">—</div></div>
+        <div class="stat t9"><div class="k">Loan closes</div><div class="v" id="kEnd">—</div><div class="p" id="kTotalInt">—</div></div>
+      </div>
+    </div>
+
+    <section class="card">
+      <h2>Repayment schedule</h2>
+      <div class="controls">
+        <div class="ctl"><span>Show</span>
+          <div class="seg" id="lFilter">
+            <button type="button" data-f="next" aria-pressed="true">Next 12</button>
+            <button type="button" data-f="unpaid" aria-pressed="false">Unpaid</button>
+            <button type="button" data-f="paid" aria-pressed="false">Paid</button>
+            <button type="button" data-f="all" aria-pressed="false">All</button>
+          </div>
+        </div>
+      </div>
+      <div class="scroll">
+        <table class="loan">
+          <colgroup>
+            <col class="l-n"><col class="l-date"><col class="l-open"><col class="l-prin">
+            <col class="l-int"><col class="l-due"><col class="l-paid"><col class="l-pdate"><col class="l-stat">
+          </colgroup>
+          <thead>
+            <tr>
+              <th class="n">No.</th><th>Due on</th><th class="n">Opening</th>
+              <th class="n c-kfc">Principal</th><th class="n c-own">Interest</th><th class="n">Total due</th>
+              <th class="n c-kfc2">Amount paid</th><th class="c-own2">Paid on</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="loanBody"></tbody>
+        </table>
+      </div>
+      <p class="note" id="loanNote"></p>
+    </section>
+
+  </div><!-- /viewLoan -->
+
+</div>
+<div id="gtip" role="status" aria-live="polite"></div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="fileIn" accept=".json,application/json" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+
+<script>
+(function(){
+  "use strict";
+  var KFC_LOAN = 7000000;
+  var PCT_FIXED = 0.8128;
+  var OWNER = "Shalom Marine Services";
+  var DEFAULTS = [
+    {id:"building",  label:"Building cost",               amount:1700000},
+    {id:"machinery", label:"Plant & machinery",           amount:6897050},
+    {id:"prelim",    label:"Preliminary & pre-op, tools", amount:15000}
+  ];
+  var KEY = "kfc-stage-split-v3", OLDKEYS = ["kfc-stage-split-v2","kfc-stage-split-v1"];
+  /* Ladders come straight from the sanction letter: [instalments, amount each]. */
+  var SEED_LOANS = [
+    {name:"KFC Term Loan", amount:7000000, ladder:[[12,100000],[41,140000],[1,60000]]},
+    {name:"KFC Working Capital Term Loan", amount:3000000, ladder:[[12,40000],[42,60000]]}
+  ];
+  var state = {unit:"lakh", basis:"fixed", view:"stages", projects:null, active_p:0, loans:null, active:0, filter:"next"};
+
+  function num(v){
+    if(typeof v === "number") return isFinite(v) ? v : 0;
+    var n = parseFloat(String(v == null ? "" : v).replace(/[₹,\s]/g, ""));
+    return isFinite(n) ? n : 0;
+  }
+  function freshHeads(blank){
+    return DEFAULTS.map(function(h){
+      return {id:h.id, label:h.label, amount: blank ? 0 : h.amount, stages:[]};
+    });
+  }
+  var projSeq = 0;
+  function normHead(h, i){
+    var d = DEFAULTS[i] || {id:"h", label:"Cost head"};
+    return {
+      id: h && h.id ? h.id : (d.id + "-" + (++projSeq)),
+      label: String((h && h.label) || d.label),
+      amount: num(h && h.amount),
+      stages: (h && Array.isArray(h.stages)) ? h.stages.map(normStage) : []
+    };
+  }
+  function normProject(P, i){
+    P = P || {};
+    var heads = Array.isArray(P.heads) && P.heads.length
+      ? P.heads.map(normHead)
+      : freshHeads(i > 0);
+    return {
+      id: P.id || ("P" + (++projSeq)),
+      name: String(P.name || (i > 0 ? "Project " + (i+1) : "Shalom Marine Services — boat yard")),
+      kfcLoan: P.kfcLoan === undefined ? (i > 0 ? 0 : KFC_LOAN) : num(P.kfcLoan),
+      heads: heads
+    };
+  }
+  function freshProjects(){ return [normProject(null, 0)]; }
+  /* every reader goes through these, so nothing has to know about the array */
+  function proj(){ return state.projects[state.active_p] || state.projects[0]; }
+  function heads(){ return proj().heads; }
+  function normStage(s){
+    return {
+      name: String((s && s.name) || ""),
+      amount: num(s && s.amount),
+      received: num(s && s.received),
+      contrib: num(s && s.contrib),
+      locked: !!(s && s.locked)
+    };
+  }
+  function adopt(p){
+    if(!p || (!Array.isArray(p.heads) && !Array.isArray(p.projects))) return false;
+    state.unit = p.unit === "rupee" ? "rupee" : "lakh";
+    state.basis = p.basis === "pct" ? "pct" : "fixed";
+    state.view = p.view === "loan" ? "loan" : "stages";
+    state.loans = normLoans(p.loans || (p.loan ? [p.loan] : null));
+    state.active = Math.min(Math.max(0, Math.round(num(p.active))), state.loans.length - 1);
+    state.filter = ["next","unpaid","paid","all"].indexOf(p.filter) >= 0 ? p.filter : "next";
+    /* older saves carried a single flat heads array */
+    var src = Array.isArray(p.projects) && p.projects.length
+      ? p.projects
+      : [{name:p.projectName, heads:p.heads}];
+    state.projects = src.map(function(P,i){ return normProject(P, i); });
+    state.active_p = Math.min(Math.max(0, Math.round(num(p.active_p))), state.projects.length - 1);
+    return true;
+  }
+  var loanSeq = 0;
+  function normLoan(L, i){
+    L = L || {};
+    var seed = (i >= 0 ? SEED_LOANS[i] : null) || {name:"Loan", amount:0, ladder:null};
+    var paid = {};
+    if(L.paid && typeof L.paid === "object"){
+      Object.keys(L.paid).forEach(function(k){
+        var e = L.paid[k] || {};
+        paid[k] = {amt:num(e.amt), date:String(e.date || "")};
+      });
+    }
+    var ladder = Array.isArray(L.ladder) && L.ladder.length ? L.ladder : (seed.ladder || null);
+    var method = ["ladder","equal","emi"].indexOf(L.method) >= 0 ? L.method : (ladder ? "ladder" : "equal");
+    if(method === "ladder" && !ladder) method = "equal";
+    /* an older single-loan save had tl + wc on one record */
+    var amount = L.amount !== undefined ? num(L.amount)
+               : (L.tl !== undefined ? num(L.tl) + num(L.wc) : seed.amount);
+    return {
+      id: L.id || ("L" + (++loanSeq)),
+      name: String(L.name || seed.name),
+      amount: amount,
+      rate: L.rate === undefined ? 5 : num(L.rate),
+      draw: String(L.draw || ""),
+      moro: L.moro === undefined ? 5 : Math.max(0, Math.round(num(L.moro))),
+      moroMode: L.moroMode === "cap" ? "cap" : "serve",
+      years: L.years === undefined ? 4.5 : Math.max(0.1, num(L.years)),
+      method: method,
+      ladder: ladder,
+      paid: paid
+    };
+  }
+  function normLoans(arr){
+    if(!Array.isArray(arr) || !arr.length){
+      return SEED_LOANS.map(function(x,i){ return normLoan({}, i); });
+    }
+    return arr.map(function(L,i){ return normLoan(L, i); });
+  }
+  function load(){
+    var keys = [KEY].concat(OLDKEYS);
+    for(var i=0;i<keys.length;i++){
+      try{
+        var raw = localStorage.getItem(keys[i]);
+        if(raw && adopt(JSON.parse(raw))) return;
+      }catch(e){}
+    }
+    state.projects = freshProjects();
+    state.active_p = 0;
+    state.loans = normLoans(null);
+    state.active = 0;
+    state.filter = "next";
+  }
+
+  var storageOK = true, lastSaved = null;
+  function save(){
+    try{ localStorage.setItem(KEY, JSON.stringify(state)); lastSaved = new Date(); }
+    catch(e){ storageOK = false; }
+    stamp();
+  }
+  function stamp(){
+    var n = document.getElementById("autoNote");
+    if(!storageOK){
+      n.textContent = "This browser is not storing entries automatically — use Save backup file before you close the page.";
+      return;
+    }
+    n.textContent = (lastSaved ? "Last saved at " + lastSaved.toLocaleTimeString() + ". " : "")
+      + "Fill a row in, then press Save on that row — it locks so the record cannot be changed by accident. Press Edit to reopen it.";
+  }
+
+  function totalCost(){ return heads().reduce(function(a,h){ return a + h.amount; }, 0); }
+  function kfcRatio(){
+    if(state.basis === "pct" && proj().kfcLoan === KFC_LOAN) return PCT_FIXED;
+    var t = totalCost();
+    return t <= 0 ? 0 : Math.min(proj().kfcLoan / t, 1);
+  }
+  function eachStage(fn){ heads().forEach(function(h){ h.stages.forEach(function(s){ fn(s, h); }); }); }
+
+  function fmt(r){
+    if(state.unit === "lakh") return (r/100000).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+    return Math.round(r).toLocaleString("en-IN");
+  }
+  function money(r){ return state.unit === "lakh" ? "₹" + fmt(r) + " L" : "₹" + fmt(r); }
+  function toInput(r){ return state.unit === "lakh" ? String(Math.round(r/1000)/100) : String(Math.round(r)); }
+  function fromInput(v){ var n = num(v); return state.unit === "lakh" ? n*100000 : n; }
+  function pct(x){ return (x*100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2}) + "%"; }
+
+  function el(t,c,x){ var e=document.createElement(t); if(c) e.className=c; if(x!==undefined&&x!==null) e.textContent=x; return e; }
+  function cell(row,c,x){ var td=el("td",c,x); row.appendChild(td); return td; }
+  /* data-l feeds the inline labels the stacked (narrow-screen) layout shows */
+  function labelRow(tr, labels){
+    Array.prototype.forEach.call(tr.children, function(td,i){
+      td.setAttribute("data-l", labels[i] || "");
+    });
+  }
+  var SUMMARY_LABELS = ["Particulars","Amount","KFC","Shalom Marine Services","Total","Stages"];
+
+  var toastEl = document.getElementById("toast"), toastT = null;
+  function toast(msg, bad){
+    toastEl.textContent = msg;
+    toastEl.className = "on" + (bad ? " bad" : "");
+    if(toastT) clearTimeout(toastT);
+    toastT = setTimeout(function(){ toastEl.className = ""; }, 3000);
+  }
+
+  var updaters = [];
+  function calc(node, fn){ updaters.push(function(){ fn(node); }); return node; }
+  function refresh(){ for(var i=0;i<updaters.length;i++) updaters[i](); }
+
+  function moneyInput(cls, get, set, aria){
+    var i = el("input", cls);
+    i.type = "text"; i.inputMode = "decimal"; i.placeholder = "0";
+    i.value = get() ? toInput(get()) : "";
+    if(aria) i.setAttribute("aria-label", aria);
+    i.addEventListener("input", function(){ set(fromInput(i.value)); save(); refresh(); });
+    i.addEventListener("blur", function(){ var v = get(); i.value = v ? toInput(v) : ""; });
+    return i;
+  }
+  function grow(ta){
+    ta.style.height = "auto";
+    ta.style.height = (ta.scrollHeight + 2) + "px";
+  }
+
+  /* ───────── render ───────── */
+  function render(){
+    updaters = [];
+
+    var sb = document.getElementById("summaryBody");
+    sb.textContent = "";
+    heads().forEach(function(h,i){
+      var tr = el("tr");
+      var td = cell(tr, null);
+      td.appendChild(el("span","idx",String(i+1)));
+      td.appendChild(document.createTextNode(h.label));
+      var ai = moneyInput("n", function(){ return h.amount; }, function(v){ h.amount = v; }, h.label + " amount");
+      ai.value = toInput(h.amount);
+      cell(tr,"n").appendChild(ai);
+      calc(cell(tr,"n c-kfc"), function(n){ n.textContent = fmt(h.amount*kfcRatio()); });
+      calc(cell(tr,"n c-own"), function(n){ n.textContent = fmt(h.amount*(1-kfcRatio())); });
+      calc(cell(tr,"n"),       function(n){ n.textContent = fmt(h.amount); });
+      calc(cell(tr,null),      function(n){
+        var st = h.stages.length;
+        n.textContent = st === 0 ? "As per quotation" : st + (st===1 ? " stage" : " stages");
+      });
+      labelRow(tr, SUMMARY_LABELS);
+      sb.appendChild(tr);
+    });
+    var trT = el("tr","tot");
+    cell(trT,null,"TOTAL");
+    calc(cell(trT,"n"),       function(n){ n.textContent = fmt(totalCost()); });
+    calc(cell(trT,"n c-kfc"), function(n){ n.textContent = fmt(totalCost()*kfcRatio()); });
+    calc(cell(trT,"n c-own"), function(n){ n.textContent = fmt(totalCost()*(1-kfcRatio())); });
+    calc(cell(trT,"n"),       function(n){ n.textContent = fmt(totalCost()); });
+    calc(cell(trT,null),      function(n){ n.textContent = state.unit === "lakh" ? "₹ lakh" : "₹"; });
+    labelRow(trT, SUMMARY_LABELS);
+    sb.appendChild(trT);
+
+    var wrap = document.getElementById("heads");
+    wrap.textContent = "";
+    heads().forEach(function(h,i){ wrap.appendChild(headCard(h,i)); });
+    var addRow = el("div","btnrow");
+    var addH = el("button","ghost","+ Add cost head");
+    addH.type = "button";
+    addH.addEventListener("click", function(){
+      heads().push({id:"h-" + (++projSeq), label:"New cost head", amount:0, stages:[]});
+      save(); render();
+      var names = document.querySelectorAll("#heads input.headname");
+      if(names.length) names[names.length-1].select();
+      toast("Cost head added.");
+    });
+    addRow.appendChild(addH);
+    wrap.appendChild(addRow);
+
+    registerStrips();
+    updaters.push(renderGraphs);
+    updaters.push(renderLoan);
+    refresh();
+    stamp();
+    Array.prototype.forEach.call(document.querySelectorAll("textarea.txt"), grow);
+  }
+
+  function totalsNow(){
+    var r = kfcRatio(), t = totalCost(), recd=0, contrib=0, sK=0, sA=0, n=0;
+    eachStage(function(s){ recd+=s.received; contrib+=s.contrib; sK+=s.amount*r; sA+=s.amount; n++; });
+    return {r:r,t:t,recd:recd,contrib:contrib,sK:sK,sA:sA,n:n,funded:recd+contrib};
+  }
+
+  function registerStrips(){
+    function set(id, fn){ calc(document.getElementById(id), function(n){ n.textContent = fn(); }); }
+    set("sTotal",   function(){ return money(totalCost()); });
+    set("sKfc",     function(){ return money(totalCost()*kfcRatio()); });
+    set("sOwn",     function(){ return money(totalCost()*(1-kfcRatio())); });
+    set("sKfcPct",  function(){ return pct(kfcRatio()) + " of project cost"; });
+    set("sOwnPct",  function(){ return pct(1-kfcRatio()) + " of project cost"; });
+    set("hKfcPct",  function(){ return pct(kfcRatio()); });
+    set("hOwnPct",  function(){ return pct(1-kfcRatio()); });
+    set("sRecd",    function(){ return money(totalsNow().recd); });
+    set("sContrib", function(){ return money(totalsNow().contrib); });
+    set("sFunded",  function(){ return money(totalsNow().funded); });
+    set("sDue",     function(){ var x = totalsNow(); return money(Math.max(x.sA - x.funded, 0)); });
+    set("sRecdPct", function(){ var x = totalsNow(), k = x.t*x.r; return k > 0 ? pct(x.recd/k) + " of the term loan" : "—"; });
+    set("sContribPct", function(){
+      var x = totalsNow(), o = x.t*(1-x.r);
+      return o > 0 ? pct(x.contrib/o) + " of the contribution due" : "—";
+    });
+  }
+
+  /* ───────── loan ─────────
+     54 instalments on the letter's ladder, preceded by interest-only months.
+     Interest each month = outstanding × rate ÷ 12, on the schedule balance. */
+  var LOAN_LABELS = ["Instalment","Due on","Opening","Principal","Interest","Total due","Amount paid","Paid on","Status"];
+  function ladderCount(L){
+    return (L.ladder||[]).reduce(function(a,x){ return a + x[0]; }, 0);
+  }
+  function ladderTotal(L){
+    return (L.ladder||[]).reduce(function(a,x){ return a + x[0]*x[1]; }, 0);
+  }
+  function ladderStep(L, k){
+    var rem = k;
+    for(var i=0;i<L.ladder.length;i++){
+      if(rem <= L.ladder[i][0]) return L.ladder[i][1];
+      rem -= L.ladder[i][0];
+    }
+    return 0;
+  }
+  function termMonths(L){
+    if(L.method === "ladder" && L.ladder) return ladderCount(L);
+    return Math.max(1, Math.round(L.years * 12));
+  }
+  function annuity(principal, mr, n){
+    if(n <= 0) return 0;
+    if(mr <= 0) return principal / n;
+    return principal * mr / (1 - Math.pow(1 + mr, -n));
+  }
+
+  function addMonths(iso, n){
+    var d = new Date(iso + "T00:00:00");
+    if(isNaN(d.getTime())) return null;
+    return new Date(d.getFullYear(), d.getMonth() + n, 1);
+  }
+  function dISO(d){
+    if(!d) return "";
+    var m = String(d.getMonth()+1), day = String(d.getDate());
+    return d.getFullYear() + "-" + (m.length<2?"0":"") + m + "-" + (day.length<2?"0":"") + day;
+  }
+  function dShow(d){
+    if(!d) return "—";
+    return d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
+  }
+  function todayISO(){ var t = new Date(); return dISO(new Date(t.getFullYear(),t.getMonth(),t.getDate())); }
+
+  /* One schedule builder for every loan.
+     Moratorium either serves the interest each month or capitalises it. */
+  function schedule(L){
+    var rows = [], bal = L.amount, mr = (L.rate/100)/12, n = 0;
+    for(var i = 1; i <= L.moro; i++){
+      n++;
+      var mi = bal * mr;
+      rows.push({n:n, k:0, key:"m"+i, date:addMonths(L.draw, i),
+                 open:bal, prin:0, intr:mi, moro:true, cap:L.moroMode === "cap"});
+      if(L.moroMode === "cap") bal += mi;
+    }
+    var base = bal, N = termMonths(L);
+    var scale = (L.method === "ladder" && L.ladder && ladderTotal(L) > 0) ? base / ladderTotal(L) : 1;
+    var pay = L.method === "emi" ? annuity(base, mr, N) : 0;
+    for(var k = 1; k <= N; k++){
+      n++;
+      var intr = bal * mr, prin;
+      if(L.method === "ladder" && L.ladder) prin = ladderStep(L, k) * scale;
+      else if(L.method === "emi") prin = pay - intr;
+      else prin = base / N;
+      if(prin > bal || k === N) prin = bal;
+      if(prin < 0) prin = 0;
+      rows.push({n:n, k:k, key:"i"+k, date:addMonths(L.draw, L.moro + k),
+                 open:bal, prin:prin, intr:intr, moro:false});
+      bal -= prin;
+    }
+    rows.forEach(function(r){
+      r.due = r.prin + r.intr;
+      var e = L.paid[r.key] || {amt:0, date:""};
+      r.paidAmt = e.amt; r.paidDate = e.date;
+      var today = todayISO(), dueISO = dISO(r.date);
+      if(r.paidAmt >= r.due - 1 && r.due > 0) r.status = "paid";
+      else if(r.paidAmt > 0) r.status = "part";
+      else if(dueISO && dueISO < today) r.status = "late";
+      else r.status = "due";
+      r.short = Math.max(0, r.due - r.paidAmt);
+    });
+    return rows;
+  }
+
+  function loanStats(L){
+    var rows = schedule(L), prin=0, intr=0, paid=0, late=0, lateN=0, next=null, totInt=0;
+    rows.forEach(function(r){
+      totInt += r.intr;
+      paid += r.paidAmt;
+      if(r.status === "paid"){ prin += r.prin; intr += r.intr; }
+      if(r.status === "late"){ late += r.short; lateN++; }
+      if(!next && r.status !== "paid") next = r;
+    });
+    return {rows:rows, prin:prin, intr:intr, paid:paid, late:late, lateN:lateN,
+            next:next, totInt:totInt, out:L.amount - prin};
+  }
+
+  function renderLoan(){
+    var body = document.getElementById("loanBody");
+    if(!body) return;
+    if(state.active >= state.loans.length) state.active = state.loans.length - 1;
+    if(state.active < 0) state.active = 0;
+    var L = state.loans[state.active];
+
+    /* loan chips */
+    var chips = document.getElementById("loanChips");
+    chips.textContent = "";
+    state.loans.forEach(function(x, i){
+      var c = el("button","chip" + (i === state.active ? " on" : ""), x.name || ("Loan " + (i+1)));
+      c.type = "button";
+      c.setAttribute("aria-pressed", String(i === state.active));
+      c.addEventListener("click", function(){ state.active = i; save(); bindLoanFields(); renderLoan(); });
+      chips.appendChild(c);
+    });
+    document.getElementById("delLoan").disabled = state.loans.length <= 1;
+    document.getElementById("loanTitle").textContent = (L.name || "Loan") + " — terms";
+
+    /* all-loans roll-up */
+    var tAmt=0, tOut=0, tPaid=0, tLate=0, tLateN=0;
+    state.loans.forEach(function(x){
+      var st = loanStats(x);
+      tAmt += x.amount; tOut += st.out; tPaid += st.paid; tLate += st.late; tLateN += st.lateN;
+    });
+    document.getElementById("aAmt").textContent = money(tAmt);
+    document.getElementById("aCount").textContent = state.loans.length + (state.loans.length===1 ? " loan" : " loans");
+    document.getElementById("aOut").textContent = money(tOut);
+    document.getElementById("aPaid").textContent = money(tPaid);
+    document.getElementById("aLate").textContent = money(tLate);
+    document.getElementById("aLateN").textContent = tLateN ? tLateN + (tLateN===1 ? " instalment behind" : " instalments behind") : "Nothing overdue";
+
+    /* this loan */
+    var st = loanStats(L), rows = st.rows, N = termMonths(L);
+    document.getElementById("kDrawn").textContent = money(L.amount);
+    document.getElementById("kTenure").textContent =
+      N + " instalments · " + (Math.round(N/12*100)/100) + " years" + (L.moro ? " after " + L.moro + " months moratorium" : "");
+    document.getElementById("kPrin").textContent  = money(st.prin);
+    document.getElementById("kPrinPct").textContent = L.amount > 0 ? pctText(pctOf(st.prin, L.amount)) + " of the loan" : "—";
+    document.getElementById("kInt").textContent   = money(st.intr);
+    document.getElementById("kOut").textContent   = money(st.out);
+    document.getElementById("kPaid").textContent  = money(st.paid);
+    document.getElementById("kNext").textContent  = st.next ? money(st.next.short) : "—";
+    document.getElementById("kNextDate").textContent = st.next ? dShow(st.next.date) : "Loan fully settled";
+    document.getElementById("kLate").textContent  = money(st.late);
+    document.getElementById("kLateN").textContent = st.lateN ? st.lateN + (st.lateN===1 ? " instalment behind" : " instalments behind") : "Nothing overdue";
+    document.getElementById("kEnd").textContent   = rows.length ? dShow(rows[rows.length-1].date) : "—";
+    document.getElementById("kTotalInt").textContent = "Interest over the term " + money(st.totInt);
+
+    var mName = {ladder:"the sanctioned ladder", equal:"equal principal", emi:"a level EMI"}[L.method];
+    document.getElementById("termsNote").textContent =
+      "Repaying on " + mName + " over " + N + " monthly instalments at " + L.rate + "% a year. "
+      + (L.moro
+          ? (L.moroMode === "cap"
+              ? "During the " + L.moro + "-month moratorium the interest is added to the loan, so repayment starts on a larger balance."
+              : "During the " + L.moro + "-month moratorium you pay the interest each month and the principal stays put.")
+          : "No moratorium — instalment 1 falls one month after drawal.")
+      + (L.method === "ladder" ? " The ladder is scaled to the amount above." : "");
+
+    /* schedule rows */
+    var show = rows, f = state.filter;
+    if(f === "unpaid") show = rows.filter(function(r){ return r.status !== "paid"; });
+    else if(f === "paid") show = rows.filter(function(r){ return r.status === "paid"; });
+    else if(f === "next"){
+      var start = rows.indexOf(st.next);
+      if(start < 0) start = Math.max(0, rows.length - 12);
+      show = rows.slice(start, start + 12);
+    }
+
+    body.textContent = "";
+    if(!L.draw){
+      var tr0 = el("tr");
+      var td0 = cell(tr0,null,"Set the date of first drawal above to build the schedule.");
+      td0.colSpan = 9; td0.style.color = "var(--ink-faint)";
+      body.appendChild(tr0);
+    }else if(!show.length){
+      var tr1 = el("tr");
+      var td1 = cell(tr1,null,"Nothing to show for this filter.");
+      td1.colSpan = 9; td1.style.color = "var(--ink-faint)";
+      body.appendChild(tr1);
+    }else{
+      show.forEach(function(r){
+        var tr = el("tr", (r.moro ? "moro" : "") + (r === st.next ? " thisrow" : ""));
+        cell(tr,"n", r.moro ? "—" : String(r.k));
+        cell(tr,null, dShow(r.date) + (r.moro ? (r.cap ? " · interest added" : " · interest only") : ""));
+        cell(tr,"n", fmt(r.open));
+        cell(tr,"n c-kfc", fmt(r.prin));
+        cell(tr,"n c-own", fmt(r.intr));
+        cell(tr,"n", fmt(r.due));
+
+        var pc = cell(tr,"n c-kfc2");
+        pc.appendChild(moneyInput("n act",
+          function(){ return (L.paid[r.key]||{}).amt || 0; },
+          function(v){
+            var e = L.paid[r.key] || {amt:0,date:""};
+            e.amt = v; L.paid[r.key] = e;
+          }, "Amount paid for instalment " + r.n));
+
+        var dc = cell(tr,"c-own2");
+        var di = el("input");
+        di.type = "date"; di.value = r.paidDate;
+        di.setAttribute("aria-label","Date paid for instalment " + r.n);
+        di.addEventListener("change", function(){
+          var e = L.paid[r.key] || {amt:0,date:""};
+          e.date = di.value; L.paid[r.key] = e;
+          save(); renderLoan();
+        });
+        dc.appendChild(di);
+
+        var lbl = {paid:"Paid", part:"Part", due:"Due", late:"Overdue"}[r.status];
+        cell(tr,null).appendChild(el("span","st " + r.status, lbl));
+
+        labelRow(tr, LOAN_LABELS);
+        body.appendChild(tr);
+      });
+    }
+    document.getElementById("loanNote").textContent =
+      "Interest each month is the opening balance × " + L.rate + "% ÷ 12. "
+      + "Enter what you actually paid and the date; a row turns Paid once the amount covers the total due.";
+  }
+
+  /* ───────── charts ─────────
+     One encoding used everywhere: a track the width of the sanctioned amount,
+     filled left-to-right by what KFC released and what the firm put in.
+     Two series only — the unfunded remainder is the track, not a third colour. */
+  var tip = document.getElementById("gtip");
+  function tipOn(e, title, series, amount, share){
+    tip.textContent = "";
+    var em = el("em", null, title); tip.appendChild(em);
+    tip.appendChild(document.createTextNode(series + " "));
+    tip.appendChild(el("b", null, money(amount)));
+    tip.appendChild(document.createTextNode(" · " + share));
+    tip.className = "on";
+    moveTip(e);
+  }
+  function moveTip(e){
+    var x = e.clientX + 14, y = e.clientY + 16;
+    var w = tip.offsetWidth, hgt = tip.offsetHeight;
+    if(x + w > window.innerWidth - 8) x = e.clientX - w - 14;
+    if(y + hgt > window.innerHeight - 8) y = e.clientY - hgt - 16;
+    tip.style.left = Math.max(8, x) + "px";
+    tip.style.top  = Math.max(8, y) + "px";
+  }
+  function tipOff(){ tip.className = ""; }
+
+  function pctOf(part, whole){ return whole > 0 ? (part/whole)*100 : 0; }
+  function pctText(x){ return (Math.round(x*10)/10).toLocaleString("en-IN") + "%"; }
+
+  function bar(container, opts){
+    // opts: {label, amount, received, contrib, cls}
+    var row = el("div","grow" + (opts.cls ? " " + opts.cls : ""));
+    row.appendChild(el("div","glab",opts.label));
+
+    var track = el("div","gtrack");
+    var pr = Math.max(0, Math.min(100, pctOf(opts.received, opts.amount)));
+    var pc = Math.max(0, Math.min(100 - pr, pctOf(opts.contrib, opts.amount)));
+
+    if(pr > 0){
+      var a = el("div","gseg s-kfc");
+      a.style.width = pr + "%";
+      a.addEventListener("mouseenter", function(e){
+        tipOn(e, opts.label, "Received from KFC", opts.received, pctText(pr) + " of this stage");
+      });
+      a.addEventListener("mousemove", moveTip);
+      a.addEventListener("mouseleave", tipOff);
+      track.appendChild(a);
+    }
+    if(pc > 0){
+      var b = el("div","gseg s-own");
+      b.style.width = pc + "%";
+      b.addEventListener("mouseenter", function(e){
+        tipOn(e, opts.label, OWNER + " put in", opts.contrib, pctText(pc) + " of this stage");
+      });
+      b.addEventListener("mousemove", moveTip);
+      b.addEventListener("mouseleave", tipOff);
+      track.appendChild(b);
+    }
+    track.setAttribute("role","img");
+    track.setAttribute("aria-label",
+      opts.label + ": " + pctText(pr + pc) + " funded of " + money(opts.amount));
+    row.appendChild(track);
+
+    var total = pr + pc;
+    var v = el("div","gval" + (total < 0.05 ? " zero" : (total >= 99.95 ? " full" : "")),
+               pctText(total));
+    row.appendChild(v);
+    container.appendChild(row);
+  }
+
+  function renderGraphs(){
+    var gh = document.getElementById("gHeads");
+    var gs = document.getElementById("gStages");
+    if(!gh || !gs) return;
+    gh.textContent = ""; gs.textContent = "";
+
+    var tA=0,tR=0,tC=0;
+    heads().forEach(function(h){
+      var r = 0, c = 0;
+      h.stages.forEach(function(x){ r += x.received; c += x.contrib; });
+      tA += h.amount; tR += r; tC += c;
+      bar(gh, {label:h.label, amount:h.amount, received:r, contrib:c});
+    });
+    bar(gh, {label:"Whole project", amount:tA, received:tR, contrib:tC, cls:"tot"});
+
+    var any = false;
+    heads().forEach(function(h){
+      if(!h.stages.length) return;
+      any = true;
+      gs.appendChild(el("p","ghead",h.label));
+      h.stages.forEach(function(x){
+        bar(gs, {label:x.name || "Untitled stage", amount:x.amount,
+                 received:x.received, contrib:x.contrib, cls:"sub"});
+      });
+    });
+    if(!any) gs.appendChild(el("p","gempty","No stages entered yet."));
+  }
+
+  function headCard(h,i){
+    var card = el("section","card");
+
+    var bar = el("div","headbar");
+    var nm = el("div","name");
+    nm.appendChild(el("span","badge",String(i+1)));
+    var hn = el("input","headname");
+    hn.type = "text"; hn.value = h.label;
+    hn.setAttribute("aria-label","Cost head name");
+    hn.addEventListener("input", function(){ h.label = hn.value; save(); refresh(); });
+    nm.appendChild(hn);
+    var rm = el("button","del","✕");
+    rm.type = "button"; rm.title = "Remove this cost head";
+    rm.setAttribute("aria-label","Remove cost head " + (i+1));
+    rm.addEventListener("click", function(){
+      if(heads().length <= 1){ toast("Keep at least one cost head.", true); return; }
+      heads().splice(i,1); save(); render(); toast(h.label + " removed.");
+    });
+    nm.appendChild(rm);
+    bar.appendChild(nm);
+    var ha = el("div","headamt");
+    var hid = "head-"+h.id;
+    var lab = el("label",null,"Sanctioned amount"); lab.setAttribute("for",hid);
+    var hi = moneyInput("n", function(){ return h.amount; }, function(v){ h.amount = v; }, h.label+" sanctioned amount");
+    hi.value = toInput(h.amount); hi.id = hid;
+    ha.appendChild(lab); ha.appendChild(hi);
+    bar.appendChild(ha);
+    card.appendChild(bar);
+
+    var scroll = el("div","scroll");
+    var tbl = el("table","stages");
+    var cg = el("colgroup");
+    ["subj","w-amt","w-kfc","w-own","w-rec","w-con","w-left","w-btn"].forEach(function(c){
+      cg.appendChild(el("col", c));
+    });
+    tbl.appendChild(cg);
+    var thead = el("thead");
+
+    var g = el("tr","grp");
+    [["",2,null],["Planned split",2,"gh"],["Funded so far",2,"gh"],["",2,null]].forEach(function(p){
+      var th = el("th", p[2], p[0]); th.colSpan = p[1]; g.appendChild(th);
+    });
+    thead.appendChild(g);
+
+    var hr = el("tr");
+    [["Stage — as per quotation","subj"],["Amount","n"],
+     ["KFC share","n c-kfc"],[OWNER + " share","n c-own"],
+     ["Received from KFC","n c-kfc2"],[OWNER + " put in","n c-own2"],
+     ["Still to fund","n c-res"],["","n"]
+    ].forEach(function(p){ hr.appendChild(el("th",p[1],p[0])); });
+    thead.appendChild(hr);
+    tbl.appendChild(thead);
+
+    var STAGE_LABELS = ["Stage — as per quotation","Amount","KFC share",OWNER + " share",
+                        "Received from KFC",OWNER + " put in","Still to fund",""];
+    var tb = el("tbody");
+    h.stages.forEach(function(s,j){
+      var tr = el("tr", s.locked ? "locked" : null);
+
+      /* subject */
+      var t1 = cell(tr,"subj");
+      if(s.locked){
+        var p = el("div","subjtext" + (s.name ? "" : " empty"), s.name || "Untitled stage");
+        t1.appendChild(p);
+        t1.appendChild(el("span","savedtag","Saved"));
+      }else{
+        var ta = el("textarea","txt");
+        ta.rows = 2; ta.value = s.name;
+        ta.placeholder = "e.g. Advance for construction of the office building";
+        ta.setAttribute("aria-label","Stage description");
+        ta.addEventListener("input",function(){ s.name = ta.value; grow(ta); save(); });
+        t1.appendChild(ta);
+      }
+
+      /* amount */
+      if(s.locked) cell(tr,"n").appendChild(el("span","lockval", fmt(s.amount)));
+      else cell(tr,"n").appendChild(moneyInput("n", function(){ return s.amount; }, function(v){ s.amount = v; }, "Stage amount"));
+
+      calc(cell(tr,"n c-kfc"), function(n){ n.textContent = fmt(s.amount*kfcRatio()); });
+      calc(cell(tr,"n c-own"), function(n){ n.textContent = fmt(s.amount*(1-kfcRatio())); });
+
+      /* received from KFC */
+      if(s.locked) cell(tr,"n c-kfc2").appendChild(el("span","lockval", fmt(s.received)));
+      else cell(tr,"n c-kfc2").appendChild(moneyInput("n act",
+        function(){ return s.received; }, function(v){ s.received = v; }, "Amount received from KFC for this stage"));
+
+      /* owner contribution */
+      if(s.locked) cell(tr,"n c-own2").appendChild(el("span","lockval", fmt(s.contrib)));
+      else cell(tr,"n c-own2").appendChild(moneyInput("n",
+        function(){ return s.contrib; }, function(v){ s.contrib = v; }, OWNER + " contribution for this stage"));
+
+      calc(cell(tr,"n pos c-res"), function(n){
+        var left = s.amount - (s.received + s.contrib);
+        n.textContent = fmt(left);
+        n.className = "n pos c-res " + (left <= 0.5 ? "clear" : "due");
+      });
+
+      var t8 = cell(tr,"rowbtns");
+      var grp = el("div","g");
+      if(s.locked){
+        var ed = el("button","rowedit","Edit");
+        ed.type="button";
+        ed.setAttribute("aria-label","Edit stage " + (j+1));
+        ed.addEventListener("click",function(){ s.locked = false; save(); render(); toast("Row reopened for editing."); });
+        grp.appendChild(ed);
+      }else{
+        var ok = el("button","rowsave","Save");
+        ok.type="button";
+        ok.setAttribute("aria-label","Save stage " + (j+1));
+        ok.addEventListener("click",function(){
+          s.locked = true; save(); render();
+          toast(s.name ? "“" + s.name.slice(0,44) + (s.name.length>44?"…":"") + "” saved and locked." : "Entry saved and locked.");
+        });
+        grp.appendChild(ok);
+      }
+      var del = el("button","del","✕");
+      del.type="button"; del.title="Remove this stage";
+      del.setAttribute("aria-label","Remove stage " + (j+1));
+      del.addEventListener("click",function(){ h.stages.splice(j,1); save(); render(); });
+      grp.appendChild(del);
+      t8.appendChild(grp);
+
+      labelRow(tr, STAGE_LABELS);
+      tb.appendChild(tr);
+    });
+
+    if(!h.stages.length){
+      var tr0 = el("tr");
+      var td0 = cell(tr0,null,"No stages yet.");
+      td0.colSpan = 8; td0.style.color = "var(--ink-faint)";
+      tb.appendChild(tr0);
+    }else{
+      var trT = el("tr","tot");
+      cell(trT,"subj","Staged so far");
+      function sum(f){ return h.stages.reduce(function(a,s){ return a + f(s); }, 0); }
+      calc(cell(trT,"n"),       function(n){ n.textContent = fmt(sum(function(s){return s.amount;})); });
+      calc(cell(trT,"n c-kfc"), function(n){ n.textContent = fmt(sum(function(s){return s.amount;})*kfcRatio()); });
+      calc(cell(trT,"n c-own"), function(n){ n.textContent = fmt(sum(function(s){return s.amount;})*(1-kfcRatio())); });
+      calc(cell(trT,"n c-kfc2"), function(n){ n.textContent = fmt(sum(function(s){return s.received;})); });
+      calc(cell(trT,"n c-own2"), function(n){ n.textContent = fmt(sum(function(s){return s.contrib;})); });
+      calc(cell(trT,"n pos c-res"),   function(n){
+        n.textContent = fmt(sum(function(s){return s.amount;}) - sum(function(s){return s.received + s.contrib;}));
+      });
+      cell(trT,"n","");
+      labelRow(trT, STAGE_LABELS);
+      tb.appendChild(trT);
+    }
+    tbl.appendChild(tb);
+    scroll.appendChild(tbl);
+    card.appendChild(scroll);
+
+    var foot = el("div","foot");
+    var btns = el("div","btnrow");
+    var add = el("button","ghost addrow","+ Add stage");
+    add.type="button";
+    add.addEventListener("click",function(){
+      h.stages.push({name:"",amount:0,received:0,contrib:0,locked:false});
+      save(); render();
+      var anchor = document.getElementById("head-" + h.id);
+      if(anchor){
+        var rows = anchor.closest("section").querySelectorAll("tbody tr textarea.txt");
+        if(rows.length) rows[rows.length-1].focus();
+      }
+      toast("Stage added — fill it in, then press Save on the row.");
+    });
+    btns.appendChild(add);
+    var lockAll = el("button","ghost primary addrow","Save all rows");
+    lockAll.type="button";
+    lockAll.addEventListener("click",function(){
+      var n = 0;
+      h.stages.forEach(function(s){ if(!s.locked){ s.locked = true; n++; } });
+      save(); render();
+      toast(n ? h.label + " — " + n + (n===1 ? " row saved and locked." : " rows saved and locked.") : "All rows already saved.");
+    });
+    btns.appendChild(lockAll);
+    foot.appendChild(btns);
+
+    var pill = el("span","pill idle","");
+    calc(pill, function(n){
+      var staged = h.stages.reduce(function(a,s){ return a + s.amount; }, 0);
+      var left = h.amount - staged;
+      if(!h.stages.length){ n.className = "pill idle"; n.textContent = "Nothing staged yet"; }
+      else if(Math.abs(left) < 1){ n.className = "pill ok"; n.textContent = "Fully staged"; }
+      else if(left > 0){ n.className = "pill idle"; n.textContent = money(left) + " left to stage"; }
+      else { n.className = "pill warn"; n.textContent = money(-left) + " over the sanctioned amount"; }
+    });
+    foot.appendChild(pill);
+    card.appendChild(foot);
+    return card;
+  }
+
+  /* ───────── save / restore ───────── */
+  var downloads = null, dlReady = false;
+  function ensureDownloads(){
+    if(dlReady) return Promise.resolve(downloads);
+    if(!(window.claude && typeof window.claude.use === "function")){ dlReady = true; return Promise.resolve(null); }
+    return window.claude.use("downloads").then(function(d){ downloads = d; dlReady = true; return d; })
+      .catch(function(){ dlReady = true; return null; });
+  }
+  function report(err){
+    var code = err && err.code;
+    if(code === "declined") toast("Save cancelled.");
+    else if(code === "rate_limited") toast("A save prompt is already open — try again in a moment.", true);
+    else if(code === "too_large") toast("That file is too large to save.", true);
+    else toast("Could not save the file.", true);
+  }
+  function offer(filename, data, fallbackName){
+    return ensureDownloads().then(function(d){
+      if(!d){ toast("Saving files is not available in this view.", true); return; }
+      return d.save({filename:filename, data:data}).then(function(){
+        toast("Saved as " + filename);
+      }).catch(function(err){
+        var code = err && err.code;
+        if((code === "extension_not_enabled" || code === "rejected_extension") && fallbackName){
+          return d.save({filename:fallbackName, data:data})
+            .then(function(){ toast("Saved as " + fallbackName); })
+            .catch(report);
+        }
+        report(err);
+      });
+    });
+  }
+
+  function csvCell(v){
+    var s = String(v == null ? "" : v).replace(/\r?\n/g, " ");
+    return /[",]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }
+  function buildLoanCsv(){
+    var out = [["Shalom Marine Services — KFC loan repayment record"],
+               ["Sanction","KFC/MCB, TVM/777/2025-26 dated 22.12.2025"],
+               ["All figures in rupees"],[]];
+    state.loans.forEach(function(L){
+      var rows = schedule(L);
+      out.push([L.name]);
+      out.push(["Amount",Math.round(L.amount),"Rate % p.a.",L.rate,
+                "First drawal",L.draw || "(not set)",
+                "Moratorium months",L.moro,
+                "Moratorium",L.moroMode === "cap" ? "interest added to loan" : "interest paid monthly",
+                "Instalments",termMonths(L),
+                "Method",{ladder:"as sanctioned",equal:"equal principal",emi:"EMI"}[L.method]]);
+      out.push(["No.","Due on","Opening","Principal","Interest","Total due","Amount paid","Paid on","Status"]);
+      rows.forEach(function(x){
+        out.push([x.moro ? "" : x.k, dISO(x.date), Math.round(x.open), Math.round(x.prin),
+                  Math.round(x.intr), Math.round(x.due), Math.round(x.paidAmt), x.paidDate,
+                  {paid:"Paid",part:"Part",due:"Due",late:"Overdue"}[x.status]]);
+      });
+      out.push([]);
+    });
+    return out.map(function(row){ return row.map(csvCell).join(","); }).join("\r\n");
+  }
+  function buildCsv(){
+    if(state.view === "loan") return buildLoanCsv();
+    var r = kfcRatio();
+    var rows = [[proj().name + " — KFC stage split & funding record"],
+                ["Sanction","KFC/MCB, TVM/777/2025-26 dated 22.12.2025"],
+                ["All figures in rupees"],[],
+                ["Cost head","Stage","Amount","KFC share",OWNER+" share","Received from KFC",OWNER+" put in","Still to fund","Status"]];
+    var tA=0,tK=0,tR=0,tC=0;
+    heads().forEach(function(h){
+      if(!h.stages.length){
+        rows.push([h.label,"(no stages entered)",Math.round(h.amount),Math.round(h.amount*r),Math.round(h.amount*(1-r)),"","","",""]);
+        return;
+      }
+      h.stages.forEach(function(s){
+        tA+=s.amount; tK+=s.amount*r; tR+=s.received; tC+=s.contrib;
+        rows.push([h.label, s.name || "Untitled stage", Math.round(s.amount), Math.round(s.amount*r),
+                   Math.round(s.amount*(1-r)), Math.round(s.received), Math.round(s.contrib),
+                   Math.round(s.amount - s.received - s.contrib), s.locked ? "Saved" : "Draft"]);
+      });
+    });
+    rows.push([]);
+    rows.push(["TOTAL OF STAGES","",Math.round(tA),Math.round(tK),Math.round(tA-tK),Math.round(tR),Math.round(tC),Math.round(tA-tR-tC),""]);
+    rows.push([]);
+    var total = totalCost();
+    rows.push(["Cost of project","",Math.round(total)]);
+    rows.push(["KFC term loan","",Math.round(total*r)]);
+    rows.push([OWNER + " contribution","",Math.round(total*(1-r))]);
+    rows.push(["KFC share of project cost","",(r*100).toFixed(4)+"%"]);
+    return rows.map(function(row){ return row.map(csvCell).join(","); }).join("\r\n");
+  }
+
+  document.getElementById("saveJson").addEventListener("click", function(){
+    offer("kfc-stage-record-backup.json", JSON.stringify(state, null, 2));
+  });
+  document.getElementById("saveCsv").addEventListener("click", function(){
+    var nm = state.view === "loan" ? "kfc-loan-record" : "kfc-stage-record";
+    offer(nm + ".csv", buildCsv(), nm + ".txt");
+  });
+  document.getElementById("printBtn").addEventListener("click", function(){
+    document.getElementById("printStamp").textContent =
+      "Stage-wise funding record · printed " + new Date().toLocaleString();
+    Array.prototype.forEach.call(document.querySelectorAll("textarea.txt"), grow);
+    window.print();
+  });
+
+  var fileIn = document.getElementById("fileIn");
+  document.getElementById("openBtn").addEventListener("click", function(){ fileIn.value = ""; fileIn.click(); });
+  fileIn.addEventListener("change", function(){
+    var f = fileIn.files && fileIn.files[0];
+    if(!f) return;
+    var fr = new FileReader();
+    fr.onload = function(){
+      try{
+        if(adopt(JSON.parse(String(fr.result)))){
+          syncSegs(); syncView(); bindProjectFields(); bindLoanFields();
+          save(); render(); toast("Backup loaded.");
+        }
+        else toast("That file is not a tracker backup.", true);
+      }catch(e){ toast("Could not read that file.", true); }
+    };
+    fr.onerror = function(){ toast("Could not read that file.", true); };
+    fr.readAsText(f);
+  });
+
+  /* ── loan term fields ── */
+  function bindProjectFields(){
+    var P = proj();
+    var chips = document.getElementById("projChips");
+    chips.textContent = "";
+    state.projects.forEach(function(x, i){
+      var c = el("button","chip" + (i === state.active_p ? " on" : ""), x.name || ("Project " + (i+1)));
+      c.type = "button";
+      c.setAttribute("aria-pressed", String(i === state.active_p));
+      c.addEventListener("click", function(){
+        state.active_p = i; save(); bindProjectFields(); render();
+      });
+      chips.appendChild(c);
+    });
+    document.getElementById("delProj").disabled = state.projects.length <= 1;
+
+    var nm = document.getElementById("pName");
+    nm.value = P.name;
+    nm.oninput = function(){ P.name = nm.value; save(); bindProjectFields(); };
+
+    var ln = document.getElementById("pLoan");
+    ln.value = P.kfcLoan ? toInput(P.kfcLoan) : "";
+    ln.oninput = function(){ P.kfcLoan = fromInput(ln.value); save(); refresh(); };
+    ln.onblur  = function(){ ln.value = P.kfcLoan ? toInput(P.kfcLoan) : ""; };
+  }
+
+  document.getElementById("addProj").addEventListener("click", function(){
+    state.projects.push(normProject({name:"Project " + (state.projects.length + 1)}, state.projects.length));
+    state.active_p = state.projects.length - 1;
+    save(); bindProjectFields(); render();
+    document.getElementById("pName").select();
+    toast("Project added — name it and set its cost heads.");
+  });
+  document.getElementById("delProj").addEventListener("click", function(){
+    if(state.projects.length <= 1){ toast("Keep at least one project.", true); return; }
+    var nm2 = proj().name;
+    state.projects.splice(state.active_p, 1);
+    state.active_p = Math.max(0, state.active_p - 1);
+    save(); bindProjectFields(); render();
+    toast(nm2 + " removed.");
+  });
+
+  function bindLoanFields(){
+    var L = state.loans[state.active];
+
+    function txt(id, get, set){
+      var i = document.getElementById(id);
+      i.value = get();
+      i.oninput = function(){ set(i.value); save(); renderLoan(); };
+    }
+    function moneyF(id, get, set){
+      var i = document.getElementById(id);
+      i.value = get() ? toInput(get()) : "";
+      i.oninput = function(){ set(fromInput(i.value)); save(); renderLoan(); };
+      i.onblur  = function(){ var v = get(); i.value = v ? toInput(v) : ""; };
+    }
+    function plain(id, get, set){
+      var i = document.getElementById(id);
+      i.value = get();
+      i.oninput = function(){ set(i.value); save(); renderLoan(); };
+    }
+    function segment(id, key, apply){
+      var box = document.getElementById(id);
+      box.onclick = function(e){
+        var b = e.target.closest("button"); if(!b) return;
+        apply(b.dataset[key]);
+        Array.prototype.forEach.call(box.querySelectorAll("button"), function(x){
+          x.setAttribute("aria-pressed", String(x === b));
+        });
+        save(); bindLoanFields(); renderLoan();
+      };
+    }
+
+    txt("lName", function(){ return L.name; }, function(v){ L.name = v; });
+    moneyF("lAmt", function(){ return L.amount; }, function(v){ L.amount = v; });
+    plain("lRate", function(){ return String(L.rate); }, function(v){ L.rate = num(v); });
+    plain("lMoro", function(){ return String(L.moro); }, function(v){ L.moro = Math.max(0, Math.round(num(v))); });
+    plain("lYears", function(){ return String(L.method === "ladder" ? Math.round(termMonths(L)/12*100)/100 : L.years); },
+                    function(v){ L.years = Math.max(0.1, num(v)); });
+
+    var d = document.getElementById("lDraw");
+    d.value = L.draw;
+    d.onchange = function(){ L.draw = d.value; save(); renderLoan(); };
+
+    /* the ladder only exists on the sanctioned loans */
+    var yrs = document.getElementById("lYears");
+    yrs.disabled = (L.method === "ladder");
+    yrs.title = L.method === "ladder" ? "Fixed by the sanctioned ladder — switch method to change it" : "";
+    var ladBtn = document.querySelector('#lMethod button[data-x="ladder"]');
+    ladBtn.disabled = !L.ladder;
+    ladBtn.title = L.ladder ? "" : "This loan has no sanctioned ladder";
+
+    segment("lMoroMode", "m", function(v){ L.moroMode = v; });
+    segment("lMethod", "x", function(v){ L.method = v; });
+    Array.prototype.forEach.call(document.querySelectorAll("#lMoroMode button"), function(b){
+      b.setAttribute("aria-pressed", String(b.dataset.m === L.moroMode));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("#lMethod button"), function(b){
+      b.setAttribute("aria-pressed", String(b.dataset.x === L.method));
+    });
+
+    document.getElementById("lFilter").onclick = function(e){
+      var b = e.target.closest("button"); if(!b) return;
+      state.filter = b.dataset.f;
+      Array.prototype.forEach.call(this.querySelectorAll("button"), function(x){
+        x.setAttribute("aria-pressed", String(x === b));
+      });
+      save(); renderLoan();
+    };
+    Array.prototype.forEach.call(document.querySelectorAll("#lFilter button"), function(b){
+      b.setAttribute("aria-pressed", String(b.dataset.f === state.filter));
+    });
+  }
+
+  document.getElementById("addLoan").addEventListener("click", function(){
+    var n = state.loans.length + 1;
+    state.loans.push(normLoan({name:"Loan " + n, amount:0, method:"equal", ladder:null,
+                               years:5, moro:0, rate:5}, -1));
+    state.active = state.loans.length - 1;
+    save(); bindLoanFields(); renderLoan();
+    document.getElementById("lName").focus();
+    toast("Loan added — fill in its terms.");
+  });
+  document.getElementById("delLoan").addEventListener("click", function(){
+    if(state.loans.length <= 1){ toast("Keep at least one loan.", true); return; }
+    var nm = state.loans[state.active].name;
+    state.loans.splice(state.active, 1);
+    state.active = Math.max(0, state.active - 1);
+    save(); bindLoanFields(); renderLoan();
+    toast(nm + " removed.");
+  });
+
+  /* ── tabs ── */
+  function syncView(){
+    document.getElementById("viewStages").hidden = state.view !== "stages";
+    document.getElementById("viewLoan").hidden   = state.view !== "loan";
+    Array.prototype.forEach.call(document.querySelectorAll("#tabs button"), function(b){
+      b.setAttribute("aria-selected", String(b.dataset.view === state.view));
+    });
+  }
+  document.getElementById("tabs").addEventListener("click", function(e){
+    var b = e.target.closest("button"); if(!b) return;
+    state.view = b.dataset.view; syncView(); save();
+  });
+
+  function syncSegs(){
+    Array.prototype.forEach.call(document.querySelectorAll("#unitSeg button"), function(b){
+      b.setAttribute("aria-pressed", String(b.dataset.unit === state.unit));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("#basisSeg button"), function(b){
+      b.setAttribute("aria-pressed", String(b.dataset.basis === state.basis));
+    });
+  }
+  document.getElementById("unitSeg").addEventListener("click", function(e){
+    var b = e.target.closest("button"); if(!b) return;
+    state.unit = b.dataset.unit; syncSegs(); save(); bindProjectFields(); bindLoanFields(); render();
+  });
+  document.getElementById("basisSeg").addEventListener("click", function(e){
+    var b = e.target.closest("button"); if(!b) return;
+    state.basis = b.dataset.basis; syncSegs(); save(); render();
+  });
+
+  document.addEventListener("keydown", function(e){
+    if((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === "s"){
+      e.preventDefault();
+      offer("kfc-stage-record-backup.json", JSON.stringify(state, null, 2));
+    }
+  });
+
+  load(); syncSegs(); syncView(); bindProjectFields(); bindLoanFields(); render();
+})();
+</script>

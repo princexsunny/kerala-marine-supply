@@ -89,12 +89,26 @@ app.get(['/Admin.dc.html', '/admin-dashboard.html'], (req, res) =>
   res.redirect(301, '/admin.html')
 );
 
-// The admin page sits behind the same session as the admin API.
-app.get('/admin.html', adminAuth, (req, res) => {
-  // Never let a proxy or the browser cache a signed-in admin page — a later
-  // signed-out visitor on the same machine could otherwise be served it.
-  res.setHeader('Cache-Control', 'no-store, private');
-  res.sendFile(path.join(PUBLIC_DIR, 'admin.html'));
+// Pages that sit behind the same session as the admin API.
+//
+// boat-yard-split.html is on this list for a reason worth spelling out: it
+// holds the yard's funding plan — the Kerala Financial Corporation loan
+// amounts, the split between borrowed and own money, the EMI and the
+// repayment schedule. express.static below serves everything in /public to
+// anyone who asks, so a file dropped in there is on the open internet whether
+// or not anything links to it. Guarding the route is what actually keeps it
+// private; not linking to it is not a control.
+const PRIVATE_PAGES = ['admin.html', 'boat-yard-split.html'];
+
+PRIVATE_PAGES.forEach((page) => {
+  app.get('/' + page, adminAuth, (req, res) => {
+    // Never let a proxy or the browser cache a signed-in page — a later
+    // signed-out visitor on the same machine could otherwise be served it.
+    res.setHeader('Cache-Control', 'no-store, private');
+    // Nor let it be framed or indexed.
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    res.sendFile(path.join(PUBLIC_DIR, page));
+  });
 });
 
 // Already signed in? Skip the login form.
