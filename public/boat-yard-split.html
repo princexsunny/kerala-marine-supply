@@ -158,8 +158,9 @@
   table.stages col.w-own{width:12%}
   table.stages col.w-rec{width:11.5%}
   table.stages col.w-con{width:12%}
-  table.stages col.w-left{width:10%}
-  table.stages col.w-btn{width:8.5%}
+  table.stages col.w-left{width:9.5%}
+  table.stages col.w-left2{width:9.5%}
+  table.stages col.w-btn{width:8%}
   table.summary col.w-s1{width:26%}
   table.summary col.w-s2{width:14%}
   table.summary col.w-s3{width:15%}
@@ -655,7 +656,8 @@
       <div class="stat t4"><div class="k">Received from KFC</div><div class="v" id="sRecd">—</div><div class="p" id="sRecdPct">—</div></div>
       <div class="stat t5"><div class="k">Shalom Marine Services put in</div><div class="v" id="sContrib">—</div><div class="p" id="sContribPct">—</div></div>
       <div class="stat t6"><div class="k">Total funded so far</div><div class="v" id="sFunded">—</div><div class="p">Received plus contribution</div></div>
-      <div class="stat t7"><div class="k">Still to fund</div><div class="v" id="sDue">—</div><div class="p">On stages entered</div></div>
+      <div class="stat t4"><div class="k">Due from KFC</div><div class="v" id="sDueK">—</div><div class="p" id="sDueKp">—</div></div>
+      <div class="stat t5"><div class="k">Still to put in yourself</div><div class="v" id="sDueO">—</div><div class="p" id="sDueOp">—</div></div>
       <!-- Money and work are different questions. This one answers the second. -->
       <div class="stat t1"><div class="k">Work completed</div><div class="v" id="sDone">—</div><div class="p" id="sDonePct">—</div></div>
     </div>
@@ -1181,7 +1183,30 @@
     set("sRecd",    function(){ return money(totalsNow().recd); });
     set("sContrib", function(){ return money(totalsNow().contrib); });
     set("sFunded",  function(){ return money(totalsNow().funded); });
-    set("sDue",     function(){ var x = totalsNow(); return money(Math.max(x.sA - x.funded, 0)); });
+    /* The one figure split in two, because "still to fund" never said who by.
+       Measured against each side's share of the stages entered so far. */
+    set("sDueK", function(){
+      var x = totalsNow();
+      return money(Math.max(x.sA*x.r - x.recd, 0));
+    });
+    set("sDueKp", function(){
+      var x = totalsNow(), owed = x.sA*x.r;
+      if(owed <= 0) return "No stages entered yet";
+      var left = owed - x.recd;
+      return left <= 0.5 ? "Fully released against these stages"
+                         : pct(left/owed) + " of their share still to come";
+    });
+    set("sDueO", function(){
+      var x = totalsNow();
+      return money(Math.max(x.sA*(1-x.r) - x.contrib, 0));
+    });
+    set("sDueOp", function(){
+      var x = totalsNow(), owed = x.sA*(1-x.r);
+      if(owed <= 0) return "No stages entered yet";
+      var left = owed - x.contrib;
+      return left <= 0.5 ? "Your share is fully in"
+                         : pct(left/owed) + " of your share still to find";
+    });
     set("sRecdPct", function(){ var x = totalsNow(), k = x.t*x.r; return k > 0 ? pct(x.recd/k) + " of the term loan" : "—"; });
     set("sContribPct", function(){
       var x = totalsNow(), o = x.t*(1-x.r);
@@ -1613,14 +1638,14 @@
     var scroll = el("div","scroll");
     var tbl = el("table","stages");
     var cg = el("colgroup");
-    ["subj","w-amt","w-kfc","w-own","w-rec","w-con","w-left","w-btn"].forEach(function(c){
+    ["subj","w-amt","w-kfc","w-own","w-rec","w-con","w-left","w-left2","w-btn"].forEach(function(c){
       cg.appendChild(el("col", c));
     });
     tbl.appendChild(cg);
     var thead = el("thead");
 
     var g = el("tr","grp");
-    [["",2,null],["Planned split",2,"gh"],["Funded so far",2,"gh"],["",2,null]].forEach(function(p){
+    [["",2,null],["Planned split",2,"gh"],["Funded so far",2,"gh"],["Still to come",2,"gh"],["",1,null]].forEach(function(p){
       var th = el("th", p[2], p[0]); th.colSpan = p[1]; g.appendChild(th);
     });
     thead.appendChild(g);
@@ -1629,13 +1654,14 @@
     [["Stage — as per quotation","subj"],["Amount","n"],
      ["KFC share","n c-kfc"],[OWNER + " share","n c-own"],
      ["Received from KFC","n c-kfc2"],[OWNER + " put in","n c-own2"],
-     ["Still to fund","n c-res"],["","n"]
+     ["Due from KFC","n c-kfc"],[OWNER + " to put in","n c-own"],["","n"]
     ].forEach(function(p){ hr.appendChild(el("th",p[1],p[0])); });
     thead.appendChild(hr);
     tbl.appendChild(thead);
 
     var STAGE_LABELS = ["Stage — as per quotation","Amount","KFC share",OWNER + " share",
-                        "Received from KFC",OWNER + " put in","Still to fund",""];
+                        "Received from KFC",OWNER + " put in",
+                        "Due from KFC",OWNER + " to put in",""];
     var tb = el("tbody");
     h.stages.forEach(function(s,j){
       var tr = el("tr", s.locked ? "locked" : null);
@@ -1763,10 +1789,22 @@
       else cell(tr,"n c-own2").appendChild(moneyInput("n",
         function(){ return s.contrib; }, function(v){ s.contrib = v; }, OWNER + " contribution for this stage"));
 
-      calc(cell(tr,"n pos c-res"), function(n){
-        var left = s.amount - (s.received + s.contrib);
-        n.textContent = fmt(left);
-        n.className = "n pos c-res " + (left <= 0.5 ? "clear" : "due");
+      /* One balance per side, so the row says WHO still owes what rather than
+         a single figure that hides it. Neither is clamped at zero, which means
+         the two always add back to the old "still to fund" total — and an
+         over-release by one side shows as a negative against that side
+         instead of silently absorbing the other's shortfall. */
+      calc(cell(tr,"n pos c-kfc"), function(n){
+        var d = s.amount*kfcRatio() - s.received;
+        n.textContent = fmt(d);
+        n.className = "n pos c-kfc " + (d <= 0.5 ? "clear" : "due");
+        n.title = d < -0.5 ? "KFC has released more than this stage's share" : "";
+      });
+      calc(cell(tr,"n pos c-own"), function(n){
+        var d = s.amount*(1-kfcRatio()) - s.contrib;
+        n.textContent = fmt(d);
+        n.className = "n pos c-own " + (d <= 0.5 ? "clear" : "due");
+        n.title = d < -0.5 ? OWNER + " has put in more than this stage's share" : "";
       });
 
       var t8 = cell(tr,"rowbtns");
@@ -1801,7 +1839,7 @@
     if(!h.stages.length){
       var tr0 = el("tr");
       var td0 = cell(tr0,null,"No stages yet.");
-      td0.colSpan = 8; td0.style.color = "var(--ink-faint)";
+      td0.colSpan = 9; td0.style.color = "var(--ink-faint)";
       tb.appendChild(tr0);
     }else{
       var trT = el("tr","tot");
@@ -1812,8 +1850,15 @@
       calc(cell(trT,"n c-own"), function(n){ n.textContent = fmt(sum(function(s){return s.amount;})*(1-kfcRatio())); });
       calc(cell(trT,"n c-kfc2"), function(n){ n.textContent = fmt(sum(function(s){return s.received;})); });
       calc(cell(trT,"n c-own2"), function(n){ n.textContent = fmt(sum(function(s){return s.contrib;})); });
-      calc(cell(trT,"n pos c-res"),   function(n){
-        n.textContent = fmt(sum(function(s){return s.amount;}) - sum(function(s){return s.received + s.contrib;}));
+      calc(cell(trT,"n pos c-kfc"), function(n){
+        var d = sum(function(s){return s.amount;})*kfcRatio() - sum(function(s){return s.received;});
+        n.textContent = fmt(d);
+        n.className = "n pos c-kfc " + (d <= 0.5 ? "clear" : "due");
+      });
+      calc(cell(trT,"n pos c-own"), function(n){
+        var d = sum(function(s){return s.amount;})*(1-kfcRatio()) - sum(function(s){return s.contrib;});
+        n.textContent = fmt(d);
+        n.className = "n pos c-own " + (d <= 0.5 ? "clear" : "due");
       });
       cell(trT,"n","");
       labelRow(trT, STAGE_LABELS);
@@ -1941,7 +1986,7 @@
     var rows = [[proj().name + " — KFC stage split & funding record"],
                 ["Sanction","KFC/MCB, TVM/777/2025-26 dated 22.12.2025"],
                 ["All figures in rupees"],[],
-                ["Cost head","Stage","Amount","KFC share",OWNER+" share","Received from KFC",OWNER+" put in","Still to fund","Status","Work completed","Completed on","Steps done"]];
+                ["Cost head","Stage","Amount","KFC share",OWNER+" share","Received from KFC",OWNER+" put in","Due from KFC",OWNER+" to put in","Status","Work completed","Completed on","Steps done"]];
     var tA=0,tK=0,tR=0,tC=0;
     heads().forEach(function(h){
       if(!h.stages.length){
@@ -1952,20 +1997,22 @@
         tA+=s.amount; tK+=s.amount*r; tR+=s.received; tC+=s.contrib;
         rows.push([h.label, s.name || "Untitled stage", Math.round(s.amount), Math.round(s.amount*r),
                    Math.round(s.amount*(1-r)), Math.round(s.received), Math.round(s.contrib),
-                   Math.round(s.amount - s.received - s.contrib), s.locked ? "Saved" : "Draft",
+                   Math.round(s.amount*r - s.received), Math.round(s.amount*(1-r) - s.contrib),
+                   s.locked ? "Saved" : "Draft",
                    s.done ? "Yes" : "No", s.doneDate || "",
                    s.subs.length ? (s.subs.filter(function(x){return x.done;}).length + " of " + s.subs.length) : ""]);
         /* Each step on its own line under its stage, so the export carries the
            actual record of what was done and when — not just a tally. */
         s.subs.forEach(function(sub){
-          rows.push(["", "   ↳ " + (sub.name || "step"), "", "", "", "", "", "",
+          rows.push(["", "   ↳ " + (sub.name || "step"), "", "", "", "", "", "", "",
                      sub.done ? "Done" : "Not done", "", sub.date || "", ""]);
         });
       });
     });
     rows.push([]);
     var pg = progressNow();
-    rows.push(["TOTAL OF STAGES","",Math.round(tA),Math.round(tK),Math.round(tA-tK),Math.round(tR),Math.round(tC),Math.round(tA-tR-tC),"",
+    rows.push(["TOTAL OF STAGES","",Math.round(tA),Math.round(tK),Math.round(tA-tK),Math.round(tR),Math.round(tC),
+               Math.round(tK-tR),Math.round((tA-tK)-tC),"",
                pg.done + " of " + pg.n + " stages", "", pg.steps ? (pg.stepsDone + " of " + pg.steps) : ""]);
     rows.push([]);
     var total = totalCost();
