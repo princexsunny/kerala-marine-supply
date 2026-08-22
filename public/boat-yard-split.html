@@ -518,6 +518,59 @@
     .gval{font-size:8pt}
   }
   @media (prefers-reduced-motion:reduce){#toast{transition:none}}
+
+  /* ── Releases: the sanction is a promise, these are the arrivals ───────── */
+  .rel{margin-top:1.4rem;border-top:1px solid var(--line);padding-top:1.1rem}
+  .rel-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .rel-head h3{font-size:.95rem;margin:0;letter-spacing:.01em}
+  table.rels{width:100%;border-collapse:collapse;margin-top:.5rem}
+  table.rels th,table.rels td{padding:.45rem .5rem;border-bottom:1px solid var(--line-soft);
+    text-align:left;font-size:.86rem;vertical-align:middle}
+  table.rels thead th{font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint)}
+  table.rels .n{text-align:right;font-family:"IBM Plex Mono",monospace}
+  table.rels tfoot th{border-bottom:none;border-top:2px solid var(--line);font-weight:700}
+  col.w-rdate{width:9.5rem} col.w-ramt{width:8.5rem} col.w-rbtn{width:2.6rem}
+  table.rels input[type=date]{width:100%}
+  /* How much of the sanction has actually landed. */
+  .relbars{margin-top:.75rem}
+  .relbar{height:.5rem;border-radius:99px;background:var(--track);overflow:hidden}
+  .relbar span{display:block;height:100%;background:var(--m-kfc);border-radius:99px;
+    transition:width .25s ease}
+  .rellab{display:flex;justify-content:space-between;gap:1rem;margin-top:.35rem;
+    font-size:.72rem;color:var(--ink-faint);letter-spacing:.02em}
+
+  /* ── Stage progress: done, and the steps within ───────────────────────── */
+  .prog{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.4rem}
+  .tick{display:inline-flex;align-items:center;gap:.35rem;border:1px solid var(--line);
+    background:var(--card);border-radius:99px;padding:.2rem .6rem;font-size:.74rem;
+    font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:inherit}
+  .tick:hover{border-color:var(--ok)}
+  .tick[aria-pressed=true]{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+  .tick .box{width:.72rem;height:.72rem;border:1.5px solid currentColor;border-radius:.18rem;
+    display:inline-block;position:relative}
+  .tick[aria-pressed=true] .box::after{content:"";position:absolute;left:.16rem;top:.01rem;
+    width:.22rem;height:.44rem;border:solid currentColor;border-width:0 1.6px 1.6px 0;
+    transform:rotate(45deg)}
+  .prog input[type=date]{font-size:.72rem;padding:.15rem .3rem}
+  .steplink{background:none;border:none;padding:.2rem 0;font:inherit;font-size:.74rem;
+    color:var(--ink-faint);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+  .steplink:hover{color:var(--ink)}
+  .steps{margin:.5rem 0 .1rem;padding:.5rem .6rem;background:var(--sunken);
+    border:1px solid var(--line-soft);border-radius:.35rem}
+  .step{display:flex;align-items:center;gap:.45rem;padding:.22rem 0}
+  .step input[type=text]{flex:1;min-width:0;font-size:.78rem;padding:.2rem .35rem;
+    border:1px solid var(--field-line);border-radius:.25rem;background:var(--field);font-family:inherit}
+  .step input[type=date]{font-size:.72rem;padding:.15rem .3rem;width:8.6rem}
+  .step .del{flex:none}
+  .step.is-done input[type=text]{color:var(--ink-faint);text-decoration:line-through}
+  .stepadd{margin-top:.35rem}
+  .donetag{display:inline-flex;align-items:center;gap:.3rem;font-size:.7rem;font-weight:700;
+    letter-spacing:.05em;text-transform:uppercase;color:var(--ok);background:var(--ok-bg);
+    border-radius:99px;padding:.12rem .5rem}
+  @media (max-width:640px){
+    col.w-rdate{width:7.5rem} col.w-ramt{width:6.5rem}
+    .step input[type=date]{width:7.4rem}
+  }
 </style>
 
 <div class="wrap">
@@ -591,6 +644,8 @@
       <div class="stat t5"><div class="k">Shalom Marine Services put in</div><div class="v" id="sContrib">—</div><div class="p" id="sContribPct">—</div></div>
       <div class="stat t6"><div class="k">Total funded so far</div><div class="v" id="sFunded">—</div><div class="p">Received plus contribution</div></div>
       <div class="stat t7"><div class="k">Still to fund</div><div class="v" id="sDue">—</div><div class="p">On stages entered</div></div>
+      <!-- Money and work are different questions. This one answers the second. -->
+      <div class="stat t1"><div class="k">Work completed</div><div class="v" id="sDone">—</div><div class="p" id="sDonePct">—</div></div>
     </div>
   </div>
 
@@ -690,6 +745,31 @@
         </div>
       </div>
       <p class="note" id="termsNote"></p>
+
+      <div class="rel">
+        <div class="rel-head">
+          <h3>Money actually released</h3>
+          <button type="button" class="ghost" id="addRel">+ Add a release</button>
+        </div>
+        <p class="note" id="relNote"></p>
+        <div class="scroll">
+          <table class="rels">
+            <colgroup><col class="w-rdate"><col><col class="w-ramt"><col class="w-rbtn"></colgroup>
+            <thead><tr>
+              <th>Date received</th><th>What it was for</th><th class="n">Amount</th><th></th>
+            </tr></thead>
+            <tbody id="relBody"></tbody>
+            <tfoot><tr>
+              <th>Total released</th><th></th>
+              <th class="n" id="relTotal">—</th><th></th>
+            </tr></tfoot>
+          </table>
+        </div>
+        <div class="relbars">
+          <div class="relbar"><span id="relFill"></span></div>
+          <div class="rellab"><span id="relDrawnLab">—</span><span id="relLeftLab">—</span></div>
+        </div>
+      </div>
     </section>
 
     <div class="card">
@@ -801,13 +881,30 @@
   /* every reader goes through these, so nothing has to know about the array */
   function proj(){ return state.projects[state.active_p] || state.projects[0]; }
   function heads(){ return proj().heads; }
+  var subSeq = 0;
+  function normSub(x){
+    x = x || {};
+    return {
+      id: x.id || ("sb" + (++subSeq)),
+      name: String(x.name || ""),
+      done: !!x.done,
+      date: String(x.date || "")
+    };
+  }
   function normStage(s){
     return {
       name: String((s && s.name) || ""),
       amount: num(s && s.amount),
       received: num(s && s.received),
       contrib: num(s && s.contrib),
-      locked: !!(s && s.locked)
+      locked: !!(s && s.locked),
+      /* Work progress, kept separate from money on purpose. A stage can be
+         paid for and unfinished, or finished and unpaid; folding the two into
+         one number hides exactly the situation worth seeing. */
+      done: !!(s && s.done),
+      doneDate: String((s && s.doneDate) || ""),
+      subs: (s && Array.isArray(s.subs)) ? s.subs.map(normSub) : [],
+      open: !!(s && s.open)
     };
   }
   function adopt(p){
@@ -837,6 +934,12 @@
         paid[k] = {amt:num(e.amt), date:String(e.date || "")};
       });
     }
+    /* The sanction is one number; the money arrives in parts. Each entry is
+       one actual release with the date it landed. */
+    var releases = (Array.isArray(L.releases) ? L.releases : []).map(function(r){
+      r = r || {};
+      return {id: r.id || ("R" + (++loanSeq)), amt: num(r.amt), date: String(r.date || ""), note: String(r.note || "")};
+    });
     var ladder = Array.isArray(L.ladder) && L.ladder.length ? L.ladder : (seed.ladder || null);
     var method = ["ladder","equal","emi"].indexOf(L.method) >= 0 ? L.method : (ladder ? "ladder" : "equal");
     if(method === "ladder" && !ladder) method = "equal";
@@ -854,8 +957,42 @@
       years: L.years === undefined ? 4.5 : Math.max(0.1, num(L.years)),
       method: method,
       ladder: ladder,
+      releases: releases,
       paid: paid
     };
+  }
+
+  /* ---- what has actually been released ----------------------------------
+     A sanction of 70 lakh does not mean 70 lakh in the account. Interest is
+     owed on money received, not money promised, so every figure below works
+     from the releases when there are any — and falls back to the sanctioned
+     amount when there are none, so a loan nobody has itemised behaves exactly
+     as it did before. */
+  function hasReleases(L){ return !!(L.releases && L.releases.length); }
+  function drawnOf(L){
+    if(!hasReleases(L)) return L.amount;
+    return L.releases.reduce(function(a,r){ return a + r.amt; }, 0);
+  }
+  function undrawnOf(L){ return Math.max(0, L.amount - drawnOf(L)); }
+  /* Total released on or before the given date. Undated releases are counted
+     from the start rather than dropped — money in the account is money in the
+     account, and forgetting to type a date should not make it vanish. */
+  function releasedBy(L, iso){
+    if(!hasReleases(L)) return L.amount;
+    /* No usable date to compare against — no drawal date set yet — so the
+       releases cannot be sequenced. Count them all rather than none: showing
+       a zero balance for money that is demonstrably in the account would be
+       worse than ignoring the timing. */
+    if(!iso) return drawnOf(L);
+    return L.releases.reduce(function(a,r){
+      return a + ((!r.date || r.date <= iso) ? r.amt : 0);
+    }, 0);
+  }
+  /* The clock starts when the first money lands. */
+  function firstDrawISO(L){
+    var d = L.draw || "";
+    L.releases.forEach(function(r){ if(r.date && (!d || r.date < d)) d = r.date; });
+    return d;
   }
   function normLoans(arr){
     if(!Array.isArray(arr) || !arr.length){
@@ -1029,6 +1166,29 @@
       var x = totalsNow(), o = x.t*(1-x.r);
       return o > 0 ? pct(x.contrib/o) + " of the contribution due" : "—";
     });
+    set("sDone", function(){
+      var p = progressNow();
+      return p.n ? p.done + " of " + p.n + " stages" : "—";
+    });
+    set("sDonePct", function(){
+      var p = progressNow();
+      if(!p.n) return "No stages entered yet";
+      /* By value, not by count: five small stages finished and the big one
+         outstanding is not half the job done. */
+      return p.amt > 0 ? pct(p.doneAmt/p.amt) + " of the work by value" : "—";
+    });
+  }
+
+  /* How much of the work is finished, counted two ways. */
+  function progressNow(){
+    var n = 0, done = 0, amt = 0, doneAmt = 0, steps = 0, stepsDone = 0;
+    eachStage(function(s){
+      n++; amt += s.amount;
+      if(s.done){ done++; doneAmt += s.amount; }
+      steps += s.subs.length;
+      stepsDone += s.subs.filter(function(x){ return x.done; }).length;
+    });
+    return {n:n, done:done, amt:amt, doneAmt:doneAmt, steps:steps, stepsDone:stepsDone};
   }
 
   /* ───────── loan ─────────
@@ -1078,29 +1238,63 @@
   /* One schedule builder for every loan.
      Moratorium either serves the interest each month or capitalises it. */
   function schedule(L){
-    var rows = [], bal = L.amount, mr = (L.rate/100)/12, n = 0;
+    var start = firstDrawISO(L);
+    var mr = (L.rate/100)/12, rows = [], n = 0;
+    /* `cap` is interest that has been rolled into the balance; the released
+       principal is looked up per month rather than carried, so a tranche that
+       lands in month three starts costing interest in month three and not
+       before. */
+    /* dISO(null) is "", so a missing or unreadable date falls through to the
+       "count everything" branch in releasedBy rather than throwing. */
+    function atMonth(i){ return dISO(addMonths(start, i)); }
+    var cap = 0, bal = releasedBy(L, atMonth(0));
+    /* A row dated 1 April charges for the month that ENDED on 1 April, so its
+       balance is the money held at the START of that month. Money released on
+       1 April has not been held for any of it and first attracts interest in
+       the row dated 1 May. Using the closing balance instead would charge a
+       full month's interest on a tranche the day it landed. */
+    var prevBal = 0;
     for(var i = 1; i <= L.moro; i++){
       n++;
+      var d = addMonths(start, i);
+      var held = releasedBy(L, atMonth(i - 1));
+      bal = held + cap;
       var mi = bal * mr;
-      rows.push({n:n, k:0, key:"m"+i, date:addMonths(L.draw, i),
-                 open:bal, prin:0, intr:mi, moro:true, cap:L.moroMode === "cap"});
-      if(L.moroMode === "cap") bal += mi;
+      rows.push({n:n, k:0, key:"m"+i, date:d,
+                 open:bal, prin:0, intr:mi, moro:true, cap:L.moroMode === "cap",
+                 rel: held - prevBal});
+      prevBal = held;
+      if(L.moroMode === "cap"){ cap += mi; }
     }
+    /* Repayment opens on whatever has been released by then, plus any interest
+       that was capitalised during the moratorium. */
+    bal = releasedBy(L, atMonth(L.moro)) + cap;
     var base = bal, N = termMonths(L);
     var scale = (L.method === "ladder" && L.ladder && ladderTotal(L) > 0) ? base / ladderTotal(L) : 1;
     var pay = L.method === "emi" ? annuity(base, mr, N) : 0;
+    var relSoFar = releasedBy(L, atMonth(L.moro));
     for(var k = 1; k <= N; k++){
       n++;
+      var d2 = addMonths(start, L.moro + k);
+      /* Money released after repayment has already begun still has to join the
+         balance, or the schedule would quietly repay less than was borrowed.
+         Same start-of-period rule as above. */
+      var relNow = releasedBy(L, atMonth(L.moro + k - 1)), lateRel = relNow - relSoFar;
+      if(lateRel > 0){ bal += lateRel; relSoFar = relNow; }
       var intr = bal * mr, prin;
       if(L.method === "ladder" && L.ladder) prin = ladderStep(L, k) * scale;
       else if(L.method === "emi") prin = pay - intr;
       else prin = base / N;
       if(prin > bal || k === N) prin = bal;
       if(prin < 0) prin = 0;
-      rows.push({n:n, k:k, key:"i"+k, date:addMonths(L.draw, L.moro + k),
-                 open:bal, prin:prin, intr:intr, moro:false});
+      rows.push({n:n, k:k, key:"i"+k, date:d2,
+                 open:bal, prin:prin, intr:intr, moro:false, rel:lateRel > 0 ? lateRel : 0});
       bal -= prin;
     }
+    /* A tail is possible when the ladder was written for the full sanction and
+       less was drawn, or when money arrived after the last instalment. Say so
+       rather than letting the numbers quietly not add up. */
+    rows.tail = bal;
     rows.forEach(function(r){
       r.due = r.prin + r.intr;
       var e = L.paid[r.key] || {amt:0, date:""};
@@ -1125,7 +1319,8 @@
       if(!next && r.status !== "paid") next = r;
     });
     return {rows:rows, prin:prin, intr:intr, paid:paid, late:late, lateN:lateN,
-            next:next, totInt:totInt, out:L.amount - prin};
+            next:next, totInt:totInt, out:drawnOf(L) - prin,
+            drawn:drawnOf(L), undrawn:undrawnOf(L), tail:rows.tail || 0};
   }
 
   function renderLoan(){
@@ -1163,11 +1358,23 @@
 
     /* this loan */
     var st = loanStats(L), rows = st.rows, N = termMonths(L);
-    document.getElementById("kDrawn").textContent = money(L.amount);
+    /* This tile used to read "Sanctioned" and show the sanction. Once releases
+       are recorded it shows what has actually been drawn — that is the number
+       every other figure on the page is built from, so it is the one that
+       belongs here. */
+    var kd = document.getElementById("kDrawn");
+    var kdLabel = kd.parentNode.querySelector(".k");
+    if(hasReleases(L)){
+      kdLabel.textContent = "Released so far";
+      kd.textContent = money(st.drawn);
+    }else{
+      kdLabel.textContent = "Sanctioned";
+      kd.textContent = money(L.amount);
+    }
     document.getElementById("kTenure").textContent =
       N + " instalments · " + (Math.round(N/12*100)/100) + " years" + (L.moro ? " after " + L.moro + " months moratorium" : "");
     document.getElementById("kPrin").textContent  = money(st.prin);
-    document.getElementById("kPrinPct").textContent = L.amount > 0 ? pctText(pctOf(st.prin, L.amount)) + " of the loan" : "—";
+    document.getElementById("kPrinPct").textContent = st.drawn > 0 ? pctText(pctOf(st.prin, st.drawn)) + " of the drawn amount" : "—";
     document.getElementById("kInt").textContent   = money(st.intr);
     document.getElementById("kOut").textContent   = money(st.out);
     document.getElementById("kPaid").textContent  = money(st.paid);
@@ -1247,7 +1454,10 @@
     }
     document.getElementById("loanNote").textContent =
       "Interest each month is the opening balance × " + L.rate + "% ÷ 12. "
-      + "Enter what you actually paid and the date; a row turns Paid once the amount covers the total due.";
+      + "Enter what you actually paid and the date; a row turns Paid once the amount covers the total due."
+      + (hasReleases(L)
+          ? " The balance starts from the money released, and each release begins earning interest from its own date."
+          : "");
   }
 
   /* ───────── charts ─────────
@@ -1420,6 +1630,97 @@
         t1.appendChild(ta);
       }
 
+      /* ---- work progress ---------------------------------------------------
+         Deliberately below the description and outside the money columns.
+         Whether the work is finished and whether it has been paid for are two
+         different facts, and the whole point of tracking both is being able to
+         see when they disagree. Locking a row freezes the figures, not the
+         progress — work carries on after the paperwork is filed. */
+      var prog = el("div","prog");
+
+      var tick = el("button","tick");
+      tick.type = "button";
+      tick.setAttribute("aria-pressed", String(s.done));
+      tick.appendChild(el("span","box"));
+      tick.appendChild(el("span",null, s.done ? "Completed" : "Mark completed"));
+      tick.setAttribute("aria-label", (s.done ? "Mark as not finished: " : "Mark as completed: ") + (s.name || "stage " + (j+1)));
+      tick.addEventListener("click", function(){
+        s.done = !s.done;
+        /* Stamp the date on the way in, and let go of it on the way out, so a
+           stage never carries a completion date it has not reached. */
+        if(s.done && !s.doneDate) s.doneDate = todayISO();
+        if(!s.done) s.doneDate = "";
+        save(); render();
+        toast(s.done ? "Marked completed." : "Reopened — no longer marked completed.");
+      });
+      prog.appendChild(tick);
+
+      if(s.done){
+        var dd = el("input"); dd.type = "date"; dd.value = s.doneDate;
+        dd.setAttribute("aria-label","Date this stage was completed");
+        dd.addEventListener("change", function(){ s.doneDate = dd.value; save(); render(); });
+        prog.appendChild(dd);
+      }
+
+      var nDone = s.subs.filter(function(x){ return x.done; }).length;
+      var steps = el("button","steplink");
+      steps.type = "button";
+      /* The tally stays visible while the panel is open. Having to collapse the
+         steps to find out how many are done is the wrong way round. */
+      var tally = s.subs.length ? " — " + nDone + " of " + s.subs.length + " done" : "";
+      steps.textContent = s.open ? "Hide steps" + tally
+                                 : (s.subs.length ? "Steps" + tally : "+ Add steps");
+      steps.setAttribute("aria-expanded", String(!!s.open));
+      steps.addEventListener("click", function(){ s.open = !s.open; save(); render(); });
+      prog.appendChild(steps);
+
+      t1.appendChild(prog);
+
+      if(s.open){
+        var box = el("div","steps");
+        s.subs.forEach(function(sub, si){
+          var row = el("div","step" + (sub.done ? " is-done" : ""));
+
+          var cb = el("input"); cb.type = "checkbox"; cb.checked = sub.done;
+          cb.setAttribute("aria-label","Step done: " + (sub.name || "step " + (si+1)));
+          cb.addEventListener("change", function(){
+            sub.done = cb.checked;
+            if(sub.done && !sub.date) sub.date = todayISO();
+            if(!sub.done) sub.date = "";
+            save(); render();
+          });
+          row.appendChild(cb);
+
+          var nm = el("input"); nm.type = "text"; nm.value = sub.name;
+          nm.placeholder = "e.g. foundation poured";
+          nm.setAttribute("aria-label","What this step is");
+          nm.addEventListener("input", function(){ sub.name = nm.value; save(); });
+          row.appendChild(nm);
+
+          var dt = el("input"); dt.type = "date"; dt.value = sub.date;
+          dt.setAttribute("aria-label","Date this step was done");
+          dt.addEventListener("change", function(){ sub.date = dt.value; save(); render(); });
+          row.appendChild(dt);
+
+          var rmx = el("button","del","✕");
+          rmx.type = "button"; rmx.title = "Remove this step";
+          rmx.setAttribute("aria-label","Remove step " + (si+1));
+          rmx.addEventListener("click", function(){ s.subs.splice(si,1); save(); render(); });
+          row.appendChild(rmx);
+
+          box.appendChild(row);
+        });
+
+        var add = el("button","ghost stepadd","+ Add a step");
+        add.type = "button";
+        add.addEventListener("click", function(){
+          s.subs.push(normSub({}));
+          s.open = true; save(); render();
+        });
+        box.appendChild(add);
+        t1.appendChild(box);
+      }
+
       /* amount */
       if(s.locked) cell(tr,"n").appendChild(el("span","lockval", fmt(s.amount)));
       else cell(tr,"n").appendChild(moneyInput("n", function(){ return s.amount; }, function(v){ s.amount = v; }, "Stage amount"));
@@ -1502,7 +1803,10 @@
     var add = el("button","ghost addrow","+ Add stage");
     add.type="button";
     add.addEventListener("click",function(){
-      h.stages.push({name:"",amount:0,received:0,contrib:0,locked:false});
+      /* Through normStage, not a hand-written object literal. A literal here
+         was missing `subs` and `done` the moment those fields were added, and
+         every new stage crashed the render. One constructor, one shape. */
+      h.stages.push(normStage(null));
       save(); render();
       var anchor = document.getElementById("head-" + h.id);
       if(anchor){
@@ -1580,6 +1884,16 @@
     state.loans.forEach(function(L){
       var rows = schedule(L);
       out.push([L.name]);
+      out.push(["Sanctioned",Math.round(L.amount),"Released",Math.round(drawnOf(L)),
+                "Still to be released",Math.round(undrawnOf(L))]);
+      if(hasReleases(L)){
+        out.push([]);
+        out.push(["Releases — date","What it was for","Amount"]);
+        L.releases.slice().sort(function(a,b){ return (a.date||"9999") < (b.date||"9999") ? -1 : 1; })
+          .forEach(function(r){ out.push([r.date || "(no date)", r.note || "", Math.round(r.amt)]); });
+        out.push(["Total released","",Math.round(drawnOf(L))]);
+        out.push([]);
+      }
       out.push(["Amount",Math.round(L.amount),"Rate % p.a.",L.rate,
                 "First drawal",L.draw || "(not set)",
                 "Moratorium months",L.moro,
@@ -1602,7 +1916,7 @@
     var rows = [[proj().name + " — KFC stage split & funding record"],
                 ["Sanction","KFC/MCB, TVM/777/2025-26 dated 22.12.2025"],
                 ["All figures in rupees"],[],
-                ["Cost head","Stage","Amount","KFC share",OWNER+" share","Received from KFC",OWNER+" put in","Still to fund","Status"]];
+                ["Cost head","Stage","Amount","KFC share",OWNER+" share","Received from KFC",OWNER+" put in","Still to fund","Status","Work completed","Completed on","Steps done"]];
     var tA=0,tK=0,tR=0,tC=0;
     heads().forEach(function(h){
       if(!h.stages.length){
@@ -1613,11 +1927,21 @@
         tA+=s.amount; tK+=s.amount*r; tR+=s.received; tC+=s.contrib;
         rows.push([h.label, s.name || "Untitled stage", Math.round(s.amount), Math.round(s.amount*r),
                    Math.round(s.amount*(1-r)), Math.round(s.received), Math.round(s.contrib),
-                   Math.round(s.amount - s.received - s.contrib), s.locked ? "Saved" : "Draft"]);
+                   Math.round(s.amount - s.received - s.contrib), s.locked ? "Saved" : "Draft",
+                   s.done ? "Yes" : "No", s.doneDate || "",
+                   s.subs.length ? (s.subs.filter(function(x){return x.done;}).length + " of " + s.subs.length) : ""]);
+        /* Each step on its own line under its stage, so the export carries the
+           actual record of what was done and when — not just a tally. */
+        s.subs.forEach(function(sub){
+          rows.push(["", "   ↳ " + (sub.name || "step"), "", "", "", "", "", "",
+                     sub.done ? "Done" : "Not done", "", sub.date || "", ""]);
+        });
       });
     });
     rows.push([]);
-    rows.push(["TOTAL OF STAGES","",Math.round(tA),Math.round(tK),Math.round(tA-tK),Math.round(tR),Math.round(tC),Math.round(tA-tR-tC),""]);
+    var pg = progressNow();
+    rows.push(["TOTAL OF STAGES","",Math.round(tA),Math.round(tK),Math.round(tA-tK),Math.round(tR),Math.round(tC),Math.round(tA-tR-tC),"",
+               pg.done + " of " + pg.n + " stages", "", pg.steps ? (pg.stepsDone + " of " + pg.steps) : ""]);
     rows.push([]);
     var total = totalCost();
     rows.push(["Cost of project","",Math.round(total)]);
@@ -1702,6 +2026,89 @@
     toast(nm2 + " removed.");
   });
 
+  /* ---- the releases table ------------------------------------------------ */
+  function renderReleases(){
+    var L = state.loans[state.active];
+    var body = document.getElementById("relBody");
+    if(!body) return;
+    body.textContent = "";
+
+    /* Oldest first, and undated entries last so a half-filled row does not
+       jump to the top of the record while it is being typed. */
+    var order = L.releases.slice().sort(function(a,b){
+      if(!a.date) return 1;
+      if(!b.date) return -1;
+      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    });
+
+    if(!order.length){
+      var tr0 = el("tr");
+      var td0 = el("td", null, "No releases recorded yet — every figure below is working from the sanctioned amount.");
+      td0.colSpan = 4; td0.className = "muted";
+      tr0.appendChild(td0); body.appendChild(tr0);
+    }
+
+    order.forEach(function(r){
+      var tr = el("tr");
+
+      var d = el("input"); d.type = "date"; d.value = r.date;
+      d.setAttribute("aria-label", "Date this money was received");
+      d.onchange = function(){ r.date = d.value; save(); renderLoan(); renderReleases(); };
+      cell(tr, null).appendChild(d);
+
+      var t = el("input"); t.type = "text"; t.className = "txtfield"; t.value = r.note;
+      t.placeholder = "e.g. first instalment against the shed";
+      t.setAttribute("aria-label", "What this release was for");
+      t.oninput = function(){ r.note = t.value; save(); };
+      cell(tr, null).appendChild(t);
+
+      cell(tr, "n").appendChild(moneyInput("n act",
+        function(){ return r.amt; },
+        function(v){ r.amt = v; renderLoan(); renderReleases(); },
+        "Amount received"));
+
+      var x = el("button", "del", "✕");
+      x.type = "button"; x.title = "Remove this release";
+      x.setAttribute("aria-label", "Remove this release");
+      x.onclick = function(){
+        L.releases = L.releases.filter(function(o){ return o !== r; });
+        save(); renderLoan(); renderReleases();
+        toast("Release removed.");
+      };
+      cell(tr, "n").appendChild(x);
+
+      body.appendChild(tr);
+    });
+
+    var drawn = drawnOf(L), left = undrawnOf(L);
+    document.getElementById("relTotal").textContent = hasReleases(L) ? money(drawn) : "—";
+
+    var pctDrawn = L.amount > 0 ? Math.max(0, Math.min(100, drawn / L.amount * 100)) : 0;
+    document.getElementById("relFill").style.width = pctDrawn + "%";
+    document.getElementById("relDrawnLab").textContent =
+      hasReleases(L) ? money(drawn) + " received · " + pctText(pctDrawn) + " of the sanction"
+                     : "Nothing recorded yet";
+    document.getElementById("relLeftLab").textContent =
+      hasReleases(L) ? (left > 0.5 ? money(left) + " still to come" : "Fully released")
+                     : money(L.amount) + " sanctioned";
+
+    var note = document.getElementById("relNote");
+    if(!hasReleases(L)){
+      note.textContent = "KFC rarely releases a sanction in one go. Add each amount as it reaches the account, "
+        + "with its date, and the interest, the balance and the repayment schedule below will all be worked out "
+        + "on the money actually received rather than the full sanction.";
+    }else if(drawn > L.amount + 0.5){
+      note.className = "note warn";
+      note.textContent = "The releases add up to " + money(drawn - L.amount) + " more than the sanctioned amount. "
+        + "Check the figures — or raise the sanction above if it was revised.";
+    }else{
+      note.className = "note";
+      note.textContent = "Interest, the outstanding balance and the schedule below are all being worked out on "
+        + money(drawn) + " — the money actually received"
+        + (left > 0.5 ? ", not the " + money(L.amount) + " sanctioned." : ".");
+    }
+  }
+
   function bindLoanFields(){
     var L = state.loans[state.active];
 
@@ -1732,6 +2139,15 @@
         save(); bindLoanFields(); renderLoan();
       };
     }
+
+    document.getElementById("addRel").onclick = function(){
+      /* Dated today by default: the overwhelmingly common case is entering a
+         release on the day it lands, and a date that is already right is one
+         fewer thing to get wrong. */
+      L.releases.push({id:"R"+(++loanSeq), amt:0, date:todayISO(), note:""});
+      save(); renderLoan(); renderReleases();
+      toast("Release added — type the amount it was for.");
+    };
 
     txt("lName", function(){ return L.name; }, function(v){ L.name = v; });
     moneyF("lAmt", function(){ return L.amount; }, function(v){ L.amount = v; });
@@ -1772,6 +2188,10 @@
     Array.prototype.forEach.call(document.querySelectorAll("#lFilter button"), function(b){
       b.setAttribute("aria-pressed", String(b.dataset.f === state.filter));
     });
+
+    /* Drawn last: the releases table is bound to this loan, so it has to be
+       rebuilt whenever the fields are. */
+    renderReleases();
   }
 
   document.getElementById("addLoan").addEventListener("click", function(){
