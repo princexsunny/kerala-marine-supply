@@ -80,6 +80,36 @@
   .page-body h2{display:none}
   .page-body section{padding:0;border-bottom:none}
   a.tile{text-decoration:none}
+  /* --- Documents: a slim bar and a fold-away upload tray ---------------- */
+  .docbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:18px;
+          padding:12px 14px;border:2px solid var(--color-divider);background:var(--color-bg);
+          transition:border-color .15s,background .15s}
+  .docbar .note{margin-top:0}
+  /* The whole bar is the drop target, and it says so when something is over it. */
+  .docbar.over{border-color:var(--color-accent);background:var(--color-accent-100)}
+  .uptray{border:2px solid var(--color-divider);border-top:none;padding:14px;background:var(--color-surface)}
+  .uprow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .uprow .upto{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-700);font-weight:600}
+  /* The native file input is unstyleable; the label is the button. */
+  .uptray input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+  .filebtn{cursor:pointer}
+  .uphint{margin:10px 0 0;font-size:12px;color:var(--color-neutral-700)}
+  .queue{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .queue:empty{display:none}
+  .qitem{display:inline-flex;align-items:center;gap:7px;max-width:20rem;font-size:12.5px;
+         border:1px solid var(--color-neutral-300);background:var(--color-bg);padding:4px 6px 4px 10px}
+  .qitem .qn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+  .qitem .qs{color:var(--color-neutral-700);font-size:11px;flex:none}
+  .qitem .qx{border:none;background:none;color:var(--color-accent-700);cursor:pointer;
+             font:inherit;font-size:13px;font-weight:700;line-height:1;padding:0 2px;flex:none}
+  .qitem .qx:hover{color:var(--color-accent)}
+  .qitem.done{opacity:.5}
+  @media(max-width:700px){
+    .uprow{gap:8px}
+    .uprow select,.uprow input[type=text]{flex:1 1 100%}
+    .qitem{max-width:100%}
+  }
+
   /* --- Documents as folders -------------------------------------------- */
   .folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:18px}
   .folder{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;
@@ -264,21 +294,28 @@
       <div class="page-body">
     <div class="eyebrow">Step 3 · Documents</div>
     <h2>Document library</h2>
-    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Licences, LOIs, quotations, the investor one-pager. Up to 200 MB, stored on the server.</p>
-    <div id="drop" class="drop">
-      <div style="font-family:var(--font-heading);font-weight:800;font-size:16px;margin-bottom:6px">Drag files here</div>
-      <p style="margin:0 0 14px;font-size:13px;color:var(--color-neutral-700)">or choose them below</p>
-      <input type="file" id="docFile" multiple>
-    </div>
-    <div class="row">
-      <select id="docCategory"></select>
-      <input type="text" id="docNewCat" placeholder="Name the new category" hidden>
-      <button class="btn btn-primary" id="uploadDoc">Upload to this category</button>
-      <button class="btn btn-ghost" id="refreshDocs">Refresh list</button>
+
+    <!-- A slim bar, not a page of controls. The folders are what you came for,
+         so the upload tray stays folded away until it is wanted. -->
+    <div id="drop" class="docbar">
+      <button type="button" class="btn btn-primary" id="openUp" aria-expanded="false" aria-controls="upTray">+ Upload files</button>
+      <button type="button" class="btn btn-ghost" id="refreshDocs">Refresh</button>
+      <span class="note" id="docCount"></span>
       <span class="note" id="docNote"></span>
     </div>
-    <div class="row" style="margin-top:6px">
-      <span class="note" id="docCount"></span>
+
+    <div class="uptray" id="upTray" hidden>
+      <div class="uprow">
+        <label class="btn btn-ghost filebtn" for="docFile">Choose files</label>
+        <input type="file" id="docFile" multiple>
+        <span class="upto">into</span>
+        <select id="docCategory" aria-label="Folder to upload into"></select>
+        <input type="text" id="docNewCat" placeholder="Name the new folder" hidden>
+        <button class="btn btn-primary" id="uploadDoc">Upload</button>
+        <button type="button" class="btn btn-ghost" id="closeUp">Cancel</button>
+      </div>
+      <div class="queue" id="upQueue"></div>
+      <p class="uphint">Drag files anywhere on this page to add them. Up to 200 MB each, stored on the server.</p>
     </div>
 
     <!-- Two views of the same list: the folders, and one folder open. -->
@@ -696,49 +733,123 @@
 
   // ---- Documents ----
   var queue = [];
+  var tray = document.getElementById('upTray');
+  var openUpBtn = document.getElementById('openUp');
+
+  function trayOpen(on){
+    tray.hidden = !on;
+    openUpBtn.setAttribute('aria-expanded', String(!!on));
+    openUpBtn.textContent = on ? 'Hide upload' : '+ Upload files';
+    if(!on){ queue = []; renderQueue(); }
+  }
+  openUpBtn.addEventListener('click', function(){ trayOpen(tray.hidden); });
+  document.getElementById('closeUp').addEventListener('click', function(){
+    trayOpen(false);
+    setNote('docNote', '');
+  });
+
+  /* The files waiting to go up, each removable. Picking six and finding one is
+     wrong should not mean starting the selection again. */
+  function renderQueue(){
+    var box = document.getElementById('upQueue');
+    box.innerHTML = '';
+    queue.forEach(function(f, i){
+      var d = document.createElement('span');
+      d.className = 'qitem';
+      d.innerHTML = '<span class="qn"></span><span class="qs">' + fmtSize(f.size) + '</span>' +
+                    '<button type="button" class="qx" aria-label="Remove ' + esc(f.name) + '">✕</button>';
+      d.querySelector('.qn').textContent = f.name;   // a filename is not to be trusted as markup
+      d.querySelector('.qx').addEventListener('click', function(){
+        queue.splice(i, 1); renderQueue();
+        setNote('docNote', queue.length ? queue.length + ' file(s) ready.' : 'Nothing chosen.');
+      });
+      box.appendChild(d);
+    });
+  }
+
+  function addToQueue(files){
+    var add = Array.prototype.slice.call(files || []);
+    if(!add.length) return;
+    /* Added to what is already there, and de-duplicated by name and size, so
+       dropping the same file twice does not upload it twice. */
+    add.forEach(function(f){
+      var dup = queue.some(function(q){ return q.name === f.name && q.size === f.size; });
+      if(!dup) queue.push(f);
+    });
+    trayOpen(true);
+    renderQueue();
+    setNote('docNote', queue.length + ' file(s) ready — choose a folder and press Upload.');
+  }
+
+  /* Dropping anywhere on the Documents page works, not only on one box. The
+     bar highlights so there is still somewhere obvious aiming at. */
   var drop = document.getElementById('drop');
+  var docPanel = document.getElementById('panel-docs');
   ['dragover','dragenter'].forEach(function(evt){
-    drop.addEventListener(evt, function(e){ e.preventDefault(); drop.classList.add('over'); });
+    docPanel.addEventListener(evt, function(e){ e.preventDefault(); drop.classList.add('over'); });
   });
   ['dragleave','dragend'].forEach(function(evt){
-    drop.addEventListener(evt, function(){ drop.classList.remove('over'); });
+    docPanel.addEventListener(evt, function(e){
+      if(e.target === docPanel || !docPanel.contains(e.relatedTarget)) drop.classList.remove('over');
+    });
   });
-  drop.addEventListener('drop', function(e){
+  docPanel.addEventListener('drop', function(e){
     e.preventDefault();
     drop.classList.remove('over');
-    queue = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
-    setNote('docNote', queue.length ? queue.length + ' file(s) ready — pick a category and upload.' : 'Nothing was dropped.');
+    var files = (e.dataTransfer && e.dataTransfer.files) || [];
+    if(files.length) addToQueue(files);
+    else setNote('docNote', 'Nothing was dropped.');
   });
+
   document.getElementById('docFile').addEventListener('change', function(e){
-    queue = Array.from(e.target.files || []);
-    setNote('docNote', queue.length ? queue.length + ' file(s) ready.' : '');
+    addToQueue(e.target.files);
+    e.target.value = '';   // so the same file can be chosen again after removing it
   });
+
   document.getElementById('uploadDoc').addEventListener('click', function(){
-    if(!queue.length){ setNote('docNote', 'Drop or choose a file first.'); return; }
+    if(!queue.length){ setNote('docNote', 'Choose or drop a file first.'); return; }
     var category = chosenCategory();
-    if(!category){ setNote('docNote', 'Name the new category, or pick one from the list.'); return; }
+    if(!category){ setNote('docNote', 'Name the new folder, or pick one from the list.'); return; }
+    var btn = this;
+    btn.disabled = true;
+    var total = queue.length, done = 0;
+
     uploadNext(0);
-    function uploadNext(i){
-      if(i >= queue.length){
-        setNote('docNote', queue.length + ' file(s) uploaded to ' + category + '.');
+    function finish(msg, bad){
+      btn.disabled = false;
+      setNote('docNote', msg);
+      loadDocs();
+      if(!bad){
+        trayOpen(false);
         // Land in the folder they went to, rather than back at the grid
         // wondering whether it worked.
-        if(openFolder() !== category) history.pushState({}, '', 'admin.html?p=docs&f=' + encodeURIComponent(category));
-        queue = [];
-        loadDocs();
+        if(openFolder() !== category){
+          history.pushState({}, '', 'admin.html?p=docs&f=' + encodeURIComponent(category));
+        }
+      }
+    }
+    function uploadNext(i){
+      if(i >= queue.length){
+        finish(done + ' of ' + total + ' file(s) uploaded to ' + category + '.', done !== total);
         return;
       }
       var f = queue[i];
-      setNote('docNote', 'Uploading ' + (i+1) + ' of ' + queue.length + ' — ' + f.name + '…');
+      setNote('docNote', 'Uploading ' + (i+1) + ' of ' + total + ' — ' + f.name + '…');
+      var chip = document.querySelectorAll('#upQueue .qitem')[i];
       var fd = new FormData();
       fd.append('category', category);
       fd.append('file', f);
       fetch('/api/documents', { method:'POST', body: fd })
         .then(function(r){ if(!r.ok) return r.json().then(function(b){ throw new Error(b.error||'Upload failed'); }); return r.json(); })
-        .then(function(){ uploadNext(i+1); })
-        .catch(function(err){ setNote('docNote', f.name + ': ' + err.message); });
+        .then(function(){ done++; if(chip) chip.className = 'qitem done'; uploadNext(i+1); })
+        .catch(function(err){
+          /* Stop and say which one failed, rather than carrying on and
+             reporting a total that hides it. */
+          finish(f.name + ': ' + err.message + (done ? ' (' + done + ' uploaded before it)' : ''), true);
+        });
     }
   });
+
   document.getElementById('refreshDocs').addEventListener('click', loadDocs);
 
   // The categories that always exist, plus any that files are actually filed
