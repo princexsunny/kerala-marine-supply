@@ -80,13 +80,26 @@
   .page-body h2{display:none}
   .page-body section{padding:0;border-bottom:none}
   a.tile{text-decoration:none}
-  /* --- Documents, grouped by category ---------------------------------- */
-  .filterlab{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-700);font-weight:600}
-  .dgroup{margin-top:26px}
-  .dgroup > h3{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 2px;
-               font-size:14px;font-weight:800;letter-spacing:-0.01em}
-  .dgroup > h3 .n{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  /* --- Documents as folders -------------------------------------------- */
+  .folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:18px}
+  .folder{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;
+          cursor:pointer;background:var(--color-bg);border:2px solid var(--color-divider);
+          padding:16px 16px 14px;font:inherit;color:var(--color-text);
+          transition:border-color .15s,box-shadow .15s,transform .15s}
+  .folder:hover{border-color:var(--color-accent);box-shadow:0 6px 18px rgba(32,30,29,.07);
+                transform:translateY(-1px)}
+  .folder:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
+  .folder svg{width:30px;height:30px;color:var(--color-accent);margin-bottom:4px}
+  .folder .f-name{font-family:var(--font-heading);font-weight:800;font-size:14.5px;line-height:1.25}
+  .folder .f-meta{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
                   color:var(--color-neutral-500)}
+  .folder.empty{opacity:.6}
+  .folderhead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:22px 0 0;
+              padding-bottom:12px;border-bottom:2px solid var(--color-divider)}
+  .folderhead h3{margin:0;font-size:19px;font-weight:800;letter-spacing:-0.02em}
+  .folderhead .n{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+                 color:var(--color-neutral-500)}
+  .folderhead .page-back{order:-1;flex-basis:100%}
   .dgroup table{margin-top:4px}
   .dname{font-weight:600}
   .drow.editing{background:var(--color-surface)}
@@ -265,11 +278,20 @@
       <span class="note" id="docNote"></span>
     </div>
     <div class="row" style="margin-top:6px">
-      <label class="filterlab" for="docFilter">Showing</label>
-      <select id="docFilter"><option value="">Every category</option></select>
       <span class="note" id="docCount"></span>
     </div>
-    <div id="docGroups"></div>
+
+    <!-- Two views of the same list: the folders, and one folder open. -->
+    <div id="docFolders" class="folders"></div>
+
+    <div id="docOpen" hidden>
+      <div class="folderhead">
+        <a class="page-back" href="admin.html?p=docs" id="docBack">← All folders</a>
+        <h3 id="docOpenName"></h3>
+        <span class="n" id="docOpenMeta"></span>
+      </div>
+      <div id="docGroups"></div>
+    </div>
     <p class="note" id="docsEmpty"></p>
   </div>
     </div>
@@ -699,6 +721,9 @@
     function uploadNext(i){
       if(i >= queue.length){
         setNote('docNote', queue.length + ' file(s) uploaded to ' + category + '.');
+        // Land in the folder they went to, rather than back at the grid
+        // wondering whether it worked.
+        if(openFolder() !== category) history.pushState({}, '', 'admin.html?p=docs&f=' + encodeURIComponent(category));
         queue = [];
         loadDocs();
         return;
@@ -765,44 +790,45 @@
     return String(catNew.value || '').trim();
   }
 
-  var filterSel = document.getElementById('docFilter');
-  filterSel.addEventListener('change', renderDocs);
+  // Which folder is open lives in the URL, the same way the admin's own
+  // category pages do. That means the browser's Back button, a refresh, a
+  // bookmark and open-in-new-tab all behave the way anyone would expect,
+  // rather than a click-only state that a refresh throws away.
+  function openFolder(){
+    return new URLSearchParams(location.search).get('f') || '';
+  }
+  function goFolder(name){
+    var u = 'admin.html?p=docs' + (name ? '&f=' + encodeURIComponent(name) : '');
+    history.pushState({}, '', u);
+    renderDocs();
+    window.scrollTo(0, 0);
+  }
 
   function loadDocs(){
     api('GET', '/api/documents').then(function(list){
       docList = list || [];
-      var keepCat = catSel.value, keepFilter = filterSel.value;
+      var keepCat = catSel.value;
       fillCatSelect(catSel, keepCat === '__new' ? null : keepCat, true);
       if(keepCat === '__new'){ catSel.value = '__new'; catNew.hidden = false; }
-
-      filterSel.innerHTML = '<option value="">Every category</option>';
-      allCats().forEach(function(c){
-        var o = document.createElement('option');
-        o.value = c; o.textContent = c;
-        filterSel.appendChild(o);
-      });
-      filterSel.value = keepFilter || '';
-
       renderDocs();
     }).catch(function(err){ setNote('docNote', err.message); });
   }
 
-  function renderDocs(){
-    var box = document.getElementById('docGroups');
-    box.innerHTML = '';
-    var only = filterSel.value;
+  var FOLDER_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+    'stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M3 7.5a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.5.7l1 1.2a2 2 0 0 0 1.5.6H19a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>' +
+    '</svg>';
 
-    // Grouped by category rather than one flat list. With everything filed as
-    // "Other" that made no difference; the moment there are three categories
-    // and thirty files it is the difference between a library and a heap.
+  function groupDocs(){
     var groups = {};
     docList.forEach(function(d){
       var c = (d.category || 'Other').trim() || 'Other';
-      if(only && c !== only) return;
       (groups[c] = groups[c] || []).push(d);
     });
-
-    var names = Object.keys(groups).sort(function(a, b){
+    return groups;
+  }
+  function sortCats(names){
+    return names.sort(function(a, b){
       // Built-ins first in their given order, then anything invented, A–Z.
       var ia = BUILTIN_CATS.indexOf(a), ib = BUILTIN_CATS.indexOf(b);
       if(ia !== -1 && ib !== -1) return ia - ib;
@@ -810,76 +836,131 @@
       if(ib !== -1) return 1;
       return a.localeCompare(b);
     });
-
-    names.forEach(function(cat){
-      var docs = groups[cat];
-      var bytes = docs.reduce(function(a, d){ return a + (d.size || 0); }, 0);
-      var wrap = document.createElement('div');
-      wrap.className = 'dgroup';
-      wrap.innerHTML = '<h3>' + esc(cat) +
-        '<span class="n">' + docs.length + (docs.length === 1 ? ' file' : ' files') +
-        ' · ' + fmtSize(bytes) + '</span></h3>' +
-        '<table><thead><tr><th>Document</th><th>Type</th><th>Size</th>' +
-        '<th style="text-align:right">Actions</th></tr></thead><tbody></tbody></table>';
-      var tb = wrap.querySelector('tbody');
-
-      docs.forEach(function(d){
-        var tr = document.createElement('tr');
-        tr.className = 'drow' + (editingId === d.id ? ' editing' : '');
-        tr.dataset.id = d.id;
-
-        if(editingId === d.id){
-          var nameTd = document.createElement('td');
-          var input = document.createElement('input');
-          input.type = 'text'; input.value = d.name; input.className = 'ename';
-          input.setAttribute('aria-label', 'Document name');
-          nameTd.appendChild(input);
-          var catTd = document.createElement('td');
-          catTd.colSpan = 2;
-          var sel = document.createElement('select');
-          sel.className = 'ecat';
-          sel.setAttribute('aria-label', 'Category');
-          fillCatSelect(sel, d.category, true);
-          var newIn = document.createElement('input');
-          newIn.type = 'text'; newIn.className = 'ecatnew';
-          newIn.placeholder = 'Name the new category';
-          newIn.hidden = true;
-          sel.addEventListener('change', function(){
-            newIn.hidden = sel.value !== '__new';
-            if(!newIn.hidden){ newIn.value = ''; newIn.focus(); }
-          });
-          catTd.appendChild(sel);
-          catTd.appendChild(newIn);
-          var actTd = document.createElement('td');
-          actTd.innerHTML = '<div class="acts">' +
-            '<button class="btn btn-primary esave" style="font-size:12px;padding:6px 12px">Save</button>' +
-            '<button class="edt ecancel">Cancel</button></div>';
-          tr.appendChild(nameTd); tr.appendChild(catTd); tr.appendChild(actTd);
-        }else{
-          tr.innerHTML =
-            '<td class="dname">' + esc(d.name) + '</td>' +
-            '<td>' + esc(d.type || '—') + '</td>' +
-            '<td>' + fmtSize(d.size) + '</td>' +
-            '<td><div class="acts">' +
-              '<a href="' + d.url + '" target="_blank" rel="noopener">Open ↗</a>' +
-              '<button class="edt edit">Edit</button>' +
-              '<button class="del" data-name="' + esc(d.name) + '">Delete</button>' +
-            '</div></td>';
-        }
-        tb.appendChild(tr);
-      });
-      box.appendChild(wrap);
-    });
-
-    var shown = docList.filter(function(d){ return !only || (d.category || 'Other') === only; }).length;
-    document.getElementById('docCount').textContent = docList.length
-      ? (only ? shown + ' of ' + docList.length + ' shown' : docList.length + ' in ' + names.length +
-         (names.length === 1 ? ' category' : ' categories'))
-      : '';
-    document.getElementById('docsEmpty').textContent = docList.length
-      ? (shown ? '' : 'Nothing filed under ' + only + ' yet.')
-      : 'No documents uploaded yet.';
   }
+
+  function renderDocs(){
+    var open = openFolder();
+    var groups = groupDocs();
+    var names = sortCats(Object.keys(groups));
+    /* Built-in categories are always offered as folders, even empty, so there
+       is somewhere obvious to put the first licence. An invented category with
+       nothing left in it disappears on its own. */
+    BUILTIN_CATS.forEach(function(c){ if(names.indexOf(c) === -1) names.push(c); });
+    names = sortCats(names);
+
+    var foldersBox = document.getElementById('docFolders');
+    var openBox = document.getElementById('docOpen');
+
+    if(!open){
+      openBox.hidden = true;
+      foldersBox.hidden = false;
+      foldersBox.innerHTML = '';
+      names.forEach(function(cat){
+        var docs = groups[cat] || [];
+        var bytes = docs.reduce(function(a, d){ return a + (d.size || 0); }, 0);
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'folder' + (docs.length ? '' : ' empty');
+        b.dataset.cat = cat;
+        b.innerHTML = FOLDER_SVG +
+          '<span class="f-name">' + esc(cat) + '</span>' +
+          '<span class="f-meta">' + (docs.length
+            ? docs.length + (docs.length === 1 ? ' file · ' : ' files · ') + fmtSize(bytes)
+            : 'Empty') + '</span>';
+        b.setAttribute('aria-label', 'Open ' + cat + ', ' + docs.length + ' files');
+        foldersBox.appendChild(b);
+      });
+      document.getElementById('docCount').textContent = docList.length
+        ? docList.length + (docList.length === 1 ? ' file in ' : ' files in ') +
+          Object.keys(groups).length + (Object.keys(groups).length === 1 ? ' folder' : ' folders')
+        : '';
+      document.getElementById('docsEmpty').textContent = docList.length
+        ? '' : 'No documents uploaded yet. Choose a folder above when you upload.';
+      return;
+    }
+
+    /* A folder is open. */
+    foldersBox.hidden = true;
+    openBox.hidden = false;
+    var docs = groups[open] || [];
+    var bytes = docs.reduce(function(a, d){ return a + (d.size || 0); }, 0);
+    document.getElementById('docOpenName').textContent = open;
+    document.getElementById('docOpenMeta').textContent = docs.length
+      ? docs.length + (docs.length === 1 ? ' file · ' : ' files · ') + fmtSize(bytes)
+      : 'Empty';
+    document.getElementById('docCount').textContent = '';
+
+    var box = document.getElementById('docGroups');
+    box.innerHTML = '';
+    if(!docs.length){
+      document.getElementById('docsEmpty').textContent = 'Nothing filed under ' + open + ' yet.';
+      return;
+    }
+    document.getElementById('docsEmpty').textContent = '';
+
+    var wrap = document.createElement('div');
+    wrap.className = 'dgroup';
+    wrap.innerHTML = '<table><thead><tr><th>Document</th><th>Type</th><th>Size</th>' +
+      '<th style="text-align:right">Actions</th></tr></thead><tbody></tbody></table>';
+    var tb = wrap.querySelector('tbody');
+
+    docs.forEach(function(d){
+      var tr = document.createElement('tr');
+      tr.className = 'drow' + (editingId === d.id ? ' editing' : '');
+      tr.dataset.id = d.id;
+
+      if(editingId === d.id){
+        var nameTd = document.createElement('td');
+        var input = document.createElement('input');
+        input.type = 'text'; input.value = d.name; input.className = 'ename';
+        input.setAttribute('aria-label', 'Document name');
+        nameTd.appendChild(input);
+        var catTd = document.createElement('td');
+        catTd.colSpan = 2;
+        var sel = document.createElement('select');
+        sel.className = 'ecat';
+        sel.setAttribute('aria-label', 'Folder');
+        fillCatSelect(sel, d.category, true);
+        var newIn = document.createElement('input');
+        newIn.type = 'text'; newIn.className = 'ecatnew';
+        newIn.placeholder = 'Name the new folder';
+        newIn.hidden = true;
+        sel.addEventListener('change', function(){
+          newIn.hidden = sel.value !== '__new';
+          if(!newIn.hidden){ newIn.value = ''; newIn.focus(); }
+        });
+        catTd.appendChild(sel);
+        catTd.appendChild(newIn);
+        var actTd = document.createElement('td');
+        actTd.innerHTML = '<div class="acts">' +
+          '<button class="btn btn-primary esave" style="font-size:12px;padding:6px 12px">Save</button>' +
+          '<button class="edt ecancel">Cancel</button></div>';
+        tr.appendChild(nameTd); tr.appendChild(catTd); tr.appendChild(actTd);
+      }else{
+        tr.innerHTML =
+          '<td class="dname">' + esc(d.name) + '</td>' +
+          '<td>' + esc(d.type || '—') + '</td>' +
+          '<td>' + fmtSize(d.size) + '</td>' +
+          '<td><div class="acts">' +
+            '<a href="' + d.url + '" target="_blank" rel="noopener">Open ↗</a>' +
+            '<button class="edt edit">Edit</button>' +
+            '<button class="del" data-name="' + esc(d.name) + '">Delete</button>' +
+          '</div></td>';
+      }
+      tb.appendChild(tr);
+    });
+    box.appendChild(wrap);
+  }
+
+  document.getElementById('docFolders').addEventListener('click', function(e){
+    var f = e.target.closest && e.target.closest('button.folder');
+    if(!f) return;
+    goFolder(f.dataset.cat);
+  });
+  document.getElementById('docBack').addEventListener('click', function(e){
+    e.preventDefault();
+    goFolder('');
+  });
 
   // Delegated so it keeps working after the list is re-rendered.
   document.getElementById('docGroups').addEventListener('click', function(e){
@@ -1116,7 +1197,12 @@
     }
     window.scrollTo(0, 0);
   }
-  window.addEventListener('popstate', showPage);  // back/forward buttons
+  window.addEventListener('popstate', function(){
+    showPage();
+    // The open folder is part of the URL too, so Back out of a folder has to
+    // redraw the list, not just the page.
+    try{ renderDocs(); }catch(e){}
+  });
   showPage();
 
   loadPhotos();
