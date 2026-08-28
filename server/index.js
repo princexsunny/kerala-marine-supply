@@ -19,6 +19,7 @@ const {
 } = require('./routes/ventureLinks');
 const documentsRoutes = require('./routes/documents');
 const { router: recordRoutes } = require('./routes/records');
+const { router: roadmapRoutes } = require('./routes/roadmaps');
 const applicationsRoutes = require('./routes/applications');
 
 const app = express();
@@ -84,6 +85,9 @@ app.use('/api', adminAuth, applicationsRoutes);
 // Private working records — the boat yard funding sheet. Admin-only to read as
 // well as write; there is no public half of this one.
 app.use('/api', adminAuth, recordRoutes);
+// Roadmaps — working notes and plans. Admin-only both ways; these are not
+// published pages and much of what goes in them is commercially sensitive.
+app.use('/api', adminAuth, roadmapRoutes);
 
 // Admin.dc.html and admin-dashboard.html were removed — admin.html is the only
 // admin page now. Old bookmarks and stale tabs still point at those URLs, and a
