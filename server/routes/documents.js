@@ -82,6 +82,57 @@ router.get('/documents', async (req, res) => {
   }
 });
 
+// PATCH /api/documents/:id — rename a document, or move it to another
+// category. The stored FILE is untouched: only the label and the filing
+// change. Renaming the object in Storage would break the signed URL that is
+// already recorded, and there is no reason to move bytes to change a name.
+const MAX_NAME = 160;
+const MAX_CATEGORY = 60;
+
+router.patch('/documents/:id', async (req, res) => {
+  try {
+    init();
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+
+  const body = req.body || {};
+  const patch = {};
+
+  if (body.name !== undefined) {
+    const name = String(body.name).trim();
+    if (!name) return res.status(400).json({ error: 'A document needs a name.' });
+    if (name.length > MAX_NAME) {
+      return res.status(400).json({ error: `That name is too long (${MAX_NAME} characters maximum).` });
+    }
+    patch.name = name;
+  }
+
+  if (body.category !== undefined) {
+    const category = String(body.category).trim();
+    if (!category) return res.status(400).json({ error: 'Pick a category.' });
+    if (category.length > MAX_CATEGORY) {
+      return res.status(400).json({ error: `That category name is too long (${MAX_CATEGORY} characters maximum).` });
+    }
+    patch.category = category;
+  }
+
+  if (!Object.keys(patch).length) {
+    return res.status(400).json({ error: 'Nothing to change.' });
+  }
+
+  try {
+    const ref = admin.firestore().collection('documents').doc(String(req.params.id));
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'That document is no longer here.' });
+    await ref.update(patch);
+    res.json({ ok: true, ...patch });
+  } catch (err) {
+    console.error('PATCH /api/documents failed:', err);
+    res.status(500).json({ error: 'Could not save the change.' });
+  }
+});
+
 router.delete('/documents/:id', async (req, res) => {
   try {
     init();

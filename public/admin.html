@@ -80,6 +80,27 @@
   .page-body h2{display:none}
   .page-body section{padding:0;border-bottom:none}
   a.tile{text-decoration:none}
+  /* --- Documents, grouped by category ---------------------------------- */
+  .filterlab{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-700);font-weight:600}
+  .dgroup{margin-top:26px}
+  .dgroup > h3{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 2px;
+               font-size:14px;font-weight:800;letter-spacing:-0.01em}
+  .dgroup > h3 .n{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+                  color:var(--color-neutral-500)}
+  .dgroup table{margin-top:4px}
+  .dname{font-weight:600}
+  .drow.editing{background:var(--color-surface)}
+  .drow input[type=text]{width:100%;padding:6px 9px;border:2px solid var(--color-divider);
+                         background:var(--color-bg);color:var(--color-text);font:inherit;font-size:13px}
+  .drow select{width:100%;font-size:13px;padding:6px 9px}
+  .drow .acts{display:flex;gap:8px;justify-content:flex-end;align-items:center;white-space:nowrap}
+  button.edt{border:2px solid var(--color-divider);background:none;color:var(--color-text);
+             font:inherit;font-size:12px;font-weight:600;padding:4px 10px;cursor:pointer}
+  button.edt:hover:not(:disabled){border-color:var(--color-accent);color:var(--color-accent-700)}
+  @media(max-width:700px){
+    .drow .acts{flex-wrap:wrap;justify-content:flex-start}
+    #docGroups table{white-space:normal}
+  }
   @media(max-width:700px){.page-box{padding:0 20px}}
 
   /* --- Phones. You will sometimes be adding a photo from the yard on your
@@ -237,22 +258,18 @@
       <input type="file" id="docFile" multiple>
     </div>
     <div class="row">
-      <select id="docCategory">
-        <option>Licences</option>
-        <option>Agreements &amp; LOIs</option>
-        <option>Quotations</option>
-        <option>Investor</option>
-        <option>Photos &amp; plans</option>
-        <option>Other</option>
-      </select>
+      <select id="docCategory"></select>
+      <input type="text" id="docNewCat" placeholder="Name the new category" hidden>
       <button class="btn btn-primary" id="uploadDoc">Upload to this category</button>
       <button class="btn btn-ghost" id="refreshDocs">Refresh list</button>
       <span class="note" id="docNote"></span>
     </div>
-    <table>
-      <thead><tr><th>Document</th><th>Category</th><th>Type</th><th>Size</th><th style="text-align:right">Link</th></tr></thead>
-      <tbody id="docRows"></tbody>
-    </table>
+    <div class="row" style="margin-top:6px">
+      <label class="filterlab" for="docFilter">Showing</label>
+      <select id="docFilter"><option value="">Every category</option></select>
+      <span class="note" id="docCount"></span>
+    </div>
+    <div id="docGroups"></div>
     <p class="note" id="docsEmpty"></p>
   </div>
     </div>
@@ -676,7 +693,8 @@
   });
   document.getElementById('uploadDoc').addEventListener('click', function(){
     if(!queue.length){ setNote('docNote', 'Drop or choose a file first.'); return; }
-    var category = document.getElementById('docCategory').value;
+    var category = chosenCategory();
+    if(!category){ setNote('docNote', 'Name the new category, or pick one from the list.'); return; }
     uploadNext(0);
     function uploadNext(i){
       if(i >= queue.length){
@@ -698,40 +716,225 @@
   });
   document.getElementById('refreshDocs').addEventListener('click', loadDocs);
 
+  // The categories that always exist, plus any that files are actually filed
+  // under. Deriving the second half means a category you invent on upload keeps
+  // working without a separate list to maintain — and one you stop using stops
+  // cluttering the menu on its own.
+  var BUILTIN_CATS = ['Licences', 'Agreements & LOIs', 'Quotations', 'Investor',
+                      'Photos & plans', 'Boat yard funding', 'Other'];
+  var docList = [];
+  var editingId = null;
+
+  function allCats(){
+    var seen = {}, out = [];
+    BUILTIN_CATS.concat(docList.map(function(d){ return d.category || 'Other'; }))
+      .forEach(function(c){
+        var k = String(c).trim();
+        if(!k || seen[k.toLowerCase()]) return;
+        seen[k.toLowerCase()] = 1;
+        out.push(k);
+      });
+    return out;
+  }
+
+  function fillCatSelect(sel, chosen, withNew){
+    sel.innerHTML = '';
+    allCats().forEach(function(c){
+      var o = document.createElement('option');
+      o.value = c; o.textContent = c;
+      if(c === chosen) o.selected = true;
+      sel.appendChild(o);
+    });
+    if(withNew){
+      var o2 = document.createElement('option');
+      o2.value = '__new'; o2.textContent = '+ New category…';
+      sel.appendChild(o2);
+    }
+  }
+
+  // The upload picker, and the "+ New category" text box it reveals.
+  var catSel = document.getElementById('docCategory');
+  var catNew = document.getElementById('docNewCat');
+  catSel.addEventListener('change', function(){
+    var isNew = catSel.value === '__new';
+    catNew.hidden = !isNew;
+    if(isNew){ catNew.value = ''; catNew.focus(); }
+  });
+  function chosenCategory(){
+    if(catSel.value !== '__new') return catSel.value;
+    return String(catNew.value || '').trim();
+  }
+
+  var filterSel = document.getElementById('docFilter');
+  filterSel.addEventListener('change', renderDocs);
+
   function loadDocs(){
     api('GET', '/api/documents').then(function(list){
-      var rows = document.getElementById('docRows');
-      rows.innerHTML = '';
-      (list||[]).forEach(function(d){
-        var tr = document.createElement('tr');
-        tr.innerHTML = '<td style="font-weight:600">'+esc(d.name)+'</td><td>'+esc(d.category)+'</td>' +
-          '<td>'+esc(d.type||'—')+'</td><td>'+fmtSize(d.size)+'</td>' +
-          '<td style="text-align:right;white-space:nowrap">' +
-            '<a href="'+d.url+'" target="_blank" rel="noopener">Open ↗</a>' +
-            '<button class="del" data-id="'+esc(d.id)+'" data-name="'+esc(d.name)+'">Delete</button>' +
-          '</td>';
-        rows.appendChild(tr);
+      docList = list || [];
+      var keepCat = catSel.value, keepFilter = filterSel.value;
+      fillCatSelect(catSel, keepCat === '__new' ? null : keepCat, true);
+      if(keepCat === '__new'){ catSel.value = '__new'; catNew.hidden = false; }
+
+      filterSel.innerHTML = '<option value="">Every category</option>';
+      allCats().forEach(function(c){
+        var o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        filterSel.appendChild(o);
       });
-      document.getElementById('docsEmpty').textContent = (list && list.length) ? '' : 'No documents uploaded yet.';
+      filterSel.value = keepFilter || '';
+
+      renderDocs();
     }).catch(function(err){ setNote('docNote', err.message); });
   }
 
-  // Delegated so it keeps working after the table is re-rendered.
-  document.getElementById('docRows').addEventListener('click', function(e){
-    var btn = e.target.closest && e.target.closest('button.del');
-    if(!btn) return;
-    var id = btn.dataset.id, name = btn.dataset.name || 'this document';
-    // Deleting removes the stored file too and cannot be undone, so confirm.
-    if(!confirm('Delete "' + name + '"?\n\nThis permanently removes the file from storage and cannot be undone.')) return;
-    btn.disabled = true;
-    btn.textContent = 'Deleting…';
-    api('DELETE', '/api/documents/' + encodeURIComponent(id))
-      .then(function(){ setNote('docNote', 'Deleted "' + name + '".'); loadDocs(); })
-      .catch(function(err){
-        btn.disabled = false;
-        btn.textContent = 'Delete';
-        setNote('docNote', err.message);
+  function renderDocs(){
+    var box = document.getElementById('docGroups');
+    box.innerHTML = '';
+    var only = filterSel.value;
+
+    // Grouped by category rather than one flat list. With everything filed as
+    // "Other" that made no difference; the moment there are three categories
+    // and thirty files it is the difference between a library and a heap.
+    var groups = {};
+    docList.forEach(function(d){
+      var c = (d.category || 'Other').trim() || 'Other';
+      if(only && c !== only) return;
+      (groups[c] = groups[c] || []).push(d);
+    });
+
+    var names = Object.keys(groups).sort(function(a, b){
+      // Built-ins first in their given order, then anything invented, A–Z.
+      var ia = BUILTIN_CATS.indexOf(a), ib = BUILTIN_CATS.indexOf(b);
+      if(ia !== -1 && ib !== -1) return ia - ib;
+      if(ia !== -1) return -1;
+      if(ib !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    names.forEach(function(cat){
+      var docs = groups[cat];
+      var bytes = docs.reduce(function(a, d){ return a + (d.size || 0); }, 0);
+      var wrap = document.createElement('div');
+      wrap.className = 'dgroup';
+      wrap.innerHTML = '<h3>' + esc(cat) +
+        '<span class="n">' + docs.length + (docs.length === 1 ? ' file' : ' files') +
+        ' · ' + fmtSize(bytes) + '</span></h3>' +
+        '<table><thead><tr><th>Document</th><th>Type</th><th>Size</th>' +
+        '<th style="text-align:right">Actions</th></tr></thead><tbody></tbody></table>';
+      var tb = wrap.querySelector('tbody');
+
+      docs.forEach(function(d){
+        var tr = document.createElement('tr');
+        tr.className = 'drow' + (editingId === d.id ? ' editing' : '');
+        tr.dataset.id = d.id;
+
+        if(editingId === d.id){
+          var nameTd = document.createElement('td');
+          var input = document.createElement('input');
+          input.type = 'text'; input.value = d.name; input.className = 'ename';
+          input.setAttribute('aria-label', 'Document name');
+          nameTd.appendChild(input);
+          var catTd = document.createElement('td');
+          catTd.colSpan = 2;
+          var sel = document.createElement('select');
+          sel.className = 'ecat';
+          sel.setAttribute('aria-label', 'Category');
+          fillCatSelect(sel, d.category, true);
+          var newIn = document.createElement('input');
+          newIn.type = 'text'; newIn.className = 'ecatnew';
+          newIn.placeholder = 'Name the new category';
+          newIn.hidden = true;
+          sel.addEventListener('change', function(){
+            newIn.hidden = sel.value !== '__new';
+            if(!newIn.hidden){ newIn.value = ''; newIn.focus(); }
+          });
+          catTd.appendChild(sel);
+          catTd.appendChild(newIn);
+          var actTd = document.createElement('td');
+          actTd.innerHTML = '<div class="acts">' +
+            '<button class="btn btn-primary esave" style="font-size:12px;padding:6px 12px">Save</button>' +
+            '<button class="edt ecancel">Cancel</button></div>';
+          tr.appendChild(nameTd); tr.appendChild(catTd); tr.appendChild(actTd);
+        }else{
+          tr.innerHTML =
+            '<td class="dname">' + esc(d.name) + '</td>' +
+            '<td>' + esc(d.type || '—') + '</td>' +
+            '<td>' + fmtSize(d.size) + '</td>' +
+            '<td><div class="acts">' +
+              '<a href="' + d.url + '" target="_blank" rel="noopener">Open ↗</a>' +
+              '<button class="edt edit">Edit</button>' +
+              '<button class="del" data-name="' + esc(d.name) + '">Delete</button>' +
+            '</div></td>';
+        }
+        tb.appendChild(tr);
       });
+      box.appendChild(wrap);
+    });
+
+    var shown = docList.filter(function(d){ return !only || (d.category || 'Other') === only; }).length;
+    document.getElementById('docCount').textContent = docList.length
+      ? (only ? shown + ' of ' + docList.length + ' shown' : docList.length + ' in ' + names.length +
+         (names.length === 1 ? ' category' : ' categories'))
+      : '';
+    document.getElementById('docsEmpty').textContent = docList.length
+      ? (shown ? '' : 'Nothing filed under ' + only + ' yet.')
+      : 'No documents uploaded yet.';
+  }
+
+  // Delegated so it keeps working after the list is re-rendered.
+  document.getElementById('docGroups').addEventListener('click', function(e){
+    var tr = e.target.closest && e.target.closest('tr.drow');
+    if(!tr) return;
+    var id = tr.dataset.id;
+    var doc = docList.filter(function(d){ return d.id === id; })[0];
+    if(!doc) return;
+
+    if(e.target.closest('button.edit')){
+      editingId = id; renderDocs();
+      var inp = document.querySelector('tr.drow.editing input.ename');
+      if(inp){ inp.focus(); inp.select(); }
+      return;
+    }
+    if(e.target.closest('button.ecancel')){ editingId = null; renderDocs(); return; }
+
+    if(e.target.closest('button.esave')){
+      var name = String(tr.querySelector('input.ename').value || '').trim();
+      var sel = tr.querySelector('select.ecat');
+      var cat = sel.value === '__new'
+        ? String(tr.querySelector('input.ecatnew').value || '').trim()
+        : sel.value;
+      if(!name){ setNote('docNote', 'A document needs a name.'); return; }
+      if(!cat){ setNote('docNote', 'Name the new category, or pick one from the list.'); return; }
+      var btn = e.target.closest('button.esave');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      api('PATCH', '/api/documents/' + encodeURIComponent(id), {name: name, category: cat})
+        .then(function(){
+          editingId = null;
+          setNote('docNote', 'Saved — "' + name + '" is filed under ' + cat + '.');
+          loadDocs();
+        })
+        .catch(function(err){
+          btn.disabled = false; btn.textContent = 'Save';
+          setNote('docNote', err.message);
+        });
+      return;
+    }
+
+    var del = e.target.closest('button.del');
+    if(del){
+      var nm = del.dataset.name || 'this document';
+      // Deleting removes the stored file too and cannot be undone, so confirm.
+      if(!confirm('Delete "' + nm + '"?\n\nThis permanently removes the file from storage and cannot be undone.')) return;
+      del.disabled = true;
+      del.textContent = 'Deleting…';
+      api('DELETE', '/api/documents/' + encodeURIComponent(id))
+        .then(function(){ setNote('docNote', 'Deleted "' + nm + '".'); loadDocs(); })
+        .catch(function(err){
+          del.disabled = false;
+          del.textContent = 'Delete';
+          setNote('docNote', err.message);
+        });
+    }
   });
 
   // ---- Applications ----
