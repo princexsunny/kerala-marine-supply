@@ -104,9 +104,9 @@
            500px height both survived onto phones, so the headline column was
            139px wide, the photograph was a 99px thumbnail, and ~470px of text
            spilled out of the bottom of the section over what came next. --- */
-    [data-screen-label="Hero"] > div{grid-template-columns:1fr !important;height:auto !important;
+    [data-screen-label="Hero"] > div{grid-template-columns:1fr !important;
+                                     min-height:0 !important;height:auto !important;
                                      gap:28px !important;padding-top:40px !important;padding-bottom:40px !important}
-    [data-screen-label="Hero"] > div > *{top:0 !important}
     [data-screen-label="Hero"] h1{font-size:clamp(32px,9vw,44px) !important}
     [data-screen-label="Hero"] p{font-size:16px !important}
 
@@ -201,8 +201,15 @@
 <main id="top">
 
 <section style="border-bottom:2px solid var(--color-divider)" data-screen-label="Hero">
-  <div style="max-width: 1280px; margin: 0 auto; padding: 76px 40px; display: grid; grid-template-columns: minmax(0,7fr) minmax(0,5fr); gap: 56px; align-items: center; position: relative; height: 500px">
-    <div style="position: relative; top: -55px">
+  <!-- min-height, not height. At 500px fixed the text column (415px of copy plus
+       76px of padding top and bottom) did not fit its own box, which is the only
+       reason both children carried a top:-55px nudge. Letting the section grow
+       removes the cause instead of the symptom, and the picture can then be
+       given real size without pushing anything out.
+       1.05fr/1fr rather than 7fr/5fr: the paragraphs are capped at 52ch and were
+       never using the extra width, so it is better spent on the photograph. -->
+  <div style="max-width: 1280px; margin: 0 auto; padding: 72px 40px; display: grid; grid-template-columns: minmax(0,1.05fr) minmax(0,1fr); gap: 56px; align-items: center; position: relative; min-height: 520px">
+    <div>
       <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--color-accent-700);font-weight:600;margin-bottom:24px">Trivandrum · Kerala · India — Est. 2025</div>
       <h1 style="font-size:clamp(38px,6vw,64px);line-height:1.02;letter-spacing:-0.03em;margin:0 0 24px;font-weight:800">Kerala’s coast is <span style="color:var(--color-accent)">changing.</span></h1>
       <p style="font-size:18px;line-height:1.55;margin:0 0 16px;max-width:52ch;color:var(--color-neutral-800)">590 kilometres of coastline, a new deepwater port at Vizhinjam, and a fishing community that has gone without basic marine infrastructure for decades.</p>
@@ -213,7 +220,9 @@
         <a href="Kerala-Marine-Supply-Investor-Onepager.pdf" class="btn btn-ghost" style="font-size:14px;letter-spacing:0.04em">Investor one-pager (PDF)</a>
       </div>
     </div>
-    <image-slot id="hero" shape="rect" style="width: 100%; aspect-ratio: 4/3; top: -55px" placeholder="Hero photograph — a boat, the yard or the harbour"></image-slot>
+    <!-- 4:3 is kept deliberately: it is what a phone camera gives you, so an
+         uploaded photograph is cropped least. -->
+    <image-slot id="hero" shape="rect" style="width: 100%; aspect-ratio: 4/3" placeholder="Hero photograph — a boat, the yard or the harbour"></image-slot>
   </div>
 </section>
 
