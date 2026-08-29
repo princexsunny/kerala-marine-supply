@@ -214,6 +214,13 @@
   // this script first runs. Rather than guess at a delay, watch the DOM and
   // re-apply until everything the API gave us has landed.
   function applyWhenReady(media) {
+    // Announce the payload for anything else on the page that wants a picture
+    // — the venture ring shows each venture's own photograph in its middle.
+    // One fetch, shared, rather than every component asking the server again.
+    try {
+      window.dispatchEvent(new CustomEvent('kms:media', { detail: media }));
+    } catch (e) {}
+
     if (apply(media)) { finalise(media); return; }
 
     var observer = new MutationObserver(function () {

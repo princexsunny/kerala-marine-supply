@@ -13,19 +13,19 @@
   // Proportions taken from the reference: the circles are small relative to
   // the ring (0.28 of the radius) so the middle stays open enough to hold a
   // two-line title, and the active one is half again the size of the rest.
-  // 195, not 178: the centre now carries eight stacked pieces (label, counter,
-  // a two-line title, rule, status, icon, chevron, hint) and at 178 the tallest
-  // of them came within a few pixels of the circles. The ring has to be opened
-  // up to hold them, which is also what the reference does.
-  var R = 195;              // ring radius
-  var DOT = 50;             // circle diameter
-  var DOT_ACTIVE = 76;
+  // 210, and circles at 54: the centre now shows the venture's own photograph,
+  // which needs about 250px of stacked height. Measured against the ring's
+  // inner clearance rather than guessed — at 195 the photograph would have run
+  // into the circles.
+  var R = 210;              // ring radius
+  var DOT = 54;             // circle diameter
+  var DOT_ACTIVE = 82;      // 1.52x, the same proportion as before
   var BOX = (R + DOT_ACTIVE / 2 + 8) * 2;   // square the ring needs
   // Timing. The ring used to snap round in 620ms, which read as a flick rather
   // than a turn — twelve ventures went past faster than any of them could be
   // read. 1150ms with a soft settle is slow enough to follow the icon you were
   // looking at all the way to the top.
-  var SPIN_MS = 1150;
+  var SPIN_MS = 1000;
   // The cooldown has to be at least as long as the spin, or a second scroll
   // lands mid-turn and the ring never comes to rest anywhere.
   var WHEEL_COOLDOWN = SPIN_MS - 150;
@@ -110,7 +110,7 @@
     '  will-change:transform,opacity}' +
     '.so-item:hover{box-shadow:0 6px 20px rgba(32,30,29,.14),0 0 0 1px rgba(236,48,19,.35);' +
     '  color:var(--color-accent,#ec3013)}' +
-    '.so-item svg{width:26px;height:26px}' +
+    '.so-item svg{width:30px;height:30px}' +
     // The active circle: white still, with the red ring drawn INSIDE it so the
     // outline sits in from the edge with the icon floating clear of it, and a
     // wide soft glow outside rather than a hard second border.
@@ -142,7 +142,7 @@
     '  background:var(--color-accent,#ec3013);opacity:.85}' +
     // Centre label: the ring is decorative without it — this is what tells you
     // which venture you are looking at.
-    '.so-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:' + Math.round(R * 1.25) + 'px;' +
+    '.so-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:' + Math.round(R * 1.15) + 'px;' +
     '  text-align:center}' +
     '.so-open{display:block;background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer;' +
     '  width:100%}' +
@@ -164,14 +164,20 @@
     // names ("Boat Yard") and the long ones.
     '  min-height:44px;display:flex;align-items:center;justify-content:center;' +
     '  transition:color .25s ease}' +
-    '.so-rule{width:26px;height:2px;background:var(--color-accent,#ec3013);margin:11px auto 0;border-radius:2px}' +
     '.so-status{font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;' +
-    '  color:var(--color-neutral-500,#a09b95);margin-top:11px}' +
-    // The active venture's own icon, large and in the accent, as the piece of
-    // artwork at the centre of the ring.
-    '.so-glyph{display:flex;justify-content:center;margin-top:15px;color:var(--color-accent,#ec3013)}' +
-    '.so-glyph svg{width:38px;height:38px}' +
-    '.so-chev{margin-top:13px;color:var(--color-accent,#ec3013);opacity:.5;line-height:1;font-size:13px}' +
+    '  color:var(--color-neutral-500,#a09b95);margin-top:10px}' +
+    // The venture's own photograph, at the centre of its ring. Falls back to
+    // the line icon when a venture has no picture uploaded yet, so the middle
+    // is never an empty hole.
+    '.so-shot{position:relative;width:96px;height:96px;border-radius:50%;margin:0 auto 12px;' +
+    '  overflow:hidden;background:var(--color-neutral-200,#eceae7);' +
+    '  display:flex;align-items:center;justify-content:center;' +
+    '  color:var(--color-accent,#ec3013);' +
+    '  box-shadow:0 0 0 1px rgba(32,30,29,.08),0 6px 18px rgba(32,30,29,.10)}' +
+    '.so-shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;' +
+    '  opacity:0;transition:opacity .45s ease}' +
+    '.so-shot img.on{opacity:1}' +
+    '.so-shot svg{width:40px;height:40px}' +
     '.so-hint{font-size:9px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;' +
     '  color:var(--color-neutral-500,#a09b95);margin-top:7px;white-space:nowrap}' +
     // The name in the middle changes the moment the ring starts moving, which
@@ -201,14 +207,13 @@
   wrap.className = 'so-wrap';
   wrap.innerHTML = '<div class="so-disc"></div><div class="so-ring"></div><div class="so-spin"></div>' +
     '<div class="so-mid"><button type="button" class="so-open">' +
+      '<div class="so-shot"></div>' +
       '<div class="so-eyebrow">Venture</div>' +
       '<div class="so-count"><span class="now"></span><span class="of"></span></div>' +
       '<div class="so-name"></div>' +
-      '<div class="so-rule"></div>' +
       '<div class="so-status"></div>' +
-      '<div class="so-glyph"></div>' +
     '</button>' +
-    '<div class="so-chev">&#9662;</div><div class="so-hint"></div></div>';
+    '<div class="so-hint"></div></div>';
   fit.appendChild(wrap);
   host.appendChild(fit);
 
@@ -239,7 +244,7 @@
   var midOf = wrap.querySelector('.so-count .of');
   var midName = wrap.querySelector('.so-name');
   var midStatus = wrap.querySelector('.so-status');
-  var midGlyph = wrap.querySelector('.so-glyph');
+  var midShot = wrap.querySelector('.so-shot');
   var items = [];
   var pips = [];
   var hoverTimer = null;
@@ -259,7 +264,7 @@
 
   // Marked so the centre text can be faded out and back rather than swapped
   // under the reader's eye halfway through a turn.
-  var labels = [wrap.querySelector('.so-count'), midName, midStatus, midGlyph];
+  var labels = [midShot, wrap.querySelector('.so-count'), midName, midStatus];
   labels.forEach(function (el) { el.classList.add('so-label'); });
 
   wrap.querySelector('.so-open').addEventListener('click', function () {
@@ -318,7 +323,7 @@
   // Because nothing is waiting on a transition to finish, a gesture can
   // interrupt the drift, or another gesture, at any point without a jump.
 
-  var TURN_MS = 96000;                  // a full revolution when left alone: 8s per venture
+  var TURN_MS = 72000;                  // a full revolution when left alone: 6s per venture
   var DRIFT = 360 / TURN_MS;            // degrees per millisecond
   var RESUME_AFTER = 2600;              // pause after you touch it, before it drifts again
   var ACTIVE_SCALE = DOT_ACTIVE / DOT;  // 1.52 — the active circle's size, as a scale
@@ -422,6 +427,83 @@
 
   function render() { place(0); }
 
+  // ---- the venture photographs ---------------------------------------------
+  //
+  // The picture in the middle is the one uploaded against that venture's slot
+  // in the admin page — the same photograph its own page shows. It is read from
+  // the media payload rather than hard-coded, so uploading a new photo changes
+  // the ring with no code change.
+  var media = null;
+
+  // The cache site-media.js keeps. Reading it here means a repeat visitor has
+  // the photograph on the first frame instead of after a round trip — which on
+  // Render's free tier can be most of a minute if the server is cold.
+  try {
+    var raw = localStorage.getItem('kms.media.v2');
+    if (raw) media = JSON.parse(raw);
+  } catch (e) { media = null; }
+
+  // site-media.js fetches /api/media for the rest of the page and announces it.
+  // Listening is better than fetching again: one request, and the ring updates
+  // the moment the fresh payload lands.
+  window.addEventListener('kms:media', function (e) {
+    if (e && e.detail) { media = e.detail; if (active >= 0) paintShot(V[active]); }
+  });
+  // Belt and braces: if nothing has announced itself — site-media missing, or
+  // it failed — ask once. Late is better than an empty circle for ever.
+  setTimeout(function () {
+    if (media) return;
+    try {
+      fetch('/api/media', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (m) {
+          if (!m || typeof m !== 'object') return;
+          media = m;
+          if (active >= 0) paintShot(V[active]);
+        })
+        .catch(function () {});
+    } catch (err) {}
+  }, 4000);
+
+  function photoFor(v) {
+    if (!media || !v || !v.photo) return '';
+    var slot = media[v.photo];
+    if (!slot) return '';
+    // items[] is the slideshow; a venture with several photos shows the first,
+    // which is the one its own page opens on.
+    if (slot.items && slot.items.length) {
+      for (var i = 0; i < slot.items.length; i++) {
+        var it = slot.items[i];
+        // Video frames cannot be shown in an <img>, so skip past any.
+        if (it && it.url && it.kind !== 'video') return it.url;
+      }
+    }
+    return slot.url && slot.kind !== 'video' ? slot.url : '';
+  }
+
+  // The icon is drawn first and always, so the circle is never empty: it is
+  // what shows while the photograph loads, and what stays if there isn't one.
+  function paintShot(v) {
+    if (!v) return;
+    midShot.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+      (ICONS[v.icon] || '') + '</svg>';
+    var url = photoFor(v);
+    if (!url) return;
+    var img = document.createElement('img');
+    img.alt = '';
+    img.decoding = 'async';
+    // A photograph that 404s leaves the icon showing rather than a broken image.
+    img.onerror = function () { if (img.parentNode) img.parentNode.removeChild(img); };
+    img.onload = function () { img.classList.add('on'); };
+    img.src = url;
+    midShot.appendChild(img);
+    // Already in the browser cache: onload may have fired before the handler
+    // was attached, so fade it in directly rather than waiting for an event
+    // that has been and gone.
+    if (img.complete && img.naturalWidth) img.classList.add('on');
+  }
+
   // Fade the centre text out, change it while nobody can see it, fade it back.
   var labelTimer = null;
   function setLabel(v) {
@@ -430,9 +512,7 @@
       midOf.textContent = ' / ' + String(N).padStart(2, '0');
       midName.textContent = v.name.replace(/^Shalom /, '');
       midStatus.textContent = v.status;
-      midGlyph.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-        'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
-        (ICONS[v.icon] || '') + '</svg>';
+      paintShot(v);
     };
     if (reduced || midName.textContent === '') { write(); return; }
     clearTimeout(labelTimer);
