@@ -151,38 +151,44 @@
   .dot.in-progress{background:#7f92d8} .dot.expecting{background:#1d4ed8}
   .dot.done{background:#2e9e5b}
 
-  /* --- The diagram ------------------------------------------------------ */
-  .flow{display:flex;align-items:flex-start;gap:0;padding:26px 4px 10px;min-width:min-content}
-  .node{display:flex;flex-direction:column;align-items:center;text-align:center;
-        width:9.5rem;flex:none}
-  .node .ring{position:relative;width:74px;height:74px;border-radius:50%;
-              border:2px solid var(--color-divider);background:var(--color-bg);
-              display:flex;align-items:center;justify-content:center;
-              font-family:var(--font-heading);font-weight:800;font-size:22px;color:var(--color-neutral-700)}
-  .node.done .ring{border-color:#2e9e5b;color:#25683f}
-  .node.in-progress .ring,.node.expecting .ring{border-color:var(--color-accent);color:var(--color-accent-700);
-              box-shadow:0 0 0 4px rgba(236,48,19,.10)}
-  .node.pending .ring{border-color:#e0952a;color:#8a5a12}
-  .node .num{position:absolute;top:-9px;left:50%;transform:translateX(-50%);
-             background:var(--color-accent);color:#fff;border-radius:99px;
-             font-size:11px;font-weight:700;padding:1px 8px;letter-spacing:.02em}
-  .node .nm{font-family:var(--font-heading);font-weight:800;font-size:13px;line-height:1.25;
-            margin:14px 0 8px;word-break:break-word}
-  .node .subs{font-size:11.5px;color:var(--color-neutral-700);margin-top:8px;line-height:1.35}
-  .node .when{font-size:11.5px;color:var(--color-neutral-700);margin-top:8px;line-height:1.35}
-  .node .when b{display:block;font-weight:700;color:var(--color-text)}
-  .arrow{flex:none;align-self:flex-start;margin-top:37px;width:2.2rem;height:2px;
-         background:var(--color-divider);position:relative}
-  .arrow::after{content:"›";position:absolute;left:50%;top:50%;transform:translate(-50%,-55%);
-                background:var(--color-bg);border:1px solid var(--color-divider);border-radius:50%;
-                width:20px;height:20px;display:flex;align-items:center;justify-content:center;
-                font-size:13px;color:var(--color-neutral-700)}
-  .legend{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;padding:16px 0 4px;
-          border-top:1px solid var(--color-divider);margin-top:10px}
+  /* --- The diagram ------------------------------------------------------
+     A vertical timeline, not a row of circles. It reads top to bottom the way
+     the work happens, it has room for the sub steps under each step, it does
+     not scroll sideways on a phone, and it prints down a page instead of off
+     the edge of one. */
+  ol.tl{list-style:none;margin:18px 0 0;padding:0;position:relative}
+  ol.tl > li{position:relative;padding:0 0 26px 44px}
+  /* The spine, drawn per item so the last one stops rather than trailing off. */
+  ol.tl > li::before{content:"";position:absolute;left:15px;top:26px;bottom:0;width:2px;
+                     background:var(--color-divider)}
+  ol.tl > li:last-child::before{display:none}
+  .tl-mark{position:absolute;left:0;top:0;width:32px;height:32px;border-radius:50%;
+           border:2px solid var(--color-divider);background:var(--color-bg);
+           display:flex;align-items:center;justify-content:center;
+           font-family:var(--font-heading);font-weight:800;font-size:13px;
+           color:var(--color-neutral-700)}
+  li.done > .tl-mark{border-color:#2e9e5b;background:#e4f2ea;color:#25683f}
+  li.in-progress > .tl-mark,li.expecting > .tl-mark{border-color:var(--color-accent);color:var(--color-accent-700)}
+  li.pending > .tl-mark{border-color:#e0952a;color:#8a5a12}
+  .tl-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:32px}
+  .tl-name{font-family:var(--font-heading);font-weight:800;font-size:15px;letter-spacing:-0.01em}
+  .tl-when{font-size:12px;color:var(--color-neutral-700);font-variant-numeric:tabular-nums}
+  .tl-when b{font-weight:700;color:var(--color-text)}
+  .tl-file{font-size:12px;font-weight:600}
+  ul.tl-subs{list-style:none;margin:10px 0 0;padding:0;border-left:1px solid var(--color-divider)}
+  ul.tl-subs li{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+                padding:6px 0 6px 14px;font-size:13px}
+  ul.tl-subs .n{font-family:var(--font-heading);font-weight:800;font-size:11px;
+                color:var(--color-neutral-500);min-width:2rem}
+  ul.tl-subs .t{flex:1 1 12rem;min-width:0}
+  ul.tl-subs li.done .t{color:var(--color-neutral-700)}
+  .tl-none{font-size:12px;color:var(--color-neutral-500);margin-top:8px}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;padding:16px 0 4px;
+          border-top:1px solid var(--color-divider);margin-top:14px}
   .legend span{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--color-neutral-800)}
 
   @media(max-width:700px){
-    .node{width:8rem} .arrow{width:1.4rem}
+    ol.tl > li{padding-left:38px}
     .rmwhen{gap:8px}
   }
 
@@ -196,7 +202,7 @@
     /* Both views print: the table for the detail, the diagram for the shape. */
     #rmListView,#rmDiagView{display:block !important}
     #rmDiagView[hidden]{display:block !important}
-    tr.stepr,tr.subr,.node{break-inside:avoid}
+    tr.stepr,tr.subr,ol.tl > li{break-inside:avoid}
     .rmtitle,.rmsummary,.stepname input[type=text]{
       border:none !important;background:transparent !important;padding:0 !important;
       color:#000 !important;resize:none;overflow:visible}
@@ -205,7 +211,7 @@
       border:none !important;background:transparent !important;padding:0 !important;
       -webkit-appearance:none;appearance:none;color:#000 !important}
     .twist,.rowact,.addrow,.filecell .fx,.filecell .pick{display:none !important}
-    .st,.node .ring{border:1px solid #999}
+    .st,.tl-mark{border:1px solid #999}
     a[href]:after{content:""}
   }
 
@@ -537,9 +543,8 @@
 
           <!-- The same steps, as a diagram -->
           <div id="rmDiagView" hidden>
-            <div class="scroll">
-              <div class="flow" id="rmFlow"></div>
-            </div>
+            <p class="note" id="rmFlowSum"></p>
+            <ol class="tl" id="rmFlow"></ol>
             <div class="legend" id="rmLegend"></div>
           </div>
         </div>
@@ -1658,45 +1663,87 @@
     if(!flow || !rm) return;
     flow.innerHTML = '';
 
-    rm.steps.forEach(function(step, i){
-      if(i){
-        var ar = document.createElement('div');
-        ar.className = 'arrow';
-        flow.appendChild(ar);
+    function whenText(holder, done){
+      var sp = document.createElement('span');
+      sp.className = 'tl-when';
+      if(holder.date){
+        var b = document.createElement('b');
+        b.textContent = rmDateShow(holder.date);
+        sp.appendChild(b);
+        sp.appendChild(document.createTextNode(' · ' + (done ? 'Completed' : 'Expecting')));
+      }else{
+        sp.textContent = done ? 'Completed' : 'No date yet';
       }
-      var n = document.createElement('div');
-      n.className = 'node ' + step.status;
+      return sp;
+    }
 
-      var ring = document.createElement('div');
-      ring.className = 'ring';
-      ring.textContent = String(i + 1);
-      var num = document.createElement('span');
-      num.className = 'num'; num.textContent = i + 1;
-      ring.appendChild(num);
-      n.appendChild(ring);
+    rm.steps.forEach(function(step, i){
+      var li = document.createElement('li');
+      li.className = step.status;
 
-      n.appendChild(Object.assign(document.createElement('div'),
-        {className:'nm', textContent: step.title || 'Untitled step'}));
-      n.appendChild(Object.assign(document.createElement('span'),
+      var mark = document.createElement('span');
+      mark.className = 'tl-mark';
+      mark.textContent = step.status === 'done' ? '✓' : String(i + 1);
+      li.appendChild(mark);
+
+      var head = document.createElement('div');
+      head.className = 'tl-head';
+      head.appendChild(Object.assign(document.createElement('span'),
+        {className:'tl-name', textContent: step.title || 'Untitled step'}));
+      head.appendChild(Object.assign(document.createElement('span'),
         {className:'st ' + step.status, textContent: rmLabel(step.status)}));
+      head.appendChild(whenText(step, step.status === 'done'));
+      var f = (step.files || [])[0];
+      if(f){
+        var a = document.createElement('a');
+        a.className = 'tl-file'; a.href = f.url; a.target = '_blank'; a.rel = 'noopener';
+        a.textContent = '📎 ' + f.name;
+        head.appendChild(a);
+      }
+      li.appendChild(head);
 
-      var done = step.subs.filter(function(x){ return x.status === 'done'; }).length;
-      n.appendChild(Object.assign(document.createElement('div'),
-        {className:'subs', textContent: done + ' / ' + step.subs.length + '\nSub steps'}));
+      if(step.subs.length){
+        var ul = document.createElement('ul');
+        ul.className = 'tl-subs';
+        step.subs.forEach(function(sub, j){
+          var sli = document.createElement('li');
+          sli.className = sub.status;
+          sli.appendChild(Object.assign(document.createElement('span'),
+            {className:'dot ' + sub.status}));
+          sli.appendChild(Object.assign(document.createElement('span'),
+            {className:'n', textContent:(i+1) + '.' + (j+1)}));
+          sli.appendChild(Object.assign(document.createElement('span'),
+            {className:'t', textContent: sub.title || 'Untitled sub step'}));
+          sli.appendChild(Object.assign(document.createElement('span'),
+            {className:'st ' + sub.status, textContent: rmLabel(sub.status)}));
+          sli.appendChild(whenText(sub, sub.status === 'done'));
+          var sf = (sub.files || [])[0];
+          if(sf){
+            var sa = document.createElement('a');
+            sa.className = 'tl-file'; sa.href = sf.url; sa.target = '_blank'; sa.rel = 'noopener';
+            sa.textContent = '📎 ' + sf.name;
+            sli.appendChild(sa);
+          }
+          ul.appendChild(sli);
+        });
+        li.appendChild(ul);
+      }else{
+        li.appendChild(Object.assign(document.createElement('div'),
+          {className:'tl-none', textContent:'No sub steps'}));
+      }
 
-      var when = document.createElement('div');
-      when.className = 'when';
-      var b = document.createElement('b');
-      b.textContent = rmDateShow(step.date);
-      when.appendChild(b);
-      when.appendChild(document.createTextNode(
-        step.status === 'done' ? 'Completed'
-        : step.date ? 'Expecting'
-        : 'No date yet'));
-      n.appendChild(when);
-
-      flow.appendChild(n);
+      flow.appendChild(li);
     });
+
+    // The two numbers worth having at the top of a plan.
+    var done = rm.steps.filter(function(t){ return t.status === 'done'; }).length;
+    var subs = rm.steps.reduce(function(a,t){ return a + t.subs.length; }, 0);
+    var subsDone = rm.steps.reduce(function(a,t){
+      return a + t.subs.filter(function(x){ return x.status === 'done'; }).length; }, 0);
+    document.getElementById('rmFlowSum').textContent = rm.steps.length
+      ? done + ' of ' + rm.steps.length + ' steps done'
+        + (subs ? ' · ' + subsDone + ' of ' + subs + ' sub steps done' : '')
+      : '';
 
     var leg = document.getElementById('rmLegend');
     leg.innerHTML = '';
