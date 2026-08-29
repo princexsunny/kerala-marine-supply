@@ -81,54 +81,110 @@
   .page-body section{padding:0;border-bottom:none}
   a.tile{text-decoration:none}
   /* --- Roadmaps --------------------------------------------------------- */
-  .rmhead{margin:22px 0 6px}
+  .rmhead{margin:22px 0 18px}
   .rmtitle{width:100%;font-family:var(--font-heading);font-weight:800;font-size:26px;
            letter-spacing:-0.02em;border:none;border-bottom:2px solid var(--color-divider);
            background:none;color:var(--color-text);padding:4px 0}
   .rmtitle:focus{outline:none;border-bottom-color:var(--color-accent)}
-  .rmsummary{width:100%;margin-top:10px;border:2px solid var(--color-divider);background:var(--color-bg);
-             color:var(--color-neutral-800);font:inherit;font-size:14px;padding:9px 11px;resize:vertical}
+  .rmwhen{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .rmsummary{width:100%;margin-top:12px;border:2px solid var(--color-divider);background:var(--color-bg);
+             color:var(--color-neutral-800);font:inherit;font-size:14px;padding:10px 12px;resize:vertical}
   .rmsummary:focus{outline:none;border-color:var(--color-accent)}
-  /* One idea. The date and status live in the header so a roadmap can be
-     scanned without opening anything. */
-  .idea{border:2px solid var(--color-divider);margin-top:14px;background:var(--color-bg)}
-  .idea-h{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;flex-wrap:wrap}
-  .idea-h .grow{flex:1 1 260px;min-width:0}
-  .idea-t{width:100%;font-family:var(--font-heading);font-weight:800;font-size:16px;
-          border:none;background:none;color:var(--color-text);padding:2px 0}
-  .idea-t:focus{outline:none;border-bottom:2px solid var(--color-accent)}
-  .idea-when{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
-  .idea-when input[type=date]{font-size:12px;padding:4px 6px}
-  .idea-when select{font-size:12px;padding:4px 8px}
-  .idea-b{padding:0 16px 14px;border-top:1px solid var(--color-divider);margin-top:2px}
-  .idea-note{width:100%;margin-top:12px;border:2px solid var(--color-divider);background:var(--color-bg);
-             color:var(--color-text);font:inherit;font-size:13.5px;line-height:1.55;padding:10px 12px;resize:vertical}
-  .idea-note:focus{outline:none;border-color:var(--color-accent)}
-  .sublab{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;
-          color:var(--color-neutral-700);margin:16px 0 6px}
-  .steps{margin:0;padding:0;list-style:none}
-  .steps li{display:flex;gap:9px;align-items:center;padding:5px 0;border-bottom:1px solid var(--color-divider)}
-  .steps li:last-child{border-bottom:none}
-  .steps input[type=text]{flex:1;min-width:0;border:1px solid var(--color-neutral-300);background:var(--color-bg);
-                          color:var(--color-text);font:inherit;font-size:13px;padding:5px 8px}
-  .steps input[type=date]{font-size:12px;padding:4px 6px;width:9.5rem}
-  .steps li.done input[type=text]{color:var(--color-neutral-500);text-decoration:line-through}
-  .steps .sx{border:none;background:none;color:var(--color-accent-700);cursor:pointer;
-             font:inherit;font-size:14px;font-weight:700;padding:0 4px}
-  .rmfiles{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
-  .rmfile{display:inline-flex;align-items:center;gap:7px;max-width:20rem;font-size:12.5px;
-          border:1px solid var(--color-neutral-300);background:var(--color-bg);padding:4px 6px 4px 10px}
-  .rmfile a{color:var(--color-text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .rmfile a:hover{color:var(--color-accent-700)}
-  .rmfile .qs{color:var(--color-neutral-700);font-size:11px}
-  .rmfile .qx{border:none;background:none;color:var(--color-accent-700);cursor:pointer;font:inherit;font-weight:700}
-  .idea-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-  .st{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-      border-radius:99px;padding:2px 9px;white-space:nowrap}
-  .st.thinking{background:var(--color-surface);color:var(--color-neutral-700)}
-  .st.doing{background:var(--color-accent-100);color:var(--color-accent-700)}
-  .st.done{background:#e9f2ec;color:#2e6b4a}
-  .st.parked{background:var(--color-neutral-200);color:var(--color-neutral-700)}
+
+  /* The step table. One row per step, and one per sub step underneath it. */
+  table.rmtable{width:100%;border-collapse:collapse;min-width:52rem;margin-top:4px}
+  table.rmtable th,table.rmtable td{padding:8px 10px;border-bottom:1px solid var(--color-divider);
+    text-align:left;font-size:13px;vertical-align:middle}
+  table.rmtable thead th{font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--color-neutral-700);font-weight:700}
+  table.rmtable .r{text-align:right}
+  col.c-step{width:auto} col.c-status{width:11rem} col.c-file{width:12rem}
+  col.c-date{width:10.5rem} col.c-act{width:5rem}
+  tr.stepr{background:var(--color-bg)}
+  tr.subr{background:var(--color-surface)}
+  tr.subhead td{padding-top:6px;padding-bottom:2px;font-size:10.5px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--color-neutral-700);font-weight:700;background:var(--color-surface)}
+  .stepname{display:flex;align-items:center;gap:8px;min-width:0}
+  .twist{border:none;background:none;cursor:pointer;color:var(--color-neutral-700);
+         font:inherit;font-size:12px;width:20px;flex:none;padding:2px}
+  .twist:hover{color:var(--color-accent)}
+  .stepno{font-family:var(--font-heading);font-weight:800;font-size:12px;color:var(--color-neutral-700);
+          flex:none;min-width:1.9rem}
+  .stepname input[type=text]{flex:1;min-width:0;border:1px solid transparent;background:none;
+    font:inherit;font-size:13.5px;font-weight:600;color:var(--color-text);padding:5px 7px}
+  .stepname input[type=text]:hover{border-color:var(--color-divider)}
+  .stepname input[type=text]:focus{outline:none;border-color:var(--color-accent);background:var(--color-bg)}
+  tr.subr .stepname{padding-left:22px}
+  tr.subr .stepname input[type=text]{font-weight:500}
+  table.rmtable select{width:100%;font-size:12.5px;padding:6px 8px}
+  table.rmtable input[type=date]{width:100%;font-size:12.5px;padding:5px 7px;
+    border:2px solid var(--color-divider);background:var(--color-bg);color:var(--color-text);font:inherit}
+  .filecell{display:flex;align-items:center;gap:6px;min-width:0}
+  .filecell .pick{flex:1;min-width:0;border:2px solid var(--color-divider);background:var(--color-bg);
+    color:var(--color-neutral-700);font:inherit;font-size:12.5px;padding:5px 8px;cursor:pointer;
+    text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .filecell .pick:hover{border-color:var(--color-accent);color:var(--color-text)}
+  .filecell a{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:12.5px;font-weight:600;color:var(--color-text)}
+  .filecell a:hover{color:var(--color-accent-700)}
+  .filecell .fx{border:none;background:none;color:var(--color-neutral-700);cursor:pointer;
+    font:inherit;font-size:13px;padding:0 2px;flex:none}
+  .filecell .fx:hover{color:var(--color-accent)}
+  .addrow{border:none;background:none;color:var(--color-accent-700);cursor:pointer;
+          font:inherit;font-size:13px;font-weight:700;padding:10px 2px}
+  .addrow:hover{color:var(--color-accent)}
+  .addsub{padding-left:30px;font-size:12.5px}
+  .rowact{border:none;background:none;color:var(--color-neutral-700);cursor:pointer;
+          font:inherit;font-size:16px;line-height:1;padding:2px 6px}
+  .rowact:hover{color:var(--color-accent)}
+
+  /* Status pills, shared by the table and the diagram. */
+  .st{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+      border-radius:99px;padding:3px 10px;white-space:nowrap;display:inline-block}
+  .st.not-started{background:var(--color-neutral-200);color:var(--color-neutral-700)}
+  .st.pending{background:#fdf0dc;color:#8a5a12}
+  .st.in-progress{background:#e7ecfb;color:#3852a4}
+  .st.expecting{background:#e4edfd;color:#1d4ed8}
+  .st.done{background:#e4f2ea;color:#25683f}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+  .dot.not-started{background:#a6a29b} .dot.pending{background:#e0952a}
+  .dot.in-progress{background:#7f92d8} .dot.expecting{background:#1d4ed8}
+  .dot.done{background:#2e9e5b}
+
+  /* --- The diagram ------------------------------------------------------ */
+  .flow{display:flex;align-items:flex-start;gap:0;padding:26px 4px 10px;min-width:min-content}
+  .node{display:flex;flex-direction:column;align-items:center;text-align:center;
+        width:9.5rem;flex:none}
+  .node .ring{position:relative;width:74px;height:74px;border-radius:50%;
+              border:2px solid var(--color-divider);background:var(--color-bg);
+              display:flex;align-items:center;justify-content:center;
+              font-family:var(--font-heading);font-weight:800;font-size:22px;color:var(--color-neutral-700)}
+  .node.done .ring{border-color:#2e9e5b;color:#25683f}
+  .node.in-progress .ring,.node.expecting .ring{border-color:var(--color-accent);color:var(--color-accent-700);
+              box-shadow:0 0 0 4px rgba(236,48,19,.10)}
+  .node.pending .ring{border-color:#e0952a;color:#8a5a12}
+  .node .num{position:absolute;top:-9px;left:50%;transform:translateX(-50%);
+             background:var(--color-accent);color:#fff;border-radius:99px;
+             font-size:11px;font-weight:700;padding:1px 8px;letter-spacing:.02em}
+  .node .nm{font-family:var(--font-heading);font-weight:800;font-size:13px;line-height:1.25;
+            margin:14px 0 8px;word-break:break-word}
+  .node .subs{font-size:11.5px;color:var(--color-neutral-700);margin-top:8px;line-height:1.35}
+  .node .when{font-size:11.5px;color:var(--color-neutral-700);margin-top:8px;line-height:1.35}
+  .node .when b{display:block;font-weight:700;color:var(--color-text)}
+  .arrow{flex:none;align-self:flex-start;margin-top:37px;width:2.2rem;height:2px;
+         background:var(--color-divider);position:relative}
+  .arrow::after{content:"›";position:absolute;left:50%;top:50%;transform:translate(-50%,-55%);
+                background:var(--color-bg);border:1px solid var(--color-divider);border-radius:50%;
+                width:20px;height:20px;display:flex;align-items:center;justify-content:center;
+                font-size:13px;color:var(--color-neutral-700)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;padding:16px 0 4px;
+          border-top:1px solid var(--color-divider);margin-top:10px}
+  .legend span{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--color-neutral-800)}
+
+  @media(max-width:700px){
+    .node{width:8rem} .arrow{width:1.4rem}
+    .rmwhen{gap:8px}
+  }
 
   /* --- Print: the roadmap, and nothing else ----------------------------- */
   @media print{
@@ -136,14 +192,20 @@
     .page:not(.on),.noprint,#rmList,header,footer,.page-head .page-back,
     .tiles,main.pad,.docbar,.uptray{display:none !important}
     .page-box{max-width:none;padding:0}
-    .idea{break-inside:avoid;border:1px solid #999;margin-top:10px}
-    .rmtitle,.rmsummary,.idea-t,.idea-note,.steps input[type=text]{
+    .scroll{overflow:visible !important}
+    /* Both views print: the table for the detail, the diagram for the shape. */
+    #rmListView,#rmDiagView{display:block !important}
+    #rmDiagView[hidden]{display:block !important}
+    tr.stepr,tr.subr,.node{break-inside:avoid}
+    .rmtitle,.rmsummary,.stepname input[type=text]{
       border:none !important;background:transparent !important;padding:0 !important;
       color:#000 !important;resize:none;overflow:visible}
-    .idea-note{white-space:pre-wrap}
-    .steps input[type=text]{text-decoration:none !important}
-    .idea-acts,.steps .sx,.rmfile .qx{display:none !important}
-    .st{border:1px solid #999}
+    .rmsummary{white-space:pre-wrap}
+    table.rmtable select,table.rmtable input[type=date]{
+      border:none !important;background:transparent !important;padding:0 !important;
+      -webkit-appearance:none;appearance:none;color:#000 !important}
+    .twist,.rowact,.addrow,.filecell .fx,.filecell .pick{display:none !important}
+    .st,.node .ring{border:1px solid #999}
     a[href]:after{content:""}
   }
 
@@ -436,7 +498,7 @@
         <div id="rmOpen" hidden>
           <div class="docbar noprint">
             <a class="page-back" href="admin.html?p=roadmap" id="rmToList">← All roadmaps</a>
-            <button type="button" class="btn btn-ghost" id="rmAddIdea">+ Add an idea</button>
+            <button type="button" class="btn btn-ghost" id="rmView">Road map diagram</button>
             <button type="button" class="btn btn-ghost" id="rmPrint">Print</button>
             <button type="button" class="btn btn-ghost del" id="rmDelete">Delete roadmap</button>
             <span class="note" id="rmOpenNote"></span>
@@ -444,14 +506,42 @@
 
           <div class="rmhead">
             <input type="text" id="rmTitle" class="rmtitle" aria-label="Roadmap name">
-            <textarea id="rmSummary" class="rmsummary" rows="2"
-                      placeholder="One or two lines on what this roadmap is for"
-                      aria-label="What this roadmap is for"></textarea>
+            <div class="rmwhen">
+              <input type="date" id="rmDate" aria-label="Date for this roadmap">
+              <select id="rmStatus" aria-label="How far along this roadmap is"></select>
+              <span class="st" id="rmStatusTag"></span>
+            </div>
+            <textarea id="rmSummary" class="rmsummary" rows="3"
+                      placeholder="What it is, why it matters, what you have found out so far…"
+                      aria-label="Notes on this roadmap"></textarea>
             <p class="note" id="rmMeta"></p>
           </div>
 
-          <div id="rmIdeas"></div>
-          <p class="note" id="rmIdeasEmpty"></p>
+          <!-- The steps, as a table -->
+          <div id="rmListView">
+            <div class="scroll">
+              <table class="rmtable">
+                <colgroup>
+                  <col class="c-step"><col class="c-status"><col class="c-file"><col class="c-date"><col class="c-act">
+                </colgroup>
+                <thead><tr>
+                  <th>Step / sub step</th><th>Status</th><th>File attached</th>
+                  <th>Expecting date</th><th class="r">Actions</th>
+                </tr></thead>
+                <tbody id="rmRows"></tbody>
+              </table>
+            </div>
+            <button type="button" class="addrow" id="rmAddStep">+ Add step</button>
+            <p class="note" id="rmIdeasEmpty"></p>
+          </div>
+
+          <!-- The same steps, as a diagram -->
+          <div id="rmDiagView" hidden>
+            <div class="scroll">
+              <div class="flow" id="rmFlow"></div>
+            </div>
+            <div class="legend" id="rmLegend"></div>
+          </div>
         </div>
 
       </div>
@@ -1262,7 +1352,17 @@
   var rmAll = [];
   var rm = null;            // the roadmap being edited
   var rmTimer = null, rmSaving = false, rmAgain = false;
-  var RM_STATUS = [['thinking','Thinking'],['doing','Doing'],['done','Done'],['parked','Parked']];
+  var RM_STATUS = [['not-started','Not started'],['pending','Pending'],
+                   ['in-progress','In progress'],['expecting','Expecting'],['done','Done']];
+  function rmLabel(v){
+    var f = RM_STATUS.filter(function(p){ return p[0] === v; })[0];
+    return f ? f[1] : 'Not started';
+  }
+  function rmDateShow(iso){
+    if(!iso) return 'dd – mm – yyyy';
+    var d = new Date(iso + 'T00:00:00');
+    return isNaN(d) ? iso : d.toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\//g, ' – ');
+  }
 
   function openRoadmap(){ return new URLSearchParams(location.search).get('r') || ''; }
   function goRoadmap(id){
@@ -1282,7 +1382,7 @@
     if(rmSaving){ rmAgain = true; return; }
     rmSaving = true;
     api('PUT', '/api/roadmaps/' + encodeURIComponent(rm.id),
-        {title: rm.title, summary: rm.summary, ideas: rm.ideas})
+        {title: rm.title, date: rm.date, status: rm.status, note: rm.note, steps: rm.steps})
       .then(function(saved){
         rm.updatedAt = saved.updatedAt;
         setNote('rmOpenNote', 'Saved ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + '.');
@@ -1298,12 +1398,16 @@
   function rmMetaLine(){
     var el = document.getElementById('rmMeta');
     if(!el || !rm) return;
-    var n = rm.ideas.length;
-    var done = rm.ideas.filter(function(i){ return i.status === 'done'; }).length;
+    var n = rm.steps.length;
+    var done = rm.steps.filter(function(t){ return t.status === 'done'; }).length;
+    var subs = rm.steps.reduce(function(a,t){ return a + t.subs.length; }, 0);
+    var subsDone = rm.steps.reduce(function(a,t){
+      return a + t.subs.filter(function(x){ return x.status === 'done'; }).length; }, 0);
     el.textContent = n
-      ? n + (n === 1 ? ' idea' : ' ideas') + ', ' + done + ' done'
+      ? n + (n === 1 ? ' step' : ' steps') + ', ' + done + ' done'
+        + (subs ? ' · ' + subsDone + ' of ' + subs + ' sub steps done' : '')
         + (rm.updatedAt ? ' · last change ' + new Date(rm.updatedAt).toLocaleDateString() : '')
-      : 'No ideas yet.';
+      : 'No steps yet.';
   }
 
   function loadRoadmaps(){
@@ -1328,15 +1432,16 @@
       var cards = document.getElementById('rmCards');
       cards.innerHTML = '';
       rmAll.forEach(function(r){
-        var done = (r.ideas||[]).filter(function(i){ return i.status === 'done'; }).length;
+        var steps = r.steps || [];
+        var done = steps.filter(function(t){ return t.status === 'done'; }).length;
         var b = document.createElement('button');
         b.type = 'button'; b.className = 'folder'; b.dataset.id = r.id;
         b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
           'stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V6a2 2 0 0 1 2-2h3l3 2h6a2 2 0 0 1 2 2v9.5"/>' +
           '<path d="M4 19.5A1.5 1.5 0 0 1 5.5 18H20"/><path d="M8.5 11h7M8.5 14.5h4"/></svg>' +
           '<span class="f-name"></span>' +
-          '<span class="f-meta">' + ((r.ideas||[]).length
-            ? (r.ideas.length + (r.ideas.length === 1 ? ' idea · ' : ' ideas · ') + done + ' done')
+          '<span class="f-meta">' + (steps.length
+            ? (steps.length + (steps.length === 1 ? ' step · ' : ' steps · ') + done + ' done')
             : 'Empty') + '</span>';
         b.querySelector('.f-name').textContent = r.title;   // a title is text, not markup
         cards.appendChild(b);
@@ -1352,192 +1457,278 @@
     listBox.hidden = true; openBox.hidden = false;
     document.getElementById('rmHead').textContent = rm.title;
     document.getElementById('rmTitle').value = rm.title;
-    document.getElementById('rmSummary').value = rm.summary || '';
+    document.getElementById('rmSummary').value = rm.note || '';
+    document.getElementById('rmDate').value = rm.date || '';
+    var ss = document.getElementById('rmStatus');
+    ss.innerHTML = '';
+    RM_STATUS.forEach(function(p){
+      var o = document.createElement('option');
+      o.value = p[0]; o.textContent = p[1];
+      if(p[0] === rm.status) o.selected = true;
+      ss.appendChild(o);
+    });
+    var tag = document.getElementById('rmStatusTag');
+    tag.className = 'st ' + rm.status;
+    tag.textContent = rmLabel(rm.status);
     rmMetaLine();
-    renderIdeas();
+    renderSteps();
+    applyRmView();
   }
 
-  function renderIdeas(){
-    var box = document.getElementById('rmIdeas');
-    box.innerHTML = '';
-    if(!rm) return;
+  // ---- the step table ----------------------------------------------------
+  //
+  // One row per step, and one per sub step under it when the step is open.
+  // Everything on a row edits in place: there is no separate edit mode,
+  // because a roadmap is something you change while you are looking at it.
 
-    // Dated first, newest at the top; undated ideas sit above them because they
-    // are the ones still to be pinned down.
-    var order = rm.ideas.slice().sort(function(a,b){
-      if(!a.date && !b.date) return 0;
-      if(!a.date) return -1;
-      if(!b.date) return 1;
-      return a.date < b.date ? 1 : -1;
+  function statusCell(get, set){
+    var td = document.createElement('td');
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;align-items:center;gap:7px';
+    var dot = document.createElement('span');
+    dot.className = 'dot ' + get();
+    var sel = document.createElement('select');
+    sel.setAttribute('aria-label', 'Status');
+    RM_STATUS.forEach(function(p){
+      var o = document.createElement('option');
+      o.value = p[0]; o.textContent = p[1];
+      if(p[0] === get()) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', function(){ set(sel.value); rmSave(); renderSteps(); });
+    wrap.appendChild(dot); wrap.appendChild(sel);
+    td.appendChild(wrap);
+    return td;
+  }
+
+  function fileCell(holder){
+    var td = document.createElement('td');
+    var box = document.createElement('div');
+    box.className = 'filecell';
+    var f = (holder.files || [])[0];
+    if(f){
+      var a = document.createElement('a');
+      a.href = f.url; a.target = '_blank'; a.rel = 'noopener';
+      a.textContent = f.name; a.title = f.name;
+      box.appendChild(a);
+      var x = document.createElement('button');
+      x.type = 'button'; x.className = 'fx'; x.textContent = '✕';
+      x.setAttribute('aria-label', 'Take ' + f.name + ' off this row');
+      x.addEventListener('click', function(){
+        // Off the row, not out of storage: the same file may be referenced
+        // elsewhere, and losing it silently would be worse than an unused
+        // entry in the library.
+        holder.files.shift(); rmSave(); renderSteps();
+      });
+      box.appendChild(x);
+    }else{
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'pick'; b.textContent = 'Choose file';
+      b.addEventListener('click', function(){ rmPickFileFor(holder); });
+      box.appendChild(b);
+    }
+    td.appendChild(box);
+    return td;
+  }
+
+  function dateCell(holder){
+    var td = document.createElement('td');
+    var d = document.createElement('input');
+    d.type = 'date'; d.value = holder.date || '';
+    d.setAttribute('aria-label', 'Expecting date');
+    d.addEventListener('change', function(){ holder.date = d.value; rmSave(); renderSteps(); });
+    td.appendChild(d);
+    return td;
+  }
+
+  function actionCell(onRemove, what){
+    var td = document.createElement('td');
+    td.className = 'r';
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'rowact'; b.textContent = '✕';
+    b.title = 'Remove ' + what;
+    b.setAttribute('aria-label', 'Remove ' + what);
+    b.addEventListener('click', onRemove);
+    td.appendChild(b);
+    return td;
+  }
+
+  function renderSteps(){
+    var body = document.getElementById('rmRows');
+    if(!body || !rm) return;
+    body.innerHTML = '';
+
+    rm.steps.forEach(function(step, i){
+      var tr = document.createElement('tr');
+      tr.className = 'stepr';
+      tr.dataset.step = step.id;
+
+      var td = document.createElement('td');
+      var nm = document.createElement('div');
+      nm.className = 'stepname';
+      var tw = document.createElement('button');
+      tw.type = 'button'; tw.className = 'twist';
+      tw.textContent = step.open ? '⌄' : '›';
+      tw.setAttribute('aria-expanded', String(!!step.open));
+      tw.setAttribute('aria-label', (step.open ? 'Hide' : 'Show') + ' sub steps of ' + (step.title || ('step ' + (i+1))));
+      tw.addEventListener('click', function(){ step.open = !step.open; rmSave(); renderSteps(); });
+      nm.appendChild(tw);
+      nm.appendChild(Object.assign(document.createElement('span'), {className:'stepno', textContent:(i+1) + '.'}));
+      var ti = document.createElement('input');
+      ti.type = 'text'; ti.value = step.title; ti.placeholder = 'Name this step';
+      ti.setAttribute('aria-label', 'Step ' + (i+1));
+      ti.addEventListener('input', function(){ step.title = ti.value; rmSave(); });
+      nm.appendChild(ti);
+      td.appendChild(nm);
+      tr.appendChild(td);
+
+      tr.appendChild(statusCell(function(){ return step.status; }, function(v){ step.status = v; }));
+      tr.appendChild(fileCell(step));
+      tr.appendChild(dateCell(step));
+      tr.appendChild(actionCell(function(){
+        if(!confirm('Remove step "' + (step.title || (i+1)) + '"' +
+                    (step.subs.length ? ' and its ' + step.subs.length + ' sub steps' : '') + '?')) return;
+        rm.steps.splice(i,1); rmSave(); renderSteps(); rmMetaLine();
+      }, 'this step'));
+      body.appendChild(tr);
+
+      if(!step.open) return;
+
+      var head = document.createElement('tr');
+      head.className = 'subhead';
+      var hd = document.createElement('td');
+      hd.colSpan = 5; hd.textContent = 'Sub steps';
+      head.appendChild(hd);
+      body.appendChild(head);
+
+      step.subs.forEach(function(sub, j){
+        var str2 = document.createElement('tr');
+        str2.className = 'subr';
+        var std = document.createElement('td');
+        var snm = document.createElement('div');
+        snm.className = 'stepname';
+        snm.appendChild(Object.assign(document.createElement('span'),
+          {className:'stepno', textContent:(i+1) + '.' + (j+1)}));
+        var si = document.createElement('input');
+        si.type = 'text'; si.value = sub.title; si.placeholder = 'Name this sub step';
+        si.setAttribute('aria-label', 'Sub step ' + (i+1) + '.' + (j+1));
+        si.addEventListener('input', function(){ sub.title = si.value; rmSave(); });
+        snm.appendChild(si);
+        std.appendChild(snm);
+        str2.appendChild(std);
+
+        str2.appendChild(statusCell(function(){ return sub.status; }, function(v){ sub.status = v; }));
+        str2.appendChild(fileCell(sub));
+        str2.appendChild(dateCell(sub));
+        str2.appendChild(actionCell(function(){
+          step.subs.splice(j,1); rmSave(); renderSteps();
+        }, 'this sub step'));
+        body.appendChild(str2);
+      });
+
+      var addTr = document.createElement('tr');
+      addTr.className = 'subr';
+      var atd = document.createElement('td');
+      atd.colSpan = 5;
+      var ab = document.createElement('button');
+      ab.type = 'button'; ab.className = 'addrow addsub'; ab.textContent = '+ Add sub step';
+      ab.addEventListener('click', function(){
+        step.subs.push({id:'b'+Date.now(), title:'', status:'not-started', date:'', files:[]});
+        step.open = true; rmSave(); renderSteps();
+        var ins = document.querySelectorAll('tr.subr .stepname input[type=text]');
+        if(ins.length) ins[ins.length-1].focus();
+      });
+      atd.appendChild(ab);
+      addTr.appendChild(atd);
+      body.appendChild(addTr);
     });
 
-    order.forEach(function(idea){
-      var card = document.createElement('div');
-      card.className = 'idea';
-      card.dataset.id = idea.id;
+    document.getElementById('rmIdeasEmpty').textContent = rm.steps.length
+      ? '' : 'No steps yet. Press “Add step” to start.';
+    renderFlow();
+  }
 
-      var h = document.createElement('div');
-      h.className = 'idea-h';
-      var grow = document.createElement('div');
-      grow.className = 'grow';
+  // ---- the diagram -------------------------------------------------------
+  //
+  // The same steps read left to right. No invented icons: the circle carries
+  // the step's number, which is the one thing about it that is certainly true.
 
-      var t = document.createElement('input');
-      t.type = 'text'; t.className = 'idea-t'; t.value = idea.title;
-      t.placeholder = 'What is the idea?';
-      t.setAttribute('aria-label', 'Idea');
-      t.addEventListener('input', function(){ idea.title = t.value; rmSave(); });
-      grow.appendChild(t);
+  function renderFlow(){
+    var flow = document.getElementById('rmFlow');
+    if(!flow || !rm) return;
+    flow.innerHTML = '';
+
+    rm.steps.forEach(function(step, i){
+      if(i){
+        var ar = document.createElement('div');
+        ar.className = 'arrow';
+        flow.appendChild(ar);
+      }
+      var n = document.createElement('div');
+      n.className = 'node ' + step.status;
+
+      var ring = document.createElement('div');
+      ring.className = 'ring';
+      ring.textContent = String(i + 1);
+      var num = document.createElement('span');
+      num.className = 'num'; num.textContent = i + 1;
+      ring.appendChild(num);
+      n.appendChild(ring);
+
+      n.appendChild(Object.assign(document.createElement('div'),
+        {className:'nm', textContent: step.title || 'Untitled step'}));
+      n.appendChild(Object.assign(document.createElement('span'),
+        {className:'st ' + step.status, textContent: rmLabel(step.status)}));
+
+      var done = step.subs.filter(function(x){ return x.status === 'done'; }).length;
+      n.appendChild(Object.assign(document.createElement('div'),
+        {className:'subs', textContent: done + ' / ' + step.subs.length + '\nSub steps'}));
 
       var when = document.createElement('div');
-      when.className = 'idea-when';
-      var dt = document.createElement('input');
-      dt.type = 'date'; dt.value = idea.date;
-      dt.setAttribute('aria-label', 'Date for this idea');
-      dt.addEventListener('change', function(){ idea.date = dt.value; rmSave(); renderIdeas(); });
-      when.appendChild(dt);
+      when.className = 'when';
+      var b = document.createElement('b');
+      b.textContent = rmDateShow(step.date);
+      when.appendChild(b);
+      when.appendChild(document.createTextNode(
+        step.status === 'done' ? 'Completed'
+        : step.date ? 'Expecting'
+        : 'No date yet'));
+      n.appendChild(when);
 
-      var sel = document.createElement('select');
-      sel.setAttribute('aria-label', 'How far along this idea is');
-      RM_STATUS.forEach(function(p){
-        var o = document.createElement('option');
-        o.value = p[0]; o.textContent = p[1];
-        if(p[0] === idea.status) o.selected = true;
-        sel.appendChild(o);
-      });
-      sel.addEventListener('change', function(){ idea.status = sel.value; rmSave(); renderIdeas(); });
-      when.appendChild(sel);
-      when.appendChild(Object.assign(document.createElement('span'),
-        {className: 'st ' + idea.status, textContent: (RM_STATUS.filter(function(p){ return p[0]===idea.status; })[0]||['','']) [1]}));
-      grow.appendChild(when);
-      h.appendChild(grow);
-      card.appendChild(h);
-
-      var b = document.createElement('div');
-      b.className = 'idea-b';
-
-      var note = document.createElement('textarea');
-      note.className = 'idea-note'; note.rows = 4; note.value = idea.note;
-      note.placeholder = 'What it is, why it matters, what you have found out so far…';
-      note.setAttribute('aria-label', 'Notes on this idea');
-      note.addEventListener('input', function(){ idea.note = note.value; rmSave(); });
-      b.appendChild(note);
-
-      b.appendChild(Object.assign(document.createElement('div'), {className:'sublab', textContent:'Steps'}));
-      var ul = document.createElement('ul');
-      ul.className = 'steps';
-      idea.steps.forEach(function(st, si){
-        var li = document.createElement('li');
-        if(st.done) li.className = 'done';
-        var cb = document.createElement('input');
-        cb.type = 'checkbox'; cb.checked = st.done;
-        cb.setAttribute('aria-label', 'Step done');
-        cb.addEventListener('change', function(){
-          st.done = cb.checked;
-          // Stamp the day it was done, and let it go if it is un-ticked, so no
-          // step ever carries a date it did not reach.
-          if(st.done && !st.date) st.date = new Date().toISOString().slice(0,10);
-          if(!st.done) st.date = '';
-          rmSave(); renderIdeas();
-        });
-        li.appendChild(cb);
-        var tx = document.createElement('input');
-        tx.type = 'text'; tx.value = st.text; tx.placeholder = 'e.g. get the quotation';
-        tx.setAttribute('aria-label', 'Step');
-        tx.addEventListener('input', function(){ st.text = tx.value; rmSave(); });
-        li.appendChild(tx);
-        var sd = document.createElement('input');
-        sd.type = 'date'; sd.value = st.date;
-        sd.setAttribute('aria-label', 'Date for this step');
-        sd.addEventListener('change', function(){ st.date = sd.value; rmSave(); });
-        li.appendChild(sd);
-        var sx = document.createElement('button');
-        sx.type = 'button'; sx.className = 'sx'; sx.textContent = '✕';
-        sx.setAttribute('aria-label', 'Remove this step');
-        sx.addEventListener('click', function(){ idea.steps.splice(si,1); rmSave(); renderIdeas(); });
-        li.appendChild(sx);
-        ul.appendChild(li);
-      });
-      b.appendChild(ul);
-
-      if(idea.files.length){
-        b.appendChild(Object.assign(document.createElement('div'), {className:'sublab', textContent:'Files'}));
-        var fb = document.createElement('div');
-        fb.className = 'rmfiles';
-        idea.files.forEach(function(f, fi){
-          var sp = document.createElement('span');
-          sp.className = 'rmfile';
-          var a = document.createElement('a');
-          a.href = f.url; a.target = '_blank'; a.rel = 'noopener';
-          a.textContent = f.name;
-          sp.appendChild(a);
-          if(f.size) sp.appendChild(Object.assign(document.createElement('span'), {className:'qs', textContent: fmtSize(f.size)}));
-          var fx = document.createElement('button');
-          fx.type = 'button'; fx.className = 'qx'; fx.textContent = '✕';
-          fx.setAttribute('aria-label', 'Take ' + f.name + ' off this idea');
-          fx.addEventListener('click', function(){
-            // Taken OFF the idea, not deleted from storage: the same file may
-            // be referenced elsewhere, and losing it silently would be worse
-            // than an unused entry in the library.
-            idea.files.splice(fi,1); rmSave(); renderIdeas();
-          });
-          sp.appendChild(fx);
-          fb.appendChild(sp);
-        });
-        b.appendChild(fb);
-      }
-
-      var acts = document.createElement('div');
-      acts.className = 'idea-acts noprint';
-      var addStep = document.createElement('button');
-      addStep.type='button'; addStep.className='btn btn-ghost'; addStep.style.fontSize='12px';
-      addStep.textContent = '+ Step';
-      addStep.addEventListener('click', function(){
-        idea.steps.push({id:'s'+Date.now(), text:'', done:false, date:''});
-        rmSave(); renderIdeas();
-        var last = card.querySelectorAll('.steps input[type=text]');
-        if(last.length) last[last.length-1].focus();
-      });
-      acts.appendChild(addStep);
-
-      var addFile = document.createElement('button');
-      addFile.type='button'; addFile.className='btn btn-ghost'; addFile.style.fontSize='12px';
-      addFile.textContent = '+ Attach a file';
-      addFile.addEventListener('click', function(){ rmPickFileFor(idea); });
-      acts.appendChild(addFile);
-
-      var rmIdea = document.createElement('button');
-      rmIdea.type='button'; rmIdea.className='del'; rmIdea.textContent='Remove idea';
-      rmIdea.addEventListener('click', function(){
-        if(!confirm('Remove "' + (idea.title || 'this idea') + '" from the roadmap?')) return;
-        rm.ideas = rm.ideas.filter(function(x){ return x !== idea; });
-        rmSave(); renderIdeas(); rmMetaLine();
-      });
-      acts.appendChild(rmIdea);
-      b.appendChild(acts);
-
-      card.appendChild(b);
-      box.appendChild(card);
+      flow.appendChild(n);
     });
 
-    document.getElementById('rmIdeasEmpty').textContent = rm.ideas.length
-      ? '' : 'No ideas in this roadmap yet. Press “Add an idea” to start one.';
+    var leg = document.getElementById('rmLegend');
+    leg.innerHTML = '';
+    RM_STATUS.forEach(function(p){
+      var sp = document.createElement('span');
+      sp.innerHTML = '<i class="dot ' + p[0] + '"></i>';
+      sp.appendChild(document.createTextNode(p[1]));
+      leg.appendChild(sp);
+    });
+
+    document.getElementById('rmIdeasEmpty').textContent = rm.steps.length
+      ? '' : 'No steps yet. Press “Add step” to start.';
   }
 
-  // Files go through the document library, filed under Roadmaps, and the idea
+  // Files go through the document library, filed under Roadmaps, and the row
   // keeps only a reference. One place files live.
+  // A row holds ONE file: the reference shows a single "Choose file" per row,
+  // and a step that needs several is a step that wants sub steps.
   var rmFileInput = document.createElement('input');
   rmFileInput.type = 'file'; rmFileInput.multiple = true;
   rmFileInput.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none';
   document.body.appendChild(rmFileInput);
   var rmFileFor = null;
-  function rmPickFileFor(idea){ rmFileFor = idea; rmFileInput.value = ''; rmFileInput.click(); }
+  function rmPickFileFor(holder){ rmFileFor = holder; rmFileInput.value = ''; rmFileInput.click(); }
   rmFileInput.addEventListener('change', function(){
     var files = Array.prototype.slice.call(rmFileInput.files || []);
-    var idea = rmFileFor;
-    if(!files.length || !idea) return;
+    var holder = rmFileFor;
+    if(!files.length || !holder) return;
+    files = files.slice(0, 1);   // one file per row
     var i = 0;
     (function next(){
-      if(i >= files.length){ rmSave(); renderIdeas(); setNote('rmOpenNote', files.length + ' file(s) attached.'); return; }
+      if(i >= files.length){ rmSave(); renderSteps(); setNote('rmOpenNote', files.length + ' file(s) attached.'); return; }
       var f = files[i];
       setNote('rmOpenNote', 'Uploading ' + f.name + ' (' + (i+1) + ' of ' + files.length + ')…');
       var fd = new FormData();
@@ -1552,7 +1743,7 @@
           // of the same name has been uploaded before.
           var mine = (all||[]).filter(function(d){ return d.name === f.name && d.category === 'Roadmaps'; });
           var got = mine[0];
-          if(got) idea.files.push({docId:got.id, name:got.name, url:got.url, size:got.size});
+          if(got) holder.files = [{docId:got.id, name:got.name, url:got.url, size:got.size}];
           i++; next();
         })
         .catch(function(err){ setNote('rmOpenNote', f.name + ': ' + err.message); i++; next(); });
@@ -1590,13 +1781,33 @@
     goRoadmap('');
     loadRoadmaps();
   });
-  document.getElementById('rmAddIdea').addEventListener('click', function(){
+  document.getElementById('rmAddStep').addEventListener('click', function(){
     if(!rm) return;
-    rm.ideas.push({id:'i'+Date.now(), title:'', date:new Date().toISOString().slice(0,10),
-                   status:'thinking', note:'', steps:[], files:[]});
-    rmSave(); renderIdeas(); rmMetaLine();
-    var first = document.querySelector('#rmIdeas .idea .idea-t');
-    if(first) first.focus();
+    rm.steps.push({id:'t'+Date.now(), title:'', status:'not-started', date:'',
+                   note:'', files:[], subs:[], open:false});
+    rmSave(); renderSteps(); rmMetaLine();
+    var ins = document.querySelectorAll('tr.stepr .stepname input[type=text]');
+    if(ins.length) ins[ins.length-1].focus();
+  });
+
+  /* List and diagram are two readings of the same steps, so the view is in the
+     URL like everything else here — a diagram worth showing someone is a
+     diagram worth being able to send them a link to. */
+  function rmViewMode(){ return new URLSearchParams(location.search).get('v') === 'diagram' ? 'diagram' : 'list'; }
+  function applyRmView(){
+    var diagram = rmViewMode() === 'diagram';
+    var lv = document.getElementById('rmListView'), dv = document.getElementById('rmDiagView');
+    if(!lv) return;
+    lv.hidden = diagram; dv.hidden = !diagram;
+    var b = document.getElementById('rmView');
+    b.textContent = diagram ? 'Back to list view' : 'Road map diagram';
+    if(diagram) renderFlow();
+  }
+  document.getElementById('rmView').addEventListener('click', function(){
+    var id = openRoadmap();
+    var to = rmViewMode() === 'diagram' ? '' : '&v=diagram';
+    history.pushState({}, '', 'admin.html?p=roadmap&r=' + encodeURIComponent(id) + to);
+    applyRmView();
   });
   document.getElementById('rmPrint').addEventListener('click', function(){
     clearTimeout(rmTimer); rmPush();
@@ -1618,7 +1829,19 @@
   });
   document.getElementById('rmSummary').addEventListener('input', function(){
     if(!rm) return;
-    rm.summary = this.value; rmSave();
+    rm.note = this.value; rmSave();
+  });
+  document.getElementById('rmDate').addEventListener('change', function(){
+    if(!rm) return;
+    rm.date = this.value; rmSave();
+  });
+  document.getElementById('rmStatus').addEventListener('change', function(){
+    if(!rm) return;
+    rm.status = this.value;
+    var tag = document.getElementById('rmStatusTag');
+    tag.className = 'st ' + rm.status;
+    tag.textContent = rmLabel(rm.status);
+    rmSave();
   });
 
   // ---- Applications ----
@@ -1806,7 +2029,7 @@
     // The open folder is part of the URL too, so Back out of a folder has to
     // redraw the list, not just the page.
     try{ renderDocs(); }catch(e){}
-    try{ renderRoadmap(); }catch(e){}
+    try{ renderRoadmap(); applyRmView(); }catch(e){}
   });
   showPage();
 
