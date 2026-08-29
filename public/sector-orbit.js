@@ -13,11 +13,18 @@
   // Proportions taken from the reference: the circles are small relative to
   // the ring (0.28 of the radius) so the middle stays open enough to hold a
   // two-line title, and the active one is half again the size of the rest.
-  // 210, and circles at 54: the centre now shows the venture's own photograph,
-  // which needs about 250px of stacked height. Measured against the ring's
-  // inner clearance rather than guessed — at 195 the photograph would have run
-  // into the circles.
-  var R = 210;              // ring radius
+  // 175, with the circles left at 54. The ring is deliberately TIGHT: a smaller
+  // hoop with the same big icons reads as a compact instrument rather than a
+  // diagram spread across the page, and it leaves the section's text room to
+  // breathe beside it.
+  //
+  // 175 is not a guess. Every piece of the centre panel — the photograph, the
+  // counter, the two-line name, the status, the hint — was checked against the
+  // ring's inner clearance AT ITS OWN WIDTH AND HEIGHT, since the wide name
+  // sits where there is most room and the narrow hint sits where there is
+  // least. The tightest of them clears by 13px. Shrink R below about 168 and
+  // the hint starts to touch the circles.
+  var R = 175;              // ring radius
   var DOT = 54;             // circle diameter
   var DOT_ACTIVE = 82;      // 1.52x, the same proportion as before
   var BOX = (R + DOT_ACTIVE / 2 + 8) * 2;   // square the ring needs
@@ -142,7 +149,7 @@
     '  background:var(--color-accent,#ec3013);opacity:.85}' +
     // Centre label: the ring is decorative without it — this is what tells you
     // which venture you are looking at.
-    '.so-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:' + Math.round(R * 1.15) + 'px;' +
+    '.so-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:' + Math.round(R * 1.2) + 'px;' +
     '  text-align:center}' +
     '.so-open{display:block;background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer;' +
     '  width:100%}' +
@@ -157,19 +164,22 @@
     '.so-count .now{color:var(--color-accent,#ec3013)}' +
     // 19px, not 22: "Shipbuilding & Vessel Manufacturing" is the longest name
     // of the twelve and has to fall on two lines, not three.
-    '.so-name{font-family:var(--font-heading,inherit);font-weight:800;font-size:19px;line-height:1.15;' +
-    '  letter-spacing:-0.02em;margin-top:11px;color:var(--color-text,#201e1d);' +
+    // 17px in a 210px column: "Shipbuilding & Vessel Manufacturing", the longest
+    // of the ten, falls on two lines. At 19 it would want three, and the extra
+    // line is what would push the panel into the circles.
+    '.so-name{font-family:var(--font-heading,inherit);font-weight:800;font-size:17px;line-height:1.15;' +
+    '  letter-spacing:-0.02em;margin-top:10px;color:var(--color-text,#201e1d);' +
     // Two lines' worth of room whether the name needs it or not, so the rest
     // of the panel does not jump up and down as the ring turns past the short
     // names ("Boat Yard") and the long ones.
-    '  min-height:44px;display:flex;align-items:center;justify-content:center;' +
+    '  min-height:40px;display:flex;align-items:center;justify-content:center;' +
     '  transition:color .25s ease}' +
     '.so-status{font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;' +
-    '  color:var(--color-neutral-500,#a09b95);margin-top:10px}' +
+    '  color:var(--color-neutral-500,#a09b95);margin-top:9px}' +
     // The venture's own photograph, at the centre of its ring. Falls back to
     // the line icon when a venture has no picture uploaded yet, so the middle
     // is never an empty hole.
-    '.so-shot{position:relative;width:96px;height:96px;border-radius:50%;margin:0 auto 12px;' +
+    '.so-shot{position:relative;width:76px;height:76px;border-radius:50%;margin:0 auto 12px;' +
     '  overflow:hidden;background:var(--color-neutral-200,#eceae7);' +
     '  display:flex;align-items:center;justify-content:center;' +
     '  color:var(--color-accent,#ec3013);' +
@@ -177,7 +187,7 @@
     '.so-shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;' +
     '  opacity:0;transition:opacity .45s ease}' +
     '.so-shot img.on{opacity:1}' +
-    '.so-shot svg{width:40px;height:40px}' +
+    '.so-shot svg{width:32px;height:32px}' +
     '.so-hint{font-size:9px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;' +
     '  color:var(--color-neutral-500,#a09b95);margin-top:7px;white-space:nowrap}' +
     // The name in the middle changes the moment the ring starts moving, which
