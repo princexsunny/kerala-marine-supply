@@ -20,6 +20,7 @@ const {
 const documentsRoutes = require('./routes/documents');
 const { router: recordRoutes } = require('./routes/records');
 const { router: roadmapRoutes } = require('./routes/roadmaps');
+const { router: expenseRoutes } = require('./routes/expenses');
 const applicationsRoutes = require('./routes/applications');
 
 const app = express();
@@ -88,6 +89,10 @@ app.use('/api', adminAuth, recordRoutes);
 // Roadmaps — working notes and plans. Admin-only both ways; these are not
 // published pages and much of what goes in them is commercially sensitive.
 app.use('/api', adminAuth, roadmapRoutes);
+// Expenses, repeating bills and loan EMIs. Admin-only both ways for the same
+// reason as the funding sheet: what the business spends and what it owes is
+// not public, and there is no half of this that could be.
+app.use('/api', adminAuth, expenseRoutes);
 
 // Admin.dc.html and admin-dashboard.html were removed — admin.html is the only
 // admin page now. Old bookmarks and stale tabs still point at those URLs, and a

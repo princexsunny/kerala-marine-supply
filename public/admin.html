@@ -348,6 +348,12 @@
         <span class="t-desc">Everyone who has applied</span>
         <span class="t-meta">inbox</span>
       </a>
+      <a class="tile" href="admin.html?p=money">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9v6M18 9v6"/></svg>
+        <span class="t-name">Expenses</span>
+        <span class="t-desc">What went out, the monthly bills and the loan EMIs</span>
+        <span class="t-meta" id="moTileMeta">money</span>
+      </a>
       <a class="tile" href="admin.html?p=roadmap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V6a2 2 0 0 1 2-2h3l3 2h6a2 2 0 0 1 2 2v9.5"/><path d="M4 19.5A1.5 1.5 0 0 1 5.5 18H20"/><path d="M8.5 11h7M8.5 14.5h4"/></svg>
         <span class="t-name">Roadmaps</span>
@@ -399,6 +405,63 @@
         <span class="t-meta">MP4</span>
       </a>
       </div>
+    </div>
+  </div>
+
+  <!-- Expenses. A folder with three pages inside it, for the same reason the
+       media tiles were folded together: they are one subject, and the front
+       screen should not grow a tile every time something is added. -->
+  <div class="page" id="panel-money">
+    <div class="page-box" aria-label="Expenses">
+      <div class="page-head"><h2>Expenses</h2><a class="page-back" href="admin.html">← All settings</a></div>
+      <p style="max-width:64ch;color:var(--color-neutral-800);font-size:14px;margin:0 0 22px">Money going out. Pick one to open it.</p>
+      <div class="tiles">
+        <a class="tile" href="admin.html?p=money-month">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>
+          <span class="t-name">The month</span>
+          <span class="t-desc">Everything spent, with the totals</span>
+          <span class="t-meta" id="moMonthMeta">by month</span>
+        </a>
+        <a class="tile" href="admin.html?p=money-loans">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20.5h18M4.5 20.5V10M19.5 20.5V10M9 20.5V10M15 20.5V10"/><path d="M2.5 10 12 4l9.5 6"/></svg>
+          <span class="t-name">Loans &amp; EMI</span>
+          <span class="t-desc">What you repay each month, and what is left</span>
+          <span class="t-meta" id="moLoanMeta">loans</span>
+        </a>
+        <a class="tile" href="admin.html?p=money-bills">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.5 15.5 4 14 2.5 12.5 4 11 2.5 9.5 4 8 2.5v17l1.5-1.5L11 19.5 12.5 18 14 19.5 15.5 18 17 19.5z"/><path d="M10.5 8h4M10.5 12h4"/><path d="M17 19.5h2a2 2 0 0 0 2-2V9h-4"/></svg>
+          <span class="t-name">Repeating bills</span>
+          <span class="t-desc">Rent, salaries, electricity — entered once</span>
+          <span class="t-meta" id="moBillMeta">every month</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="panel-money-month">
+    <div class="page-box" aria-label="The month">
+      <div class="page-head"><h2>The month</h2>
+        <span class="crumb"><a href="admin.html">All settings</a><span aria-hidden="true">&rsaquo;</span><a class="page-back" href="admin.html?p=money">← Expenses</a></span>
+      </div>
+      <div class="page-body" id="moMonth"></div>
+    </div>
+  </div>
+
+  <div class="page" id="panel-money-loans">
+    <div class="page-box" aria-label="Loans and EMI">
+      <div class="page-head"><h2>Loans &amp; EMI</h2>
+        <span class="crumb"><a href="admin.html">All settings</a><span aria-hidden="true">&rsaquo;</span><a class="page-back" href="admin.html?p=money">← Expenses</a></span>
+      </div>
+      <div class="page-body" id="moLoans"></div>
+    </div>
+  </div>
+
+  <div class="page" id="panel-money-bills">
+    <div class="page-box" aria-label="Repeating bills">
+      <div class="page-head"><h2>Repeating bills</h2>
+        <span class="crumb"><a href="admin.html">All settings</a><span aria-hidden="true">&rsaquo;</span><a class="page-back" href="admin.html?p=money">← Expenses</a></span>
+      </div>
+      <div class="page-body" id="moBills"></div>
     </div>
   </div>
 
@@ -597,6 +660,7 @@
   </div>
 
 <script src="ventures-data.js"></script>
+<script src="admin-money.js?v=1"></script>
 <script>
 (function(){
   var SLOTS = [
@@ -2081,6 +2145,10 @@
   // and opening a category in a new tab all behave as anyone would expect.
   var TITLES = {
     media:    'Website media',
+    money:          'Expenses',
+    'money-month':  'The month',
+    'money-loans':  'Loans & EMI',
+    'money-bills':  'Repeating bills',
     photos:   'Website photos',
     ventures: 'Venture photos',
     links:    'Venture websites',
@@ -2101,6 +2169,9 @@
       panel.classList.add('on');
       if (menu) menu.style.display = 'none';
       document.title = TITLES[key] + ' — Admin — Kerala Marine Supply';
+      // The expenses pages are drawn by admin-money.js, which has no way of
+      // knowing a panel just became visible.
+      if (window.KMS_MONEY) { try { window.KMS_MONEY.show(key); } catch (e) {} }
     } else {
       // No category, or one we don't recognise: fall back to the menu rather
       // than leaving a blank screen.
