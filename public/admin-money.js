@@ -12,6 +12,13 @@
 // that repeats every month; LOANS are a rule with an end to it. Bills and
 // loans are never copied into a month — they are worked out for the month you
 // are looking at, so correcting the rent is one edit and not twelve.
+//
+// READ, THEN EDIT, THEN SAVE. Everything shows as a plain list. One row at a
+// time opens into a form, and nothing leaves the page until Save is pressed.
+// The earlier version saved every keystroke, which meant a half-typed amount
+// was briefly the truth and there was no moment where you could say "that is
+// what I meant". The two exceptions are the paid and skipped ticks: a tick is
+// a whole action on its own, so it saves at once.
 (function () {
   'use strict';
 
@@ -37,6 +44,10 @@
   function thisMonth() {
     var d = new Date();
     return d.getFullYear() + '-' + pad2(d.getMonth() + 1);
+  }
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
   }
   function shiftMonth(m, by) {
     var y = Number(m.slice(0, 4)), mo = Number(m.slice(5, 7)) - 1 + by;
@@ -73,6 +84,7 @@
   }
   function el(id) { return document.getElementById(id); }
   function uid(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function copy(o) { return JSON.parse(JSON.stringify(o)); }
 
   // ---- what applies in a given month ---------------------------------------
 
@@ -123,14 +135,35 @@
     return out;
   }
 
+  // What is left to pay: the instalments not yet ticked, times the EMI. This
+  // is NOT the outstanding principal — an EMI is part interest — and it is
+  // labelled that way everywhere it appears, because quoting it as principal
+  // would overstate what a bank would accept to close the loan.
+  function left(l) {
+    if (!l.months) return 0;
+    return Math.max(0, l.months - l.paid.length) * l.emi;
+  }
+  function nextDue(l) {
+    if (!l.from) return '';
+    var i = l.paid.length;
+    if (l.months && i >= l.months) return '';
+    return dueDate(shiftMonth(l.from, i), l.dueDay);
+  }
+
   // ---- state ---------------------------------------------------------------
 
   var D = { year: 0, entries: [], bills: [], loans: [], categories: [] };
   var month = thisMonth();
   var loaded = {};        // years already fetched, so switching back is instant
-  var years = {};         // year -> entries, kept so a year switch does not lose the other
+  var years = {};         // year -> entries, so a year switch does not lose the other
   var ready = false;
-  var current = '';       // which of the pages is open
+  var current = '';       // which page is open
+
+  // The one thing being edited, if any. At most one at a time: two open forms
+  // means two answers to "what happens when I press Save", and a list you can
+  // no longer read at a glance.
+  //   { kind: 'entry'|'loan'|'bill', id, draft, isNew }
+  var edit = null;
 
   function ventures() {
     return (window.KMS_VISIBLE || window.KMS_VENTURES || []).filter(function (v) { return !v.hidden; });
@@ -142,40 +175,25 @@
 
   // ---- saving --------------------------------------------------------------
   //
-  // Debounced, and coalesced: a second change while a save is in flight queues
-  // one more save rather than racing it. Typing an amount fires a change per
-  // keystroke, and without this every one of them would be a request.
-  var saving = { entries: false, bills: false, loans: false };
-  var again = {};
-  var timers = {};
+  // Explicit. commit() is called by a Save button, or by a tick, and goes
+  // straight to the server — there is no debounce and no queue, because there
+  // is no longer a stream of keystrokes to absorb.
+
+  var inFlight = 0;
 
   function setStatus(text, bad) {
     var n = el('moStatus');
     if (!n) return;
-    n.textContent = text;
-    n.style.color = bad ? 'var(--color-accent-700)' : 'var(--color-neutral-700)';
+    n.textContent = text || '';
+    n.className = 'mo-status' + (bad ? ' bad' : '');
   }
 
-  function save(what) {
-    clearTimeout(timers[what]);
-    timers[what] = setTimeout(function () { doSave(what); }, 650);
+  function commit(what, then) {
+    var url = what === 'entries' ? API + '/entries/' + D.year : API + '/' + what;
+    var body = what === 'entries' ? { entries: D.entries } : { items: D[what] };
+    inFlight++;
     setStatus('Saving…');
-  }
-
-  function doSave(what) {
-    if (saving[what]) { again[what] = true; return; }
-    saving[what] = true;
-
-    var url, body;
-    if (what === 'entries') {
-      url = API + '/entries/' + D.year;
-      body = { entries: D.entries };
-    } else {
-      url = API + '/' + what;
-      body = { items: D[what] };
-    }
-
-    fetch(url, {
+    return fetch(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
@@ -187,36 +205,28 @@
           return j;
         });
       })
-      .then(function () {
-        saving[what] = false;
-        if (again[what]) { again[what] = false; doSave(what); return; }
-        setStatus('Saved ' + new Date().toLocaleTimeString('en-IN',
+      .then(function (j) {
+        inFlight--;
+        setStatus('Saved at ' + new Date().toLocaleTimeString('en-IN',
           { hour: '2-digit', minute: '2-digit' }));
+        if (then) then(j);
       })
       .catch(function (err) {
-        saving[what] = false;
-        // The change is still on screen and still in memory — say what went
-        // wrong rather than reverting under the reader and losing the typing.
-        setStatus(err.message + ' Your change is still here; try again.', true);
+        inFlight--;
+        // The change is still on screen and still in memory. Saying what went
+        // wrong is better than reverting under the reader and losing the work.
+        setStatus(err.message + ' Nothing was lost — press Save again.', true);
+        throw err;
       });
   }
 
-  // A save that has not left yet must not be lost to a closed tab. keepalive
-  // lets the request outlive the page.
-  window.addEventListener('pagehide', function () {
-    ['entries', 'bills', 'loans'].forEach(function (what) {
-      if (!timers[what]) return;
-      clearTimeout(timers[what]);
-      var url = what === 'entries' ? API + '/entries/' + D.year : API + '/' + what;
-      var body = what === 'entries' ? { entries: D.entries } : { items: D[what] };
-      try {
-        fetch(url, {
-          method: 'PUT', keepalive: true,
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin', body: JSON.stringify(body),
-        });
-      } catch (e) {}
-    });
+  // Leaving with a form open would lose whatever is in it, and the browser is
+  // the only thing that can stop that in time.
+  window.addEventListener('beforeunload', function (e) {
+    if (!edit) return;
+    e.preventDefault();
+    e.returnValue = '';
+    return '';
   });
 
   // ---- loading -------------------------------------------------------------
@@ -300,12 +310,34 @@
       }).join('') + '</select>';
   }
 
-  function statusBar() {
-    return '<p class="mo-status" id="moStatus"></p>';
+  function statusBar() { return '<p class="mo-status" id="moStatus"></p>'; }
+  function emptyNote(t) { return '<p class="mo-empty">' + esc(t) + '</p>'; }
+  function saveRow(label) {
+    return '<div class="mo-row mo-save">' +
+      '<button type="button" class="mo-btn f-save">' + esc(label || 'Save') + '</button>' +
+      '<button type="button" class="mo-btn mo-quiet f-cancel">Cancel</button>' +
+      '<span class="mo-editing">Not saved yet</span>' +
+    '</div>';
   }
 
-  function emptyNote(text) {
-    return '<p class="mo-empty">' + esc(text) + '</p>';
+  // Editing anything else while a form is open would silently drop what is in
+  // it. Asking is the only honest option.
+  function leaveEdit() {
+    if (!edit) return true;
+    if (!confirm('You have not saved what you were editing. Leave it and lose the change?')) return false;
+    if (edit.isNew) removeNew(edit);
+    edit = null;
+    return true;
+  }
+  function removeNew(e) {
+    if (e.kind === 'entry') {
+      D.entries = D.entries.filter(function (x) { return x.id !== e.id; });
+      years[D.year] = D.entries;
+    } else if (e.kind === 'loan') {
+      D.loans = D.loans.filter(function (x) { return x.id !== e.id; });
+    } else {
+      D.bills = D.bills.filter(function (x) { return x.id !== e.id; });
+    }
   }
 
   // ---- page: the month -----------------------------------------------------
@@ -317,7 +349,9 @@
 
     var t = monthTotals(D, month);
     var prev = shiftMonth(month, -1);
-    var pt = loaded[yearOf(prev)] ? monthTotals({ entries: years[yearOf(prev)] || [], bills: D.bills, loans: D.loans }, prev) : null;
+    var pt = loaded[yearOf(prev)]
+      ? monthTotals({ entries: years[yearOf(prev)] || [], bills: D.bills, loans: D.loans }, prev)
+      : null;
 
     var diff = pt ? t.total - pt.total : null;
     var change = diff === null
@@ -331,7 +365,7 @@
     var cats = Object.keys(t.byCat).sort(function (a, b) { return t.byCat[b] - t.byCat[a]; });
     var biggest = cats.length ? t.byCat[cats[0]] : 0;
 
-    var html =
+    host.innerHTML =
       '<div class="mo-bar">' +
         '<button type="button" class="mo-nav" id="moPrev" aria-label="Previous month">‹</button>' +
         '<input type="month" id="moPick" value="' + month + '">' +
@@ -350,28 +384,15 @@
           '<span class="c"><a href="admin.html?p=money-loans">manage</a></span></div>' +
       '</div>' +
 
-      // ---- add ----
-      '<h3 class="mo-h">Add an expense</h3>' +
-      '<div class="mo-add">' +
-        '<input type="date" id="moDate" value="' + dueDate(month, new Date().getMonth() + 1 === Number(month.slice(5, 7)) && String(new Date().getFullYear()) === month.slice(0, 4) ? new Date().getDate() : 1) + '">' +
-        '<input type="text" id="moAmt" inputmode="decimal" placeholder="Amount">' +
-        '<input type="text" id="moCat" list="moCats" placeholder="Category">' +
-        ventureSelect('', 'mo-v') +
-        '<input type="text" id="moNote" placeholder="What was it for? (optional)">' +
-        '<button type="button" class="mo-btn" id="moAdd">Add</button>' +
-      '</div>' +
-      '<datalist id="moCats">' + catOptions() + '</datalist>' +
+      '<div class="mo-head"><h3 class="mo-h">Spent in ' + esc(monthName(month)) + '</h3>' +
+        '<button type="button" class="mo-btn" id="moAddEntry">Add an expense</button></div>' +
       statusBar() +
+      '<datalist id="moCats">' + catOptions() + '</datalist>' +
+      renderEntryList() +
 
-      // ---- what was spent ----
-      '<h3 class="mo-h">Spent in ' + esc(monthName(month)) + '</h3>' +
-      renderEntryTable() +
-
-      // ---- what repeats ----
       '<h3 class="mo-h">Due this month</h3>' +
-      renderDueTable(month) +
+      renderDueList(month) +
 
-      // ---- where it went ----
       '<h3 class="mo-h">Where it went</h3>' +
       (cats.length
         ? '<div class="mo-split">' + cats.map(function (c) {
@@ -383,31 +404,49 @@
           }).join('') + '</div>'
         : emptyNote('Nothing in this month yet.'));
 
-    host.innerHTML = html;
     bindMonth();
   }
 
-  function renderEntryTable() {
+  // The list. Plain rows you can read down, with one row swapped for a form
+  // when it is being edited.
+  function renderEntryList() {
     var rows = D.entries.filter(function (e) { return e.date.slice(0, 7) === month; });
-    if (!rows.length) return emptyNote('No expenses recorded in this month yet.');
-    return '<div class="scroll"><table class="mo-tbl">' +
-      '<thead><tr><th>Date</th><th>Amount</th><th>Category</th><th>Venture</th><th>What for</th><th></th></tr></thead><tbody>' +
-      rows.map(function (e) {
-        return '<tr data-id="' + esc(e.id) + '">' +
-          '<td><input type="date" class="f-date" value="' + esc(e.date) + '"></td>' +
-          '<td><input type="text" inputmode="decimal" class="f-amt" value="' + e.amount + '"></td>' +
-          '<td><input type="text" list="moCats" class="f-cat" value="' + esc(e.category) + '"></td>' +
-          '<td>' + ventureSelect(e.venture, 'f-ven') + '</td>' +
-          '<td><input type="text" class="f-note" value="' + esc(e.note) + '"></td>' +
-          '<td class="r"><button type="button" class="mo-x" title="Delete this expense">Delete</button></td>' +
-        '</tr>';
-      }).join('') + '</tbody></table></div>';
+    if (!rows.length && !(edit && edit.kind === 'entry')) {
+      return emptyNote('No expenses recorded in this month yet.');
+    }
+    return '<ul class="mo-list">' + rows.map(function (e) {
+      if (edit && edit.kind === 'entry' && edit.id === e.id) return entryForm(edit.draft, edit.isNew);
+      return '<li class="mo-li" data-id="' + esc(e.id) + '">' +
+        '<span class="mo-when">' + esc(prettyDate(e.date)) + '</span>' +
+        '<span class="mo-what"><b>' + esc(e.category || 'Uncategorised') + '</b>' +
+          (e.note ? '<span class="mo-sub">' + esc(e.note) + '</span>' : '') + '</span>' +
+        '<span class="mo-for">' + esc(ventureName(e.venture) || '—') + '</span>' +
+        '<span class="mo-amt">' + rupees(e.amount) + '</span>' +
+        '<span class="mo-acts">' +
+          '<button type="button" class="mo-x f-edit">Edit</button>' +
+          '<button type="button" class="mo-x f-del">Delete</button>' +
+        '</span>' +
+      '</li>';
+    }).join('') + '</ul>';
+  }
+
+  function entryForm(e, isNew) {
+    return '<li class="mo-li mo-open" data-id="' + esc(e.id) + '">' +
+      '<div class="mo-grid">' +
+        '<label>Date<input type="date" class="f-date" value="' + esc(e.date) + '"></label>' +
+        '<label>Amount<input type="text" inputmode="decimal" class="f-amt" value="' + (e.amount || '') + '" placeholder="0"></label>' +
+        '<label>Category<input type="text" list="moCats" class="f-cat" value="' + esc(e.category) + '" placeholder="Fuel"></label>' +
+        '<label>Venture' + ventureSelect(e.venture, 'f-ven') + '</label>' +
+        '<label class="wide">What was it for<input type="text" class="f-note" value="' + esc(e.note) + '" placeholder="optional"></label>' +
+      '</div>' +
+      saveRow(isNew ? 'Save this expense' : 'Save changes') +
+    '</li>';
   }
 
   // The bills and EMIs that fall in this month. Ticking one paid is the only
-  // edit available here — the amount belongs to the rule, not to the month, so
-  // changing it here would be changing every month at once without saying so.
-  function renderDueTable(m) {
+  // change available here — the amount belongs to the rule, not to the month,
+  // so editing it here would change every month at once without saying so.
+  function renderDueList(m) {
     var rows = [];
     D.bills.forEach(function (b) {
       if (!billIn(b, m)) return;
@@ -431,125 +470,147 @@
     if (!rows.length) return emptyNote('No repeating bills or EMIs fall in this month.');
     rows.sort(function (a, b) { return a.when.localeCompare(b.when); });
 
-    var today = new Date().toISOString().slice(0, 10);
-    return '<div class="scroll"><table class="mo-tbl">' +
-      '<thead><tr><th>Due</th><th>What</th><th>Amount</th><th>For</th><th>Paid</th><th></th></tr></thead><tbody>' +
-      rows.map(function (r) {
-        var late = !r.paid && !r.skipped && r.when < today;
-        return '<tr data-kind="' + r.kind + '" data-id="' + esc(r.id) + '"' +
-               (r.skipped ? ' class="mo-skipped"' : '') + '>' +
-          '<td>' + prettyDate(r.when) +
-            (late ? ' <span class="mo-late">overdue</span>' : '') + '</td>' +
-          '<td><strong>' + esc(r.name) + '</strong><br><span class="mo-sub">' + esc(r.what) + '</span></td>' +
-          '<td>' + rupees(r.amount) + '</td>' +
-          '<td>' + esc(ventureName(r.venture) || '—') + '</td>' +
-          '<td><label class="mo-tick"><input type="checkbox" class="f-paid"' +
-            (r.paid ? ' checked' : '') + (r.skipped ? ' disabled' : '') + '> paid</label></td>' +
-          '<td class="r">' + (r.kind === 'bill'
+    var now = today();
+    return '<ul class="mo-list">' + rows.map(function (r) {
+      var late = !r.paid && !r.skipped && r.when < now;
+      return '<li class="mo-li' + (r.skipped ? ' mo-skipped' : '') +
+             '" data-kind="' + r.kind + '" data-id="' + esc(r.id) + '">' +
+        '<span class="mo-when">' + esc(prettyDate(r.when)) +
+          (late ? '<span class="mo-late">overdue</span>' : '') + '</span>' +
+        '<span class="mo-what"><b>' + esc(r.name) + '</b><span class="mo-sub">' + esc(r.what) + '</span></span>' +
+        '<span class="mo-for">' + esc(ventureName(r.venture) || '—') + '</span>' +
+        '<span class="mo-amt">' + rupees(r.amount) + '</span>' +
+        '<span class="mo-acts">' +
+          '<label class="mo-tick"><input type="checkbox" class="f-paid"' +
+            (r.paid ? ' checked' : '') + (r.skipped ? ' disabled' : '') + '> paid</label>' +
+          (r.kind === 'bill'
             ? '<label class="mo-tick"><input type="checkbox" class="f-skip"' +
               (r.skipped ? ' checked' : '') + '> not this month</label>'
-            : '') + '</td>' +
-        '</tr>';
-      }).join('') + '</tbody></table></div>';
+            : '') +
+        '</span>' +
+      '</li>';
+    }).join('') + '</ul>';
   }
 
   function bindMonth() {
     var host = el('moMonth');
 
     function goTo(m) {
+      if (!leaveEdit()) return;
       month = m;
       var y = yearOf(m);
       if (y !== D.year) {
-        // Keep the year we are leaving, so switching back does not refetch and
-        // an unsaved edit in it is not thrown away.
-        years[D.year] = D.entries;
-        load(y, renderMonth);
+        years[D.year] = D.entries;   // keep the year being left
+        load(y, function () { renderMonth(); paintTiles(); });
       } else {
-        renderMonth();
+        renderMonth(); paintTiles();
       }
-      paintTiles();
     }
 
     el('moPrev').onclick = function () { goTo(shiftMonth(month, -1)); };
     el('moNext').onclick = function () { goTo(shiftMonth(month, 1)); };
     el('moNow').onclick = function () { goTo(thisMonth()); };
-    el('moPick').onchange = function () { if (/^\d{4}-\d{2}$/.test(this.value)) goTo(this.value); };
-
-    el('moAdd').onclick = function () {
-      var date = el('moDate').value;
-      var amt = num(el('moAmt').value);
-      if (!date) { setStatus('Give the expense a date.', true); el('moDate').focus(); return; }
-      if (!amt) { setStatus('Give the expense an amount.', true); el('moAmt').focus(); return; }
-      if (yearOf(date.slice(0, 7)) !== D.year) {
-        setStatus('That date is in ' + date.slice(0, 4) + '. Switch to that year first.', true);
-        return;
-      }
-      D.entries.unshift({
-        id: uid('e'), date: date, amount: amt,
-        category: el('moCat').value.trim(),
-        venture: host.querySelector('.mo-add .mo-v').value,
-        note: el('moNote').value.trim(),
-      });
-      D.entries.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
-      save('entries');
-      // Jump to the month the expense was actually dated in, so an entry never
-      // disappears the moment it is added.
-      if (date.slice(0, 7) !== month) month = date.slice(0, 7);
-      renderMonth();
-      paintTiles();
-      var f = el('moAmt'); if (f) f.focus();
+    el('moPick').onchange = function () {
+      if (/^\d{4}-\d{2}$/.test(this.value)) goTo(this.value);
     };
 
-    // Editing an expense.
-    host.querySelectorAll('.mo-tbl tr[data-id]').forEach(function (tr) {
-      var id = tr.getAttribute('data-id');
-      var kind = tr.getAttribute('data-kind');
+    el('moAddEntry').onclick = function () {
+      if (!leaveEdit()) return;
+      var d = (thisMonth() === month) ? today() : dueDate(month, 1);
+      var e = { id: uid('e'), date: d, amount: 0, category: '', venture: '', note: '' };
+      D.entries.unshift(e);
+      years[D.year] = D.entries;
+      edit = { kind: 'entry', id: e.id, draft: copy(e), isNew: true };
+      renderMonth();
+      var f = host.querySelector('.mo-open .f-amt');
+      if (f) f.focus();
+    };
+
+    // Rows being read.
+    host.querySelectorAll('.mo-li[data-id]:not(.mo-open)').forEach(function (li) {
+      var id = li.getAttribute('data-id');
+      var kind = li.getAttribute('data-kind');
 
       if (!kind) {
         var e = D.entries.filter(function (x) { return x.id === id; })[0];
         if (!e) return;
-        var reRender = false;
-        tr.querySelector('.f-date').onchange = function () {
-          if (yearOf(this.value.slice(0, 7)) !== D.year) {
-            setStatus('That date is in another year. Switch year and add it there.', true);
-            this.value = e.date;
-            return;
-          }
-          e.date = this.value; save('entries'); renderMonth(); paintTiles();
+        li.querySelector('.f-edit').onclick = function () {
+          if (!leaveEdit()) return;
+          edit = { kind: 'entry', id: id, draft: copy(e), isNew: false };
+          renderMonth();
         };
-        tr.querySelector('.f-amt').onchange = function () {
-          e.amount = num(this.value); this.value = e.amount; save('entries'); paintTiles();
-        };
-        tr.querySelector('.f-cat').onchange = function () {
-          e.category = this.value.trim(); save('entries');
-        };
-        tr.querySelector('.f-ven').onchange = function () { e.venture = this.value; save('entries'); };
-        tr.querySelector('.f-note').onchange = function () { e.note = this.value.trim(); save('entries'); };
-        tr.querySelector('.mo-x').onclick = function () {
+        li.querySelector('.f-del').onclick = function () {
+          if (!leaveEdit()) return;
           if (!confirm('Delete this ' + rupees(e.amount) + ' expense? This cannot be undone.')) return;
           D.entries = D.entries.filter(function (x) { return x.id !== id; });
           years[D.year] = D.entries;
-          save('entries'); renderMonth(); paintTiles();
+          commit('entries').catch(function () {});
+          renderMonth(); paintTiles();
         };
         return;
       }
 
-      // A bill or an EMI: only the ticks.
+      // A bill or an EMI: the ticks only, and they save at once.
       var list = kind === 'bill' ? D.bills : D.loans;
       var it = list.filter(function (x) { return x.id === id; })[0];
       if (!it) return;
-      var paid = tr.querySelector('.f-paid');
+      var paid = li.querySelector('.f-paid');
       if (paid) paid.onchange = function () {
         toggle(it.paid, month, this.checked);
-        save(kind === 'bill' ? 'bills' : 'loans');
+        commit(kind === 'bill' ? 'bills' : 'loans').catch(function () {});
       };
-      var skip = tr.querySelector('.f-skip');
+      var skip = li.querySelector('.f-skip');
       if (skip) skip.onchange = function () {
         toggle(it.skip, month, this.checked);
         if (this.checked) toggle(it.paid, month, false);
-        save('bills'); renderMonth(); paintTiles();
+        commit('bills').then(function () { renderMonth(); paintTiles(); }, function () {});
       };
     });
+
+    // The one row open as a form.
+    var open = host.querySelector('.mo-open');
+    if (open) bindEntryForm(open);
+  }
+
+  function bindEntryForm(box) {
+    var d = edit.draft;
+    function read() {
+      d.date = box.querySelector('.f-date').value;
+      d.amount = num(box.querySelector('.f-amt').value);
+      d.category = box.querySelector('.f-cat').value.trim();
+      d.venture = box.querySelector('.f-ven').value;
+      d.note = box.querySelector('.f-note').value.trim();
+    }
+    box.querySelector('.f-save').onclick = function () {
+      read();
+      if (!d.date) { setStatus('Give the expense a date.', true); box.querySelector('.f-date').focus(); return; }
+      if (!d.amount) { setStatus('Give the expense an amount.', true); box.querySelector('.f-amt').focus(); return; }
+      if (yearOf(d.date.slice(0, 7)) !== D.year) {
+        setStatus('That date is in ' + d.date.slice(0, 4) + ', and this book is ' + D.year +
+                  '. Switch year first, then add it there.', true);
+        return;
+      }
+      // Write the draft over the real record only now.
+      var i = D.entries.findIndex(function (x) { return x.id === d.id; });
+      if (i >= 0) D.entries[i] = copy(d);
+      D.entries.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+      years[D.year] = D.entries;
+      var wasNew = edit.isNew;
+      edit = null;
+      // Follow the expense to the month it was dated in, so a saved entry is
+      // never invisible the moment it is saved.
+      if (d.date.slice(0, 7) !== month) month = d.date.slice(0, 7);
+      commit('entries').then(function () {
+        if (wasNew) setStatus('Added ' + rupees(d.amount) + ' on ' + prettyDate(d.date) + '.');
+      }, function () {});
+      renderMonth(); paintTiles();
+    };
+    box.querySelector('.f-cancel').onclick = function () {
+      if (edit.isNew) removeNew(edit);
+      edit = null;
+      setStatus('');
+      renderMonth();
+    };
   }
 
   // ---- page: loans ---------------------------------------------------------
@@ -574,115 +635,150 @@
         '<div class="mo-card"><span class="k">Still to repay</span><strong>' + rupees(owed) + '</strong>' +
           '<span class="c">instalments left × EMI, interest included</span></div>' +
       '</div>' +
-      '<p class="mo-caveat">These are the figures you enter. Nothing here is taken from a bank — check ' +
-        'a statement before relying on it for a payment.</p>' +
-      '<div class="mo-row"><button type="button" class="mo-btn" id="moAddLoan">Add a loan</button></div>' +
+      '<p class="mo-caveat">These are the figures you enter. Nothing here is taken from a bank — ' +
+        'check a statement before relying on it for a payment.</p>' +
+      '<div class="mo-head"><h3 class="mo-h">Loans</h3>' +
+        '<button type="button" class="mo-btn" id="moAddLoan">Add a loan</button></div>' +
       statusBar() +
-      (D.loans.length ? D.loans.map(loanCard).join('') : emptyNote('No loans added yet.'));
+      (D.loans.length
+        ? '<ul class="mo-list">' + D.loans.map(function (l) {
+            return (edit && edit.kind === 'loan' && edit.id === l.id)
+              ? loanForm(edit.draft, edit.isNew) : loanRow(l);
+          }).join('') + '</ul>'
+        : emptyNote('No loans added yet.'));
 
     bindLoans();
   }
 
-  // What is left to pay: the instalments not yet ticked, times the EMI. This
-  // is NOT the outstanding principal — an EMI is part interest — and it is
-  // labelled that way everywhere it appears, because quoting it as principal
-  // would overstate what a bank would accept to close the loan.
-  function left(l) {
-    if (!l.months) return 0;
-    return Math.max(0, l.months - l.paid.length) * l.emi;
-  }
-  function nextDue(l) {
-    if (!l.from) return '';
-    var i = l.paid.length;
-    if (l.months && i >= l.months) return '';
-    return dueDate(shiftMonth(l.from, i), l.dueDay);
-  }
-
-  function loanCard(l) {
+  function loanRow(l) {
     var n = nextDue(l);
     var done = l.months ? Math.min(100, Math.round(l.paid.length / l.months * 100)) : 0;
-    var today = new Date().toISOString().slice(0, 10);
-    return '<div class="mo-item" data-id="' + esc(l.id) + '">' +
+    var late = n && n < today();
+    return '<li class="mo-li mo-tall" data-id="' + esc(l.id) + '">' +
+      '<span class="mo-what"><b>' + esc(l.lender || 'Untitled loan') + '</b>' +
+        '<span class="mo-sub">' + esc(l.purpose || 'no purpose set') +
+        (ventureName(l.venture) ? ' · ' + esc(ventureName(l.venture)) : '') + '</span>' +
+        '<span class="mo-meter"><i style="width:' + done + '%"></i></span>' +
+        '<span class="mo-sub"><b>' + l.paid.length + '</b> of ' + (l.months || '—') + ' paid · ' +
+          'next ' + (n ? esc(prettyDate(n)) : 'nothing outstanding') +
+          (late ? ' <span class="mo-late">overdue</span>' : '') + '</span>' +
+      '</span>' +
+      '<span class="mo-amt"><b>' + rupees(l.emi) + '</b><span class="mo-sub">a month</span>' +
+        '<span class="mo-sub">' + rupees(left(l)) + ' left</span></span>' +
+      '<span class="mo-acts">' +
+        '<button type="button" class="mo-x f-pay">Mark next EMI paid</button>' +
+        '<button type="button" class="mo-x f-edit">Edit</button>' +
+        '<button type="button" class="mo-x f-del">Delete</button>' +
+      '</span>' +
+    '</li>';
+  }
+
+  function loanForm(l, isNew) {
+    return '<li class="mo-li mo-open" data-id="' + esc(l.id) + '">' +
       '<div class="mo-grid">' +
         '<label>Lender<input type="text" class="f-lender" value="' + esc(l.lender) + '" placeholder="Kerala Financial Corporation"></label>' +
         '<label>What for<input type="text" class="f-purpose" value="' + esc(l.purpose) + '" placeholder="Boat yard"></label>' +
         '<label>Venture' + ventureSelect(l.venture, 'f-ven') + '</label>' +
-        '<label>Amount borrowed<input type="text" inputmode="decimal" class="f-principal" value="' + l.principal + '"></label>' +
-        '<label>EMI a month<input type="text" inputmode="decimal" class="f-emi" value="' + l.emi + '"></label>' +
-        '<label>Interest %<input type="text" inputmode="decimal" class="f-rate" value="' + l.rate + '"></label>' +
+        '<label>Amount borrowed<input type="text" inputmode="decimal" class="f-principal" value="' + (l.principal || '') + '" placeholder="0"></label>' +
+        '<label>EMI a month<input type="text" inputmode="decimal" class="f-emi" value="' + (l.emi || '') + '" placeholder="0"></label>' +
+        '<label>Interest %<input type="text" inputmode="decimal" class="f-rate" value="' + (l.rate || '') + '" placeholder="0"></label>' +
         '<label>First EMI month<input type="month" class="f-from" value="' + esc(l.from) + '"></label>' +
-        '<label>How many EMIs<input type="number" min="0" max="600" class="f-months" value="' + (l.months || '') + '"></label>' +
+        '<label>How many EMIs<input type="number" min="0" max="600" class="f-months" value="' + (l.months || '') + '" placeholder="e.g. 84"></label>' +
         '<label>Due on day<input type="number" min="1" max="31" class="f-day" value="' + l.dueDay + '"></label>' +
       '</div>' +
-      '<div class="mo-meter"><i style="width:' + done + '%"></i></div>' +
-      '<p class="mo-facts">' +
-        '<span><b>' + l.paid.length + '</b> of ' + (l.months || '—') + ' paid</span>' +
-        '<span>Left to pay <b>' + rupees(left(l)) + '</b></span>' +
-        '<span>Next due <b>' + (n ? prettyDate(n) : 'nothing outstanding') + '</b>' +
-          (n && n < today ? ' <span class="mo-late">overdue</span>' : '') + '</span>' +
-      '</p>' +
-      '<div class="mo-row">' +
-        '<button type="button" class="mo-btn mo-quiet f-pay">Mark next EMI paid</button>' +
-        '<button type="button" class="mo-btn mo-quiet f-unpay">Undo last</button>' +
-        '<button type="button" class="mo-x f-del">Delete this loan</button>' +
-      '</div>' +
-    '</div>';
+      (l.paid.length ? '<p class="mo-facts"><span><b>' + l.paid.length + '</b> instalments are ticked paid on this loan</span></p>' : '') +
+      saveRow(isNew ? 'Save this loan' : 'Save changes') +
+    '</li>';
   }
 
   function bindLoans() {
     var host = el('moLoans');
+
     el('moAddLoan').onclick = function () {
-      D.loans.unshift({
+      if (!leaveEdit()) return;
+      var l = {
         id: uid('l'), lender: '', purpose: '', principal: 0, emi: 0, rate: 0,
         dueDay: 5, from: thisMonth(), months: 0, venture: '', paid: [], note: '',
-      });
-      save('loans'); renderLoans();
+      };
+      D.loans.unshift(l);
+      edit = { kind: 'loan', id: l.id, draft: copy(l), isNew: true };
+      renderLoans();
+      var f = host.querySelector('.mo-open .f-lender');
+      if (f) f.focus();
     };
 
-    host.querySelectorAll('.mo-item').forEach(function (box) {
-      var id = box.getAttribute('data-id');
+    host.querySelectorAll('.mo-li[data-id]:not(.mo-open)').forEach(function (li) {
+      var id = li.getAttribute('data-id');
       var l = D.loans.filter(function (x) { return x.id === id; })[0];
       if (!l) return;
-      function on(sel, fn, redraw) {
-        var n = box.querySelector(sel);
-        if (n) n.onchange = function () { fn.call(n); save('loans'); if (redraw) renderLoans(); paintTiles(); };
-      }
-      on('.f-lender', function () { l.lender = this.value.trim(); });
-      on('.f-purpose', function () { l.purpose = this.value.trim(); });
-      on('.f-ven', function () { l.venture = this.value; });
-      on('.f-principal', function () { l.principal = num(this.value); this.value = l.principal; });
-      on('.f-emi', function () { l.emi = num(this.value); this.value = l.emi; }, true);
-      on('.f-rate', function () { var n = Number(this.value); l.rate = isFinite(n) && n >= 0 && n <= 100 ? n : 0; this.value = l.rate; });
-      on('.f-from', function () { l.from = /^\d{4}-\d{2}$/.test(this.value) ? this.value : ''; }, true);
-      on('.f-day', function () { l.dueDay = Math.min(31, Math.max(1, Number(this.value) || 1)); this.value = l.dueDay; }, true);
-      on('.f-months', function () {
-        var n = Math.max(0, Math.round(Number(this.value) || 0));
-        // Fewer instalments than are already ticked paid would make "left to
-        // pay" negative and the server would refuse the save anyway.
-        if (n && n < l.paid.length) {
-          setStatus(l.paid.length + ' EMIs are already marked paid, so there cannot be ' + n + '.', true);
-          this.value = l.months || '';
-          return;
-        }
-        l.months = n;
-      }, true);
 
-      box.querySelector('.f-pay').onclick = function () {
-        var m = l.from ? shiftMonth(l.from, l.paid.length) : '';
-        if (!m) { setStatus('Set the first EMI month before marking one paid.', true); return; }
-        if (l.months && l.paid.length >= l.months) { setStatus('All the EMIs on this loan are paid.', true); return; }
-        toggle(l.paid, m, true); save('loans'); renderLoans(); paintTiles();
+      li.querySelector('.f-edit').onclick = function () {
+        if (!leaveEdit()) return;
+        edit = { kind: 'loan', id: id, draft: copy(l), isNew: false };
+        renderLoans();
       };
-      box.querySelector('.f-unpay').onclick = function () {
-        if (!l.paid.length) { setStatus('Nothing is marked paid on this loan yet.', true); return; }
-        l.paid.pop(); save('loans'); renderLoans(); paintTiles();
-      };
-      box.querySelector('.f-del').onclick = function () {
-        if (!confirm('Delete the ' + (l.lender || 'untitled') + ' loan and everything marked paid on it?')) return;
+      li.querySelector('.f-del').onclick = function () {
+        if (!leaveEdit()) return;
+        if (!confirm('Delete the ' + (l.lender || 'untitled') + ' loan and everything ticked paid on it?')) return;
         D.loans = D.loans.filter(function (x) { return x.id !== id; });
-        save('loans'); renderLoans(); paintTiles();
+        commit('loans').catch(function () {});
+        renderLoans(); paintTiles();
+      };
+      li.querySelector('.f-pay').onclick = function () {
+        if (!l.from) { setStatus('Set the first EMI month on this loan before marking one paid.', true); return; }
+        if (l.months && l.paid.length >= l.months) { setStatus('Every EMI on this loan is already paid.', true); return; }
+        var m = shiftMonth(l.from, l.paid.length);
+        toggle(l.paid, m, true);
+        commit('loans').then(function () {
+          setStatus('Marked ' + monthName(m) + ' paid on ' + (l.lender || 'that loan') + '.');
+        }, function () {});
+        renderLoans(); paintTiles();
       };
     });
+
+    var open = host.querySelector('.mo-open');
+    if (open) bindLoanForm(open);
+  }
+
+  function bindLoanForm(box) {
+    var d = edit.draft;
+    function read() {
+      d.lender = box.querySelector('.f-lender').value.trim();
+      d.purpose = box.querySelector('.f-purpose').value.trim();
+      d.venture = box.querySelector('.f-ven').value;
+      d.principal = num(box.querySelector('.f-principal').value);
+      d.emi = num(box.querySelector('.f-emi').value);
+      var r = Number(box.querySelector('.f-rate').value);
+      d.rate = isFinite(r) && r >= 0 && r <= 100 ? Math.round(r * 100) / 100 : 0;
+      var f = box.querySelector('.f-from').value;
+      d.from = /^\d{4}-\d{2}$/.test(f) ? f : '';
+      d.months = Math.max(0, Math.min(600, Math.round(Number(box.querySelector('.f-months').value) || 0)));
+      d.dueDay = Math.min(31, Math.max(1, Number(box.querySelector('.f-day').value) || 1));
+    }
+    box.querySelector('.f-save').onclick = function () {
+      read();
+      if (!d.lender) { setStatus('Who is the loan from?', true); box.querySelector('.f-lender').focus(); return; }
+      if (!d.emi) { setStatus('What is the EMI each month?', true); box.querySelector('.f-emi').focus(); return; }
+      if (!d.from) { setStatus('Which month was the first EMI?', true); box.querySelector('.f-from').focus(); return; }
+      // Fewer instalments than are already ticked paid would make "left to
+      // pay" negative, and the server would refuse the save anyway.
+      if (d.months && d.months < d.paid.length) {
+        setStatus(d.paid.length + ' EMIs are already ticked paid on this loan, so it cannot have only ' +
+                  d.months + '.', true);
+        return;
+      }
+      var i = D.loans.findIndex(function (x) { return x.id === d.id; });
+      if (i >= 0) D.loans[i] = copy(d);
+      edit = null;
+      commit('loans').catch(function () {});
+      renderLoans(); paintTiles();
+    };
+    box.querySelector('.f-cancel').onclick = function () {
+      if (edit.isNew) removeNew(edit);
+      edit = null;
+      setStatus('');
+      renderLoans();
+    };
   }
 
   // ---- page: repeating bills -----------------------------------------------
@@ -704,80 +800,136 @@
         '<div class="mo-card"><span class="k">A year of them</span><strong>' + rupees(per * 12) +
           '</strong><span class="c">at this month’s rate</span></div>' +
       '</div>' +
-      '<p class="mo-caveat">A bill entered here counts in every month between its first and last, ' +
+      '<p class="mo-caveat">A bill entered here counts in every month between its first and its last, ' +
         'without being typed again. Leave the last month empty while it is still running.</p>' +
-      '<div class="mo-row"><button type="button" class="mo-btn" id="moAddBill">Add a repeating bill</button></div>' +
+      '<div class="mo-head"><h3 class="mo-h">Repeating bills</h3>' +
+        '<button type="button" class="mo-btn" id="moAddBill">Add a repeating bill</button></div>' +
       '<datalist id="moCats">' + catOptions() + '</datalist>' +
       statusBar() +
-      (D.bills.length ? D.bills.map(billCard).join('') : emptyNote('No repeating bills yet.'));
+      (D.bills.length
+        ? '<ul class="mo-list">' + D.bills.map(function (b) {
+            return (edit && edit.kind === 'bill' && edit.id === b.id)
+              ? billForm(edit.draft, edit.isNew) : billRow(b);
+          }).join('') + '</ul>'
+        : emptyNote('No repeating bills yet.'));
 
     bindBills();
   }
 
-  function billCard(b) {
+  function billRow(b) {
     var now = thisMonth();
     var state = !b.from ? 'No start month set'
       : (b.to && now > b.to) ? 'Ended ' + monthName(b.to)
       : (now < b.from) ? 'Starts ' + monthName(b.from)
       : 'Running since ' + monthName(b.from);
-    return '<div class="mo-item" data-id="' + esc(b.id) + '">' +
+    var on = billIn(b, now) && !has(b.skip, now);
+    return '<li class="mo-li mo-tall' + (on ? '' : ' mo-skipped') + '" data-id="' + esc(b.id) + '">' +
+      '<span class="mo-what"><b>' + esc(b.name || 'Untitled bill') + '</b>' +
+        '<span class="mo-sub">' + esc(b.category || 'no category') +
+          (ventureName(b.venture) ? ' · ' + esc(ventureName(b.venture)) : '') + '</span>' +
+        '<span class="mo-sub">' + esc(state) + ' · due on the ' + b.dueDay + '</span>' +
+        (b.paid.length || b.skip.length
+          ? '<span class="mo-sub">' + b.paid.length + ' months ticked paid' +
+            (b.skip.length ? ', ' + b.skip.length + ' skipped' : '') + '</span>' : '') +
+      '</span>' +
+      '<span class="mo-amt"><b>' + rupees(b.amount) + '</b><span class="mo-sub">a month</span></span>' +
+      '<span class="mo-acts">' +
+        '<button type="button" class="mo-x f-edit">Edit</button>' +
+        '<button type="button" class="mo-x f-del">Delete</button>' +
+      '</span>' +
+    '</li>';
+  }
+
+  function billForm(b, isNew) {
+    return '<li class="mo-li mo-open" data-id="' + esc(b.id) + '">' +
       '<div class="mo-grid">' +
         '<label>What is it<input type="text" class="f-name" value="' + esc(b.name) + '" placeholder="Shop rent"></label>' +
-        '<label>Amount a month<input type="text" inputmode="decimal" class="f-amt" value="' + b.amount + '"></label>' +
-        '<label>Category<input type="text" list="moCats" class="f-cat" value="' + esc(b.category) + '"></label>' +
+        '<label>Amount a month<input type="text" inputmode="decimal" class="f-amt" value="' + (b.amount || '') + '" placeholder="0"></label>' +
+        '<label>Category<input type="text" list="moCats" class="f-cat" value="' + esc(b.category) + '" placeholder="Rent"></label>' +
         '<label>Venture' + ventureSelect(b.venture, 'f-ven') + '</label>' +
         '<label>Due on day<input type="number" min="1" max="31" class="f-day" value="' + b.dueDay + '"></label>' +
         '<label>First month<input type="month" class="f-from" value="' + esc(b.from) + '"></label>' +
-        '<label>Last month<input type="month" class="f-to" value="' + esc(b.to) + '" placeholder="still running"></label>' +
+        '<label>Last month<input type="month" class="f-to" value="' + esc(b.to) + '"></label>' +
       '</div>' +
-      '<p class="mo-facts"><span>' + esc(state) + '</span>' +
-        '<span><b>' + b.paid.length + '</b> months ticked paid</span>' +
-        (b.skip.length ? '<span><b>' + b.skip.length + '</b> months skipped</span>' : '') + '</p>' +
-      '<div class="mo-row"><button type="button" class="mo-x f-del">Delete this bill</button></div>' +
-    '</div>';
+      '<p class="mo-facts"><span>Leave the last month empty while the bill is still running.</span></p>' +
+      saveRow(isNew ? 'Save this bill' : 'Save changes') +
+    '</li>';
   }
 
   function bindBills() {
     var host = el('moBills');
+
     el('moAddBill').onclick = function () {
-      D.bills.unshift({
+      if (!leaveEdit()) return;
+      var b = {
         id: uid('b'), name: '', amount: 0, category: '', venture: '',
         dueDay: 1, from: thisMonth(), to: '', paid: [], skip: [], note: '',
-      });
-      save('bills'); renderBills();
+      };
+      D.bills.unshift(b);
+      edit = { kind: 'bill', id: b.id, draft: copy(b), isNew: true };
+      renderBills();
+      var f = host.querySelector('.mo-open .f-name');
+      if (f) f.focus();
     };
 
-    host.querySelectorAll('.mo-item').forEach(function (box) {
-      var id = box.getAttribute('data-id');
+    host.querySelectorAll('.mo-li[data-id]:not(.mo-open)').forEach(function (li) {
+      var id = li.getAttribute('data-id');
       var b = D.bills.filter(function (x) { return x.id === id; })[0];
       if (!b) return;
-      function on(sel, fn, redraw) {
-        var n = box.querySelector(sel);
-        if (n) n.onchange = function () { fn.call(n); save('bills'); if (redraw) renderBills(); paintTiles(); };
-      }
-      on('.f-name', function () { b.name = this.value.trim(); });
-      on('.f-amt', function () { b.amount = num(this.value); this.value = b.amount; }, true);
-      on('.f-cat', function () { b.category = this.value.trim(); });
-      on('.f-ven', function () { b.venture = this.value; });
-      on('.f-day', function () { b.dueDay = Math.min(31, Math.max(1, Number(this.value) || 1)); this.value = b.dueDay; });
-      on('.f-from', function () { b.from = /^\d{4}-\d{2}$/.test(this.value) ? this.value : ''; }, true);
-      on('.f-to', function () {
-        var v = /^\d{4}-\d{2}$/.test(this.value) ? this.value : '';
-        // A bill ending before it starts appears in no month at all, which
-        // looks exactly like a bill that failed to save.
-        if (v && b.from && v < b.from) {
-          setStatus('That is before the bill starts (' + monthName(b.from) + ').', true);
-          this.value = b.to;
-          return;
-        }
-        b.to = v;
-      }, true);
-      box.querySelector('.f-del').onclick = function () {
+      li.querySelector('.f-edit').onclick = function () {
+        if (!leaveEdit()) return;
+        edit = { kind: 'bill', id: id, draft: copy(b), isNew: false };
+        renderBills();
+      };
+      li.querySelector('.f-del').onclick = function () {
+        if (!leaveEdit()) return;
         if (!confirm('Delete "' + (b.name || 'this bill') + '"? It will stop counting in every month.')) return;
         D.bills = D.bills.filter(function (x) { return x.id !== id; });
-        save('bills'); renderBills(); paintTiles();
+        commit('bills').catch(function () {});
+        renderBills(); paintTiles();
       };
     });
+
+    var open = host.querySelector('.mo-open');
+    if (open) bindBillForm(open);
+  }
+
+  function bindBillForm(box) {
+    var d = edit.draft;
+    function read() {
+      d.name = box.querySelector('.f-name').value.trim();
+      d.amount = num(box.querySelector('.f-amt').value);
+      d.category = box.querySelector('.f-cat').value.trim();
+      d.venture = box.querySelector('.f-ven').value;
+      d.dueDay = Math.min(31, Math.max(1, Number(box.querySelector('.f-day').value) || 1));
+      var f = box.querySelector('.f-from').value;
+      var t = box.querySelector('.f-to').value;
+      d.from = /^\d{4}-\d{2}$/.test(f) ? f : '';
+      d.to = /^\d{4}-\d{2}$/.test(t) ? t : '';
+    }
+    box.querySelector('.f-save').onclick = function () {
+      read();
+      if (!d.name) { setStatus('What is the bill for?', true); box.querySelector('.f-name').focus(); return; }
+      if (!d.amount) { setStatus('How much is it each month?', true); box.querySelector('.f-amt').focus(); return; }
+      if (!d.from) { setStatus('Which month does it start?', true); box.querySelector('.f-from').focus(); return; }
+      // A bill ending before it starts appears in no month at all, which looks
+      // exactly like a bill that failed to save.
+      if (d.to && d.to < d.from) {
+        setStatus('It ends (' + monthName(d.to) + ') before it starts (' + monthName(d.from) + ').', true);
+        return;
+      }
+      var i = D.bills.findIndex(function (x) { return x.id === d.id; });
+      if (i >= 0) D.bills[i] = copy(d);
+      edit = null;
+      commit('bills').catch(function () {});
+      renderBills(); paintTiles();
+    };
+    box.querySelector('.f-cancel').onclick = function () {
+      if (edit.isNew) removeNew(edit);
+      edit = null;
+      setStatus('');
+      renderBills();
+    };
   }
 
   // ---- styles --------------------------------------------------------------
@@ -804,11 +956,9 @@
     '.mo-down{color:#2b7a4b;font-weight:700}' +
     '.mo-flat{color:var(--color-neutral-700)}' +
 
-    '.mo-h{font-family:var(--font-heading);font-weight:800;font-size:16px;margin:30px 0 10px}' +
-    '.mo-add{display:grid;grid-template-columns:150px 130px 1fr 1fr 1.4fr auto;gap:8px;align-items:center}' +
-    '.mo-add input,.mo-add select{font:inherit;font-size:13px;padding:9px 11px;width:100%;' +
-    '  border:2px solid var(--color-divider);background:var(--color-bg);color:var(--color-text)}' +
-    '.mo-add input:focus,.mo-add select:focus{outline:none;border-color:var(--color-accent)}' +
+    '.mo-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;' +
+    '  margin:32px 0 10px}' +
+    '.mo-h{font-family:var(--font-heading);font-weight:800;font-size:16px;margin:0}' +
     '.mo-btn{font:inherit;font-size:13px;font-weight:700;padding:10px 18px;cursor:pointer;white-space:nowrap;' +
     '  border:2px solid var(--color-accent);background:var(--color-accent);color:#fff}' +
     '.mo-btn:hover{background:var(--color-accent-700);border-color:var(--color-accent-700)}' +
@@ -816,25 +966,50 @@
     '.mo-quiet:hover{background:var(--color-accent-100);border-color:var(--color-accent);color:var(--color-accent-700)}' +
     '.mo-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}' +
 
-    '.scroll{overflow-x:auto}' +
-    'table.mo-tbl{width:100%;border-collapse:collapse;min-width:44rem}' +
-    'table.mo-tbl th,table.mo-tbl td{padding:8px 10px;border-bottom:1px solid var(--color-divider);' +
-    '  text-align:left;font-size:13px;vertical-align:middle}' +
-    'table.mo-tbl thead th{font-size:11px;letter-spacing:.09em;text-transform:uppercase;' +
-    '  color:var(--color-neutral-700);font-weight:700}' +
-    'table.mo-tbl td.r{text-align:right}' +
-    'table.mo-tbl input[type=text],table.mo-tbl input[type=date],table.mo-tbl select{' +
-    '  font:inherit;font-size:13px;padding:6px 8px;width:100%;' +
-    '  border:1px solid var(--color-divider);background:var(--color-bg);color:var(--color-text)}' +
-    'table.mo-tbl input:focus,table.mo-tbl select:focus{outline:none;border-color:var(--color-accent)}' +
-    '.mo-sub{font-size:11.5px;color:var(--color-neutral-700)}' +
+    // ---- the list ----
+    'ul.mo-list{list-style:none;margin:6px 0 0;padding:0;border-top:1px solid var(--color-divider)}' +
+    '.mo-li{display:grid;grid-template-columns:120px minmax(0,1fr) 130px 130px auto;gap:14px;' +
+    '  align-items:center;padding:11px 2px;border-bottom:1px solid var(--color-divider);font-size:13px}' +
+    '.mo-tall{grid-template-columns:minmax(0,1fr) 150px auto}' +
+    '.mo-when{font-weight:700;white-space:nowrap}' +
+    '.mo-what{min-width:0}' +
+    '.mo-what b{font-family:var(--font-heading);font-weight:800;font-size:13.5px;display:block}' +
+    '.mo-sub{display:block;font-size:11.5px;color:var(--color-neutral-700);margin-top:2px}' +
+    '.mo-for{color:var(--color-neutral-700);font-size:12px}' +
+    '.mo-amt{text-align:right;font-weight:700;white-space:nowrap}' +
+    '.mo-amt b{font-family:var(--font-heading);font-weight:800;font-size:15px}' +
+    '.mo-amt .mo-sub{text-align:right;font-weight:400}' +
+    '.mo-acts{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}' +
     '.mo-skipped{opacity:.5}' +
-    '.mo-late{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;' +
-    '  color:var(--color-accent-700);background:var(--color-accent-100);padding:1px 6px}' +
+    '.mo-late{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.06em;' +
+    '  text-transform:uppercase;color:var(--color-accent-700);background:var(--color-accent-100);' +
+    '  padding:1px 6px;margin-left:6px}' +
     '.mo-tick{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;white-space:nowrap}' +
-    '.mo-x{font:inherit;font-size:12px;font-weight:600;padding:5px 11px;cursor:pointer;' +
+    '.mo-x{font:inherit;font-size:12px;font-weight:600;padding:5px 11px;cursor:pointer;white-space:nowrap;' +
     '  border:2px solid var(--color-divider);background:none;color:var(--color-accent-700)}' +
     '.mo-x:hover{border-color:var(--color-accent);background:var(--color-accent-100)}' +
+
+    // ---- one row, open as a form ----
+    '.mo-open{display:block;border:2px solid var(--color-accent);padding:16px 18px;' +
+    '  background:var(--color-accent-100);margin:-1px 0}' +
+    '.mo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 14px}' +
+    '.mo-grid label{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;' +
+    '  text-transform:uppercase;color:var(--color-neutral-700)}' +
+    '.mo-grid label.wide{grid-column:1/-1}' +
+    '.mo-grid input,.mo-grid select{display:block;font:inherit;font-size:13px;padding:8px 10px;width:100%;' +
+    '  margin-top:5px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--color-text);' +
+    '  border:2px solid var(--color-divider);background:var(--color-bg)}' +
+    '.mo-grid input:focus,.mo-grid select:focus{outline:none;border-color:var(--color-accent)}' +
+    '.mo-save{border-top:1px solid var(--color-neutral-300);padding-top:14px;margin-top:16px}' +
+    '.mo-editing{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;' +
+    '  color:var(--color-accent-700)}' +
+
+    '.mo-meter{display:block;height:6px;background:var(--color-surface);' +
+    '  border:1px solid var(--color-divider);margin:7px 0 5px;max-width:260px}' +
+    '.mo-meter i{display:block;height:100%;background:var(--color-accent)}' +
+    '.mo-facts{display:flex;flex-wrap:wrap;gap:6px 22px;margin:14px 0 0;font-size:12.5px;' +
+    '  color:var(--color-neutral-800)}' +
+    '.mo-facts b{font-family:var(--font-heading);font-weight:800}' +
 
     '.mo-split{margin-top:6px}' +
     '.mo-srow{display:grid;grid-template-columns:minmax(110px,1.1fr) 2fr 110px 44px;gap:12px;' +
@@ -844,36 +1019,25 @@
     '.mo-srow .v{text-align:right;font-weight:700}' +
     '.mo-srow .p{text-align:right;color:var(--color-neutral-700);font-size:12px}' +
 
-    '.mo-item{border:2px solid var(--color-divider);padding:16px 18px;margin-top:14px;background:var(--color-bg)}' +
-    '.mo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 14px}' +
-    '.mo-grid label{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;' +
-    '  text-transform:uppercase;color:var(--color-neutral-700)}' +
-    '.mo-grid input,.mo-grid select{display:block;font:inherit;font-size:13px;padding:8px 10px;width:100%;' +
-    '  margin-top:5px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--color-text);' +
-    '  border:2px solid var(--color-divider);background:var(--color-bg)}' +
-    '.mo-grid input:focus,.mo-grid select:focus{outline:none;border-color:var(--color-accent)}' +
-    '.mo-meter{height:7px;background:var(--color-surface);border:1px solid var(--color-divider);margin:14px 0 10px}' +
-    '.mo-meter i{display:block;height:100%;background:var(--color-accent)}' +
-    '.mo-facts{display:flex;flex-wrap:wrap;gap:6px 22px;margin:0;font-size:12.5px;color:var(--color-neutral-800)}' +
-    '.mo-facts b{font-family:var(--font-heading);font-weight:800}' +
-
     '.mo-status{font-size:12.5px;color:var(--color-neutral-700);margin:12px 0 0;min-height:1.2em}' +
+    '.mo-status.bad{color:var(--color-accent-700);font-weight:700}' +
     '.mo-empty{font-size:13px;color:var(--color-neutral-700);border:2px dashed var(--color-divider);' +
     '  padding:18px 16px;margin:6px 0 0}' +
     '.mo-caveat{font-size:12.5px;color:var(--color-neutral-700);max-width:62ch;margin:14px 0 0}' +
 
     '@media(max-width:860px){' +
-    '  .mo-add{grid-template-columns:1fr 1fr}' +
-    '  .mo-add .mo-btn{grid-column:1/-1}' +
+    '  .mo-li,.mo-tall{grid-template-columns:minmax(0,1fr) auto;gap:6px 12px}' +
+    '  .mo-when{grid-column:1/-1;font-size:12px;color:var(--color-neutral-700)}' +
+    '  .mo-for{grid-column:1/-1;font-size:11.5px}' +
+    '  .mo-acts{grid-column:1/-1;justify-content:flex-start;margin-top:6px}' +
     '  .mo-srow{grid-template-columns:1fr 92px 40px}' +
     '  .mo-srow .b{display:none}' +
     '}' +
     // iOS zooms the page in when a field under 16px is focused, and never
-    // zooms back out. Every field on these pages is a number or a date, which
-    // is exactly when that is most disruptive.
+    // zooms back out. Every field here is a number or a date, which is exactly
+    // when that is most disruptive.
     '@media(max-width:700px){' +
-    '  .mo-add input,.mo-add select,.mo-grid input,.mo-grid select,' +
-    '  table.mo-tbl input,table.mo-tbl select,.mo-bar input[type=month]{font-size:16px}' +
+    '  .mo-grid input,.mo-grid select,.mo-bar input[type=month]{font-size:16px}' +
     '}';
 
   function injectCss() {
@@ -895,6 +1059,12 @@
   window.KMS_MONEY = {
     show: function (key) {
       if (key !== 'money' && !PAGES[key]) return;
+      // Moving between the pages abandons an open form, so it has to ask, and
+      // it has to tidy up a half-added row that was never saved.
+      if (edit && key !== current) {
+        if (edit.isNew) removeNew(edit);
+        edit = null;
+      }
       current = key;
       injectCss();
       var draw = PAGES[key] || function () {};
@@ -906,7 +1076,7 @@
     _calc: {
       monthTotals: monthTotals, billIn: billIn, loanInstalment: loanInstalment,
       left: left, nextDue: nextDue, shiftMonth: shiftMonth, dueDate: dueDate,
-      rupees: rupees, monthDiff: monthDiff,
+      rupees: rupees, monthDiff: monthDiff, num: num,
     },
     _state: D,
   };
