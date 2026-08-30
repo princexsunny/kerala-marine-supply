@@ -55,7 +55,11 @@ function str(v, max) {
 // one NaN in a list poisons every total downstream of it, and a wrong total
 // that looks like a number is far worse than a zero you can see is wrong.
 function money(v) {
-  const n = Number(v);
+  // Strip grouping and a rupee sign before parsing. The page sends numbers,
+  // but anything hand-posting "10,00,000" would otherwise have it read as NaN
+  // and stored as 0 — a silent loss of ten lakh, which is the worst possible
+  // way for this to go wrong.
+  const n = Number(typeof v === 'string' ? v.replace(/[,\s₹]/g, '') : v);
   if (!isFinite(n) || n < 0) return 0;
   return Math.round(Math.min(n, MAX_AMOUNT) * 100) / 100;
 }
@@ -130,12 +134,29 @@ function cleanBill(x) {
   };
 }
 
+// A tranche. A sanction is not a payment: KFC and every other lender releases
+// against progress, so what has actually reached the account is its own fact,
+// separate from what was agreed.
+function cleanRelease(x) {
+  x = x || {};
+  return {
+    id: str(x.id, 40) || id('r'),
+    date: isoDate(x.date),
+    amount: money(x.amount),
+    note: str(x.note, MAX_TEXT),
+  };
+}
+
 function cleanLoan(x) {
   x = x || {};
+  const start = isoMonth(x.start);
+  const moratorium = int(x.moratorium, 0, 120, 0);
   return {
     id: str(x.id, 40) || id('l'),
     lender: str(x.lender, MAX_TEXT),
     purpose: str(x.purpose, MAX_TEXT),
+    // What was sanctioned. Named principal from the start and left that way —
+    // renaming a stored field to read better costs every existing record.
     principal: money(x.principal),
     emi: money(x.emi),
     rate: (function () {
@@ -143,8 +164,15 @@ function cleanLoan(x) {
       return isFinite(n) && n >= 0 && n <= 100 ? Math.round(n * 100) / 100 : 0;
     })(),
     dueDay: int(x.dueDay, 1, 31, 5),
+    // The month the loan starts, and how many months of holiday before the
+    // first EMI. When both are set the page derives `from` from them, so the
+    // schedule still keys off one field and nothing downstream changes.
+    start: start,
+    moratorium: moratorium,
     from: isoMonth(x.from),
     months: int(x.months, 0, 600, 0),
+    releases: (Array.isArray(x.releases) ? x.releases : [])
+      .slice(0, 60).map(cleanRelease).filter((r) => r.amount || r.date),
     venture: str(x.venture, 60),
     paid: months(x.paid),
     note: str(x.note, MAX_NOTE),
@@ -323,6 +351,16 @@ router.put('/finance/loans', async (req, res) => {
     return res.status(400).json({
       error: `"${over.lender || 'That loan'}" has ${over.paid.length} instalments marked paid `
            + `but only ${over.months} in total.`,
+    });
+  }
+
+  // A release dated before the loan starts is almost always a typo in the
+  // year, and it would quietly sit outside every total that sums by period.
+  const early = items.find((l) => l.start && l.releases.some((r) => r.date && r.date.slice(0, 7) < l.start));
+  if (early) {
+    return res.status(400).json({
+      error: `"${early.lender || 'That loan'}" has money released before the loan starts (${early.start}). `
+           + 'Check the date on it.',
     });
   }
 

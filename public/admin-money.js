@@ -143,6 +143,42 @@
     if (!l.months) return 0;
     return Math.max(0, l.months - l.paid.length) * l.emi;
   }
+  // What has actually reached the account, as against what was agreed. A
+  // sanction is a promise; a release is money.
+  function released(l) {
+    return (l.releases || []).reduce(function (a, r) { return a + (Number(r.amount) || 0); }, 0);
+  }
+  // The month the first EMI falls in. When a start month and a moratorium are
+  // both given, that is where it lands — six months of holiday from June means
+  // the first EMI is in December. Otherwise it is whatever was typed in.
+  function firstEmi(l) {
+    if (l.start) return shiftMonth(l.start, l.moratorium || 0);
+    return l.from || '';
+  }
+  // The last month of the holiday, or '' if there isn't one.
+  function moratoriumEnds(l) {
+    if (!l.start || !l.moratorium) return '';
+    return shiftMonth(l.start, l.moratorium - 1);
+  }
+  function inMoratorium(l, m) {
+    var end = moratoriumEnds(l);
+    return !!end && m >= l.start && m <= end;
+  }
+  // Interest is usually payable through a moratorium even though no EMI is.
+  // This is simple interest on what has been released — a figure to budget
+  // with, not a bank's number, and it is labelled that way wherever it shows.
+  function moratoriumInterest(l) {
+    if (!l.rate) return 0;
+    return Math.round(released(l) * (l.rate / 100) / 12 * 100) / 100;
+  }
+  // NOT `years`: that name is already the year -> entries cache below, and a
+  // var declaration would quietly overwrite this function.
+  function termYears(months) {
+    if (!months) return '';
+    return months % 12 === 0 ? (months / 12) + (months === 12 ? ' year' : ' years')
+                             : (months / 12).toFixed(1) + ' years';
+  }
+
   function nextDue(l) {
     if (!l.from) return '';
     var i = l.paid.length;
@@ -621,10 +657,13 @@
     if (!ready) { host.innerHTML = statusBar(); setStatus('Loading…'); return; }
 
     var now = thisMonth();
-    var dueNow = 0, owed = 0;
+    var dueNow = 0, owed = 0, sanctioned = 0, got = 0, onHoliday = 0;
     D.loans.forEach(function (l) {
       if (loanInstalment(l, now) >= 0) dueNow += l.emi;
       owed += left(l);
+      sanctioned += l.principal;
+      got += released(l);
+      if (inMoratorium(l, now)) onHoliday++;
     });
 
     host.innerHTML =
@@ -634,6 +673,14 @@
           (D.loans.length === 1 ? ' loan' : ' loans') + '</span></div>' +
         '<div class="mo-card"><span class="k">Still to repay</span><strong>' + rupees(owed) + '</strong>' +
           '<span class="c">instalments left × EMI, interest included</span></div>' +
+        '<div class="mo-card"><span class="k">Released</span><strong>' + rupees(got) + '</strong>' +
+          '<span class="c">' + (sanctioned
+            ? 'of ' + rupees(sanctioned) + ' sanctioned' +
+              (sanctioned - got > 0.005 ? ' · ' + rupees(sanctioned - got) + ' to come' : '')
+            : 'no sanction amount entered') + '</span></div>' +
+        (onHoliday ? '<div class="mo-card"><span class="k">In moratorium</span><strong>' + onHoliday +
+          '</strong><span class="c">' + (onHoliday === 1 ? 'loan is' : 'loans are') +
+          ' not paying an EMI yet</span></div>' : '') +
       '</div>' +
       '<p class="mo-caveat">These are the figures you enter. Nothing here is taken from a bank — ' +
         'check a statement before relying on it for a payment.</p>' +
@@ -654,17 +701,44 @@
     var n = nextDue(l);
     var done = l.months ? Math.min(100, Math.round(l.paid.length / l.months * 100)) : 0;
     var late = n && n < today();
+    var got = released(l);
+    var now = thisMonth();
+    var holiday = inMoratorium(l, now);
+    var end = moratoriumEnds(l);
+
+    // How much of the sanction has actually arrived. Shown whenever a sanction
+    // has been entered, including when nothing has been released yet — "₹0 of
+    // ₹40,00,000 released" is a fact worth seeing, and hiding it would read as
+    // if the money were in hand.
+    var releaseLine = l.principal
+      ? '<span class="mo-sub"><b>' + rupees(got) + '</b> released of ' + rupees(l.principal) +
+        (got > l.principal
+          ? ' <span class="mo-late">over sanction</span>'
+          : (l.principal - got > 0.005
+              ? ' · ' + rupees(l.principal - got) + ' still to come' : ' · fully released')) +
+        '</span>'
+      : (got ? '<span class="mo-sub"><b>' + rupees(got) + '</b> released</span>' : '');
+
     return '<li class="mo-li mo-tall" data-id="' + esc(l.id) + '">' +
       '<span class="mo-what"><b>' + esc(l.lender || 'Untitled loan') + '</b>' +
         '<span class="mo-sub">' + esc(l.purpose || 'no purpose set') +
-        (ventureName(l.venture) ? ' · ' + esc(ventureName(l.venture)) : '') + '</span>' +
+        (ventureName(l.venture) ? ' · ' + esc(ventureName(l.venture)) : '') +
+        (l.months ? ' · ' + esc(termYears(l.months)) + ' (' + l.months + ' EMIs)' : '') + '</span>' +
+        releaseLine +
+        (holiday
+          ? '<span class="mo-sub mo-hol">In moratorium until ' + esc(monthName(end)) +
+            ' · first EMI ' + esc(monthName(firstEmi(l))) + '</span>'
+          : (end ? '<span class="mo-sub">Moratorium ended ' + esc(monthName(end)) + '</span>' : '')) +
         '<span class="mo-meter"><i style="width:' + done + '%"></i></span>' +
         '<span class="mo-sub"><b>' + l.paid.length + '</b> of ' + (l.months || '—') + ' paid · ' +
           'next ' + (n ? esc(prettyDate(n)) : 'nothing outstanding') +
           (late ? ' <span class="mo-late">overdue</span>' : '') + '</span>' +
       '</span>' +
       '<span class="mo-amt"><b>' + rupees(l.emi) + '</b><span class="mo-sub">a month</span>' +
-        '<span class="mo-sub">' + rupees(left(l)) + ' left</span></span>' +
+        '<span class="mo-sub">' + rupees(left(l)) + ' left</span>' +
+        (holiday && moratoriumInterest(l)
+          ? '<span class="mo-sub">~' + rupees(moratoriumInterest(l)) + ' interest</span>' : '') +
+      '</span>' +
       '<span class="mo-acts">' +
         '<button type="button" class="mo-x f-pay">Mark next EMI paid</button>' +
         '<button type="button" class="mo-x f-edit">Edit</button>' +
@@ -674,21 +748,57 @@
   }
 
   function loanForm(l, isNew) {
+    var got = released(l);
     return '<li class="mo-li mo-open" data-id="' + esc(l.id) + '">' +
       '<div class="mo-grid">' +
         '<label>Lender<input type="text" class="f-lender" value="' + esc(l.lender) + '" placeholder="Kerala Financial Corporation"></label>' +
         '<label>What for<input type="text" class="f-purpose" value="' + esc(l.purpose) + '" placeholder="Boat yard"></label>' +
         '<label>Venture' + ventureSelect(l.venture, 'f-ven') + '</label>' +
-        '<label>Amount borrowed<input type="text" inputmode="decimal" class="f-principal" value="' + (l.principal || '') + '" placeholder="0"></label>' +
+        '<label>Amount sanctioned<input type="text" inputmode="decimal" class="f-principal" value="' + (l.principal || '') + '" placeholder="0"></label>' +
         '<label>EMI a month<input type="text" inputmode="decimal" class="f-emi" value="' + (l.emi || '') + '" placeholder="0"></label>' +
         '<label>Interest %<input type="text" inputmode="decimal" class="f-rate" value="' + (l.rate || '') + '" placeholder="0"></label>' +
-        '<label>First EMI month<input type="month" class="f-from" value="' + esc(l.from) + '"></label>' +
-        '<label>How many EMIs<input type="number" min="0" max="600" class="f-months" value="' + (l.months || '') + '" placeholder="e.g. 84"></label>' +
-        '<label>Due on day<input type="number" min="1" max="31" class="f-day" value="' + l.dueDay + '"></label>' +
       '</div>' +
+
+      // ---- the term ----
+      '<h4 class="mo-sech">Term and moratorium</h4>' +
+      '<div class="mo-grid">' +
+        '<label>Loan starts<input type="month" class="f-start" value="' + esc(l.start || '') + '"></label>' +
+        '<label>Moratorium, months<input type="number" min="0" max="120" class="f-mor" value="' + (l.moratorium || '') + '" placeholder="0"></label>' +
+        '<label>Term, years<input type="number" min="0" max="50" step="0.5" class="f-years" value="' +
+          (l.months && l.months % 6 === 0 ? (l.months / 12) : '') + '" placeholder="e.g. 7"></label>' +
+        '<label>Or number of EMIs<input type="number" min="0" max="600" class="f-months" value="' + (l.months || '') + '" placeholder="e.g. 84"></label>' +
+        '<label>Due on day<input type="number" min="1" max="31" class="f-day" value="' + l.dueDay + '"></label>' +
+        '<label class="' + (l.start ? 'mo-derived' : '') + '">First EMI month' +
+          '<input type="month" class="f-from" value="' + esc(l.from) + '"' + (l.start ? ' readonly' : '') + '></label>' +
+      '</div>' +
+      '<p class="mo-facts" id="moTermSum"></p>' +
+
+      // ---- what has actually arrived ----
+      '<h4 class="mo-sech">Amount released</h4>' +
+      '<p class="mo-facts"><span>A sanction is a promise. Enter each release as it reaches ' +
+        'the account — the loan then shows what has actually arrived against what was agreed.</span></p>' +
+      '<div class="mo-rel" id="moRel">' +
+        (l.releases && l.releases.length
+          ? l.releases.map(releaseRow).join('')
+          : '<p class="mo-empty mo-tight">Nothing released yet.</p>') +
+      '</div>' +
+      '<div class="mo-row"><button type="button" class="mo-x" id="moAddRel">Add a release</button>' +
+        '<span class="mo-facts"><span id="moRelSum">' +
+          (l.principal ? rupees(got) + ' of ' + rupees(l.principal) : rupees(got)) +
+        '</span></span></div>' +
+
       (l.paid.length ? '<p class="mo-facts"><span><b>' + l.paid.length + '</b> instalments are ticked paid on this loan</span></p>' : '') +
       saveRow(isNew ? 'Save this loan' : 'Save changes') +
     '</li>';
+  }
+
+  function releaseRow(r) {
+    return '<div class="mo-relrow" data-rid="' + esc(r.id) + '">' +
+      '<input type="date" class="r-date" value="' + esc(r.date) + '">' +
+      '<input type="text" inputmode="decimal" class="r-amt" value="' + (r.amount || '') + '" placeholder="Amount">' +
+      '<input type="text" class="r-note" value="' + esc(r.note || '') + '" placeholder="Stage 1, machinery… (optional)">' +
+      '<button type="button" class="mo-x r-del" title="Remove this release">&times;</button>' +
+    '</div>';
   }
 
   function bindLoans() {
@@ -698,7 +808,8 @@
       if (!leaveEdit()) return;
       var l = {
         id: uid('l'), lender: '', purpose: '', principal: 0, emi: 0, rate: 0,
-        dueDay: 5, from: thisMonth(), months: 0, venture: '', paid: [], note: '',
+        dueDay: 5, start: '', moratorium: 0, from: thisMonth(), months: 0,
+        releases: [], venture: '', paid: [], note: '',
       };
       D.loans.unshift(l);
       edit = { kind: 'loan', id: l.id, draft: copy(l), isNew: true };
@@ -742,6 +853,20 @@
 
   function bindLoanForm(box) {
     var d = edit.draft;
+    if (!Array.isArray(d.releases)) d.releases = [];
+
+    function readReleases() {
+      d.releases = [];
+      box.querySelectorAll('.mo-relrow').forEach(function (row) {
+        d.releases.push({
+          id: row.getAttribute('data-rid'),
+          date: row.querySelector('.r-date').value,
+          amount: num(row.querySelector('.r-amt').value),
+          note: row.querySelector('.r-note').value.trim(),
+        });
+      });
+    }
+
     function read() {
       d.lender = box.querySelector('.f-lender').value.trim();
       d.purpose = box.querySelector('.f-purpose').value.trim();
@@ -750,16 +875,125 @@
       d.emi = num(box.querySelector('.f-emi').value);
       var r = Number(box.querySelector('.f-rate').value);
       d.rate = isFinite(r) && r >= 0 && r <= 100 ? Math.round(r * 100) / 100 : 0;
-      var f = box.querySelector('.f-from').value;
-      d.from = /^\d{4}-\d{2}$/.test(f) ? f : '';
+      var st = box.querySelector('.f-start').value;
+      d.start = /^\d{4}-\d{2}$/.test(st) ? st : '';
+      d.moratorium = Math.max(0, Math.min(120, Math.round(Number(box.querySelector('.f-mor').value) || 0)));
       d.months = Math.max(0, Math.min(600, Math.round(Number(box.querySelector('.f-months').value) || 0)));
       d.dueDay = Math.min(31, Math.max(1, Number(box.querySelector('.f-day').value) || 1));
+      // With a start month and a moratorium, the first EMI is worked out — one
+      // field decides the schedule, so there is no way for the two to disagree.
+      var f = box.querySelector('.f-from').value;
+      d.from = d.start ? firstEmi(d) : (/^\d{4}-\d{2}$/.test(f) ? f : '');
+      readReleases();
     }
+
+    // A running sentence under the term fields, so the moratorium is something
+    // you can see the effect of rather than work out.
+    function summarise() {
+      read();
+      var sum = box.querySelector('#moTermSum');
+      if (sum) {
+        var bits = [];
+        if (d.months) bits.push('<span><b>' + esc(termYears(d.months)) + '</b> · ' + d.months + ' EMIs of ' + rupees(d.emi) + '</span>');
+        if (d.start && d.moratorium) {
+          bits.push('<span>Moratorium ' + esc(monthName(d.start)) + ' to ' +
+                    esc(monthName(moratoriumEnds(d))) + ' — <b>' + d.moratorium + ' months</b> with no EMI</span>');
+        }
+        if (d.from) {
+          var last = d.months ? shiftMonth(d.from, d.months - 1) : '';
+          bits.push('<span>First EMI <b>' + esc(monthName(d.from)) + '</b>' +
+                    (last ? ', last <b>' + esc(monthName(last)) + '</b>' : '') + '</span>');
+        }
+        if (d.start && d.moratorium && d.rate && released(d)) {
+          bits.push('<span>Roughly <b>' + rupees(moratoriumInterest(d)) +
+                    '</b> interest a month through the moratorium — an estimate on what has been ' +
+                    'released, not a bank figure</span>');
+        }
+        sum.innerHTML = bits.join('');
+      }
+      var rs = box.querySelector('#moRelSum');
+      if (rs) {
+        var got = released(d);
+        rs.innerHTML = d.principal
+          ? esc(rupees(got) + ' of ' + rupees(d.principal)) +
+            (got > d.principal ? ' <span class="mo-late">over sanction</span>'
+              : (d.principal - got > 0.005 ? esc(' · ' + rupees(d.principal - got) + ' still to come') : ' · fully released'))
+          : esc(rupees(got) + ' released');
+      }
+      var fromField = box.querySelector('.f-from');
+      if (fromField) {
+        if (d.start) { fromField.value = d.from; fromField.readOnly = true; fromField.parentNode.classList.add('mo-derived'); }
+        else { fromField.readOnly = false; fromField.parentNode.classList.remove('mo-derived'); }
+      }
+    }
+
+    // Years and EMIs are two ways of saying the same thing, so each writes the
+    // other. Typing 7 in one shows 84 in the other, and nobody has to multiply.
+    var yearsField = box.querySelector('.f-years');
+    var monthsField = box.querySelector('.f-months');
+    yearsField.oninput = function () {
+      var y = Number(this.value);
+      if (isFinite(y) && y > 0) monthsField.value = Math.round(y * 12);
+      summarise();
+    };
+    monthsField.oninput = function () {
+      var m = Math.round(Number(this.value) || 0);
+      yearsField.value = m && m % 6 === 0 ? (m / 12) : '';
+      summarise();
+    };
+    ['.f-start', '.f-mor', '.f-emi', '.f-rate', '.f-principal', '.f-from', '.f-day'].forEach(function (sel) {
+      var n = box.querySelector(sel);
+      if (n) n.oninput = summarise;
+    });
+
+    function bindReleaseRows() {
+      box.querySelectorAll('.mo-relrow').forEach(function (row) {
+        row.querySelector('.r-del').onclick = function () {
+          row.parentNode.removeChild(row);
+          if (!box.querySelectorAll('.mo-relrow').length) {
+            box.querySelector('#moRel').innerHTML = '<p class="mo-empty mo-tight">Nothing released yet.</p>';
+          }
+          summarise();
+        };
+        row.querySelectorAll('input').forEach(function (i) { i.oninput = summarise; });
+      });
+    }
+    bindReleaseRows();
+
+    box.querySelector('#moAddRel').onclick = function () {
+      var host = box.querySelector('#moRel');
+      var blank = host.querySelector('.mo-empty');
+      if (blank) host.innerHTML = '';
+      host.insertAdjacentHTML('beforeend', releaseRow({ id: uid('r'), date: today(), amount: 0, note: '' }));
+      bindReleaseRows();
+      var last = host.querySelector('.mo-relrow:last-child .r-amt');
+      if (last) last.focus();
+      summarise();
+    };
+
+    summarise();
+
     box.querySelector('.f-save').onclick = function () {
       read();
       if (!d.lender) { setStatus('Who is the loan from?', true); box.querySelector('.f-lender').focus(); return; }
       if (!d.emi) { setStatus('What is the EMI each month?', true); box.querySelector('.f-emi').focus(); return; }
-      if (!d.from) { setStatus('Which month was the first EMI?', true); box.querySelector('.f-from').focus(); return; }
+      if (!d.from) {
+        setStatus(d.start ? 'Set the moratorium, or clear the start month and type the first EMI month.'
+                          : 'Which month was the first EMI?', true);
+        box.querySelector(d.start ? '.f-mor' : '.f-from').focus();
+        return;
+      }
+      // A release with an amount but no date cannot be placed in time, and a
+      // release dated before the loan starts is nearly always a typed year.
+      var undated = d.releases.filter(function (r) { return r.amount && !r.date; })[0];
+      if (undated) { setStatus('One of the releases has an amount but no date.', true); return; }
+      var early = d.releases.filter(function (r) { return r.date && d.start && r.date.slice(0, 7) < d.start; })[0];
+      if (early) {
+        setStatus('A release is dated ' + prettyDate(early.date) + ', before the loan starts (' +
+                  monthName(d.start) + '). Check the date.', true);
+        return;
+      }
+      d.releases = d.releases.filter(function (r) { return r.amount || r.date; });
       // Fewer instalments than are already ticked paid would make "left to
       // pay" negative, and the server would refuse the save anyway.
       if (d.months && d.months < d.paid.length) {
@@ -1010,6 +1244,24 @@
     '.mo-facts{display:flex;flex-wrap:wrap;gap:6px 22px;margin:14px 0 0;font-size:12.5px;' +
     '  color:var(--color-neutral-800)}' +
     '.mo-facts b{font-family:var(--font-heading);font-weight:800}' +
+    '.mo-sech{font-family:var(--font-heading);font-weight:800;font-size:12px;letter-spacing:.09em;' +
+    '  text-transform:uppercase;color:var(--color-neutral-700);margin:22px 0 10px;' +
+    '  padding-top:14px;border-top:1px solid var(--color-neutral-300)}' +
+    // A derived field is shown, not typed. Making it look different from the
+    // ones you can change is the difference between "why will this not edit"
+    // and "of course, it is worked out".
+    '.mo-derived input{background:var(--color-surface);color:var(--color-neutral-700);' +
+    '  border-style:dashed;cursor:default}' +
+    '.mo-hol{color:var(--color-accent-700);font-weight:700}' +
+    '.mo-relrow{display:grid;grid-template-columns:150px 130px minmax(0,1fr) auto;gap:8px;' +
+    '  align-items:center;margin-bottom:8px}' +
+    '.mo-relrow input{font:inherit;font-size:13px;padding:8px 10px;width:100%;' +
+    '  border:2px solid var(--color-divider);background:var(--color-bg);color:var(--color-text)}' +
+    '.mo-relrow input:focus{outline:none;border-color:var(--color-accent)}' +
+    '.mo-relrow .r-del{padding:6px 12px;font-size:14px;line-height:1}' +
+    '.mo-tight{padding:10px 14px;margin:0}' +
+    '@media(max-width:700px){.mo-relrow{grid-template-columns:1fr 1fr;gap:6px}' +
+    '  .mo-relrow .r-note{grid-column:1/-1}.mo-relrow input{font-size:16px}}' +
 
     '.mo-split{margin-top:6px}' +
     '.mo-srow{display:grid;grid-template-columns:minmax(110px,1.1fr) 2fr 110px 44px;gap:12px;' +
@@ -1077,6 +1329,8 @@
       monthTotals: monthTotals, billIn: billIn, loanInstalment: loanInstalment,
       left: left, nextDue: nextDue, shiftMonth: shiftMonth, dueDate: dueDate,
       rupees: rupees, monthDiff: monthDiff, num: num,
+      released: released, firstEmi: firstEmi, moratoriumEnds: moratoriumEnds,
+      inMoratorium: inMoratorium, moratoriumInterest: moratoriumInterest, years: termYears,
     },
     _state: D,
   };
