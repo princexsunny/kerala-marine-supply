@@ -75,6 +75,9 @@
              padding:26px 0 18px;border-bottom:2px solid var(--color-divider);margin-bottom:26px}
   .page-head h2{margin:0;font-size:22px}
   .page-back{font-size:13px;font-weight:700;white-space:nowrap}
+  /* Inside a folder: up one level, or all the way out, in one click each. */
+  .crumb{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;white-space:nowrap}
+  .crumb > span{color:var(--color-neutral-500);font-weight:400}
   .page-body{padding-bottom:48px}
   .page-body .eyebrow{display:none}
   .page-body h2{display:none}
@@ -322,29 +325,16 @@
 <main class="pad">
   <p style="max-width:64ch;color:var(--color-neutral-800);font-size:14px;margin:26px 0 22px">Pick what you want to change. Each one opens as its own page.</p>
   <div class="tiles">
-      <a class="tile" href="admin.html?p=photos">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5L7 19"/></svg>
-        <span class="t-name">Website photos</span>
-        <span class="t-desc">Hero and founder pictures</span>
-        <span class="t-meta">2 slots</span>
-      </a>
-      <a class="tile" href="admin.html?p=ventures">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        <span class="t-name">Venture photos</span>
-        <span class="t-desc">One picture per venture page</span>
-        <span class="t-meta">10 slots</span>
-      </a>
-      <a class="tile" href="admin.html?p=links">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
-        <span class="t-name">Venture websites</span>
-        <span class="t-desc">A link for each venture page</span>
-        <span class="t-meta">10 links</span>
-      </a>
-      <a class="tile" href="admin.html?p=video">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="14" height="13" rx="2"/><path d="m16.5 10 5-3v10l-5-3z"/></svg>
-        <span class="t-name">Website video</span>
-        <span class="t-desc">One clip for the home page</span>
-        <span class="t-meta">MP4</span>
+      <!-- The four media tiles that used to sit here — website photos, venture
+           photos, venture websites and the video — are one folder now. They
+           are all "what the public site shows", they were four of the eight
+           things on this screen, and three of them are opened perhaps twice a
+           year. Each still has its own page and its own URL underneath. -->
+      <a class="tile" href="admin.html?p=media">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 0 1 2-2h3.6l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="9" cy="13" r="1.4"/><path d="m20 17.5-4.2-4.2L10 19"/></svg>
+        <span class="t-name">Website media</span>
+        <span class="t-desc">Photos, venture pictures, links and the video</span>
+        <span class="t-meta" id="mediaTileMeta">4 things</span>
       </a>
       <a class="tile" href="admin.html?p=docs">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2.5H7a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z"/><path d="M13 2.5v6h6"/><path d="M8.5 13h7M8.5 16.5h7"/></svg>
@@ -376,9 +366,45 @@
   </div>
 </main>
 
+  <!-- The folder. Nothing lives here: it is a shelf holding the four pages
+       that do, each of which keeps the URL it always had so old bookmarks and
+       anything already linking to ?p=video still land in the right place. -->
+  <div class="page" id="panel-media">
+    <div class="page-box" aria-label="Website media">
+      <div class="page-head"><h2>Website media</h2><a class="page-back" href="admin.html">← All settings</a></div>
+      <p style="max-width:64ch;color:var(--color-neutral-800);font-size:14px;margin:0 0 22px">Everything the public website shows. Pick one to open it.</p>
+      <div class="tiles">
+      <a class="tile" href="admin.html?p=photos">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m21 16-5-5L7 19"/></svg>
+        <span class="t-name">Website photos</span>
+        <span class="t-desc">Hero and founder pictures</span>
+        <span class="t-meta">2 slots</span>
+      </a>
+      <a class="tile" href="admin.html?p=ventures">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span class="t-name">Venture photos</span>
+        <span class="t-desc">One picture per venture page</span>
+        <span class="t-meta">10 slots</span>
+      </a>
+      <a class="tile" href="admin.html?p=links">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+        <span class="t-name">Venture websites</span>
+        <span class="t-desc">A link for each venture page</span>
+        <span class="t-meta">10 links</span>
+      </a>
+      <a class="tile" href="admin.html?p=video">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="14" height="13" rx="2"/><path d="m16.5 10 5-3v10l-5-3z"/></svg>
+        <span class="t-name">Website video</span>
+        <span class="t-desc">One clip for the home page</span>
+        <span class="t-meta">MP4</span>
+      </a>
+      </div>
+    </div>
+  </div>
+
   <div class="page" id="panel-photos">
     <div class="page-box" aria-label="Website photos">
-      <div class="page-head"><h2>Website photos</h2><a class="page-back" href="admin.html">← All settings</a></div>
+      <div class="page-head"><h2>Website photos</h2><span class="crumb"><a href="admin.html">All settings</a><span aria-hidden="true">›</span><a class="page-back" href="admin.html?p=media">← Website media</a></span></div>
       <div class="page-body">
     <div class="eyebrow">Step 1 · Photographs</div>
     <h2>Website photos</h2>
@@ -390,7 +416,7 @@
   </div>
   <div class="page" id="panel-ventures">
     <div class="page-box" aria-label="Venture photos">
-      <div class="page-head"><h2>Venture photos</h2><a class="page-back" href="admin.html">← All settings</a></div>
+      <div class="page-head"><h2>Venture photos</h2><span class="crumb"><a href="admin.html">All settings</a><span aria-hidden="true">›</span><a class="page-back" href="admin.html?p=media">← Website media</a></span></div>
       <div class="page-body"><h3 style="font-size:16px;font-weight:800;margin:30px 0 4px">Venture photographs</h3>
     <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px;margin:0 0 14px">Pictures for each venture page — one, or several to make a slideshow. Leave a slot empty and that page shows a caption instead.</p>
     <div class="grid2" id="ventureGrid"></div>
@@ -400,7 +426,7 @@
   </div>
   <div class="page" id="panel-links">
     <div class="page-box" aria-label="Venture websites">
-      <div class="page-head"><h2>Venture websites</h2><a class="page-back" href="admin.html">← All settings</a></div>
+      <div class="page-head"><h2>Venture websites</h2><span class="crumb"><a href="admin.html">All settings</a><span aria-hidden="true">›</span><a class="page-back" href="admin.html?p=media">← Website media</a></span></div>
       <div class="page-body">
         <p style="max-width:64ch;color:var(--color-neutral-800);font-size:14px;margin:0 0 18px">Give a venture its own website and a button appears on that venture's page. Leave the address empty to remove it. Use a full address starting with <strong>https://</strong>, or a page on this site such as <strong>ledger-app.html</strong>.</p>
         <div id="linkRows"></div>
@@ -414,7 +440,7 @@
 
   <div class="page" id="panel-video">
     <div class="page-box" aria-label="Website video">
-      <div class="page-head"><h2>Website video</h2><a class="page-back" href="admin.html">← All settings</a></div>
+      <div class="page-head"><h2>Website video</h2><span class="crumb"><a href="admin.html">All settings</a><span aria-hidden="true">›</span><a class="page-back" href="admin.html?p=media">← Website media</a></span></div>
       <div class="page-body">
     <div class="eyebrow">Step 2 · Video</div>
     <h2>Website video</h2>
@@ -689,7 +715,18 @@
                     : (entry && entry.url ? [{ id: null, url: entry.url }] : []);
         paintSlot(s.key);
       });
+      paintMediaTile();
     }).catch(function(){});
+  }
+
+  // What the folder tile says. "4 things" would be true of an empty site and a
+  // finished one alike; how many slots actually have a picture in them is the
+  // thing worth knowing from the front screen.
+  function paintMediaTile(){
+    var el = document.getElementById('mediaTileMeta');
+    if(!el) return;
+    var filled = ALL_SLOTS.filter(function(s){ return (live[s.key] || []).length; }).length;
+    el.textContent = filled + ' of ' + ALL_SLOTS.length + ' pictures set';
   }
 
   // One delegated handler for both grids, so it survives every re-render.
@@ -2043,6 +2080,7 @@
   // the URL rather than from a click means the back button, refresh, bookmarks
   // and opening a category in a new tab all behave as anyone would expect.
   var TITLES = {
+    media:    'Website media',
     photos:   'Website photos',
     ventures: 'Venture photos',
     links:    'Venture websites',
