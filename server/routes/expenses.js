@@ -38,6 +38,17 @@ const MAX_BYTES = 800 * 1024;
 // would otherwise silently wreck every total on the page.
 const MAX_AMOUNT = 1e11;
 
+// What kind of borrowing it is. A gold loan behaves differently enough from a
+// term loan to be worth naming: it is usually interest every three months with
+// the principal returned at the end, not an amortising EMI.
+const LOAN_KINDS = ['Term loan', 'Gold loan', 'Vehicle loan', 'Overdraft', 'Hand loan', 'Other'];
+
+// How the money comes back. 'emi' is a level instalment that pays down the
+// balance; 'interest-only' is interest each period with the principal due at
+// the end. Forcing a gold loan into the first would misstate both the payment
+// and what is left owing.
+const REPAY = ['emi', 'interest-only'];
+
 // Suggestions, not a fixed list. The page offers these and accepts anything
 // else typed in, the same way the document library handles its folders.
 const CATEGORIES = [
@@ -110,6 +121,7 @@ function cleanEntry(x) {
     amount: money(x.amount),
     category: str(x.category, MAX_TEXT),
     venture: str(x.venture, 60),   // a slug from ventures-data.js, or ''
+    home: !!x.home,                // the house's, not the business's
     note: str(x.note, MAX_NOTE),
   };
 }
@@ -123,6 +135,14 @@ function cleanBill(x) {
     category: str(x.category, MAX_TEXT),
     venture: str(x.venture, 60),
     dueDay: int(x.dueDay, 1, 31, 1),
+    // How many months between one charge and the next. The electricity here
+    // comes every two months, so 'monthly' was never the whole story. Defaults
+    // to 1, which is what every bill saved before this field existed was.
+    every: int(x.every, 1, 12, 1),
+    // Whether this is the business's or the house's. Kept as a mark on the
+    // bill rather than a separate book: the two are paid from the same hand
+    // and it is the TOTALS that need to keep them apart, not the entry.
+    home: !!x.home,
     from: isoMonth(x.from),
     to: isoMonth(x.to),          // '' means it is still running
     paid: months(x.paid),
@@ -164,18 +184,41 @@ function cleanLoan(x) {
       return isFinite(n) && n >= 0 && n <= 100 ? Math.round(n * 100) / 100 : 0;
     })(),
     dueDay: int(x.dueDay, 1, 31, 5),
+    kind: LOAN_KINDS.indexOf(x.kind) >= 0 ? x.kind : 'Term loan',
+    repay: REPAY.indexOf(x.repay) >= 0 ? x.repay : 'emi',
+    // Months between one instalment and the next. A gold loan is commonly
+    // three. 1 is monthly, and is what every loan saved before this existed
+    // was, so nothing already stored moves.
+    every: int(x.every, 1, 12, 1),
     // The month the loan starts, and how many months of holiday before the
-    // first EMI. When both are set the page derives `from` from them, so the
-    // schedule still keys off one field and nothing downstream changes.
+    // first instalment. When both are set the page derives `from` from them,
+    // so the schedule still keys off one field.
     start: start,
     moratorium: moratorium,
     from: isoMonth(x.from),
+    // NUMBER OF INSTALMENTS, not months. With `every` above 1 the two differ,
+    // and calling it months would make a three-yearly gold loan look like a
+    // three-month one.
     months: int(x.months, 0, 600, 0),
     releases: (Array.isArray(x.releases) ? x.releases : [])
       .slice(0, 60).map(cleanRelease).filter((r) => r.amount || r.date),
     venture: str(x.venture, 60),
     paid: months(x.paid),
     note: str(x.note, MAX_NOTE),
+  };
+}
+
+// How far ahead a due date should start being flagged. Stored rather than
+// assumed: five days suits a bill you pay from the phone, ten suits one that
+// needs money moving between accounts first.
+function cleanSettings(x) {
+  x = x || {};
+  return {
+    remindDays: int(x.remindDays, 0, 60, 5),
+    // A browser notification, and only that. It cannot reach a phone that is
+    // not looking at this page, and the wording on the page says so — a
+    // reminder someone believes in and does not get is worse than none.
+    notify: !!x.notify,
   };
 }
 
@@ -246,10 +289,11 @@ router.get('/finance', async (req, res) => {
   if (!y) return res.status(400).json({ error: 'That is not a year I can store.' });
 
   try {
-    const [entriesDoc, bills, loans] = await Promise.all([
+    const [entriesDoc, bills, loans, settingsDoc] = await Promise.all([
       docRef('year-' + y).get(),
       readList('bills', cleanBill, MAX_BILLS),
       readList('loans', cleanLoan, MAX_LOANS),
+      docRef('settings').get(),
     ]);
     const raw = entriesDoc.exists ? (entriesDoc.data() || {}) : {};
     const entries = (Array.isArray(raw.entries) ? raw.entries : [])
@@ -259,7 +303,12 @@ router.get('/finance', async (req, res) => {
       // it is still money that went out, and hiding it would hide a mistake.
       .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
-    res.json({ year: y, entries, bills, loans, categories: CATEGORIES });
+    res.json({
+      year: y, entries, bills, loans,
+      settings: cleanSettings(settingsDoc.exists ? settingsDoc.data() : null),
+      categories: CATEGORIES,
+      loanKinds: LOAN_KINDS,
+    });
   } catch (err) {
     console.error('GET /api/finance failed:', err);
     res.status(500).json({ error: 'Could not load the expenses.' });
@@ -373,12 +422,31 @@ router.put('/finance/loans', async (req, res) => {
   }
 });
 
+// ---- reminder settings -----------------------------------------------------
+
+router.put('/finance/settings', async (req, res) => {
+  if (!ready(res)) return;
+  const settings = cleanSettings(req.body);
+  try {
+    await docRef('settings').set(
+      { ...settings, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+    res.json(settings);
+  } catch (err) {
+    console.error('PUT /api/finance/settings failed:', err);
+    res.status(500).json({ error: 'Could not save the reminder setting.' });
+  }
+});
+
 module.exports = {
   router,
+  LOAN_KINDS,
+  REPAY,
   CATEGORIES,
   MAX_ENTRIES,
   MAX_BILLS,
   MAX_LOANS,
   // Exported for the tests, which check the arithmetic these produce.
-  _clean: { cleanEntry, cleanBill, cleanLoan, money, isoMonth, year },
+  _clean: { cleanEntry, cleanBill, cleanLoan, cleanSettings, money, isoMonth, year },
 };

@@ -88,20 +88,54 @@
 
   // ---- what applies in a given month ---------------------------------------
 
+  // How many months between one charge and the next. Anything saved before the
+  // field existed is monthly, which is what it always was.
+  function every(x) { return Math.max(1, Math.round(Number(x && x.every) || 1)); }
+
+  // Does this bill fall in this month? Not just "is it running" — a bill every
+  // two months falls in every OTHER month, counted from the one it started in.
   function billIn(b, month) {
     if (!b.from || month < b.from) return false;
     if (b.to && month > b.to) return false;
-    return true;
+    return monthDiff(b.from, month) % every(b) === 0;
   }
-  // Which instalment number this month is for a loan, or -1 if none is due.
-  // A loan with months = 0 has not been told how long it runs, so it is treated
-  // as still running rather than as finished — the alternative silently drops
-  // it out of every month.
+  // Which instalment number this month is, or -1 if none is due. With `every`
+  // above 1 most months have none: a gold loan paying every three months is
+  // due in one month out of three, and silently charging it monthly would
+  // overstate the year by a factor of three.
+  //
+  // A loan with months = 0 has not been told how long it runs, so it is
+  // treated as still running rather than as finished.
   function loanInstalment(l, month) {
     if (!l.from || month < l.from) return -1;
-    var i = monthDiff(l.from, month);
+    var d = monthDiff(l.from, month);
+    var n = every(l);
+    if (d % n !== 0) return -1;
+    var i = d / n;
     if (l.months && i >= l.months) return -1;
     return i;
+  }
+  // What one payment is made of, and what it leaves behind.
+  //
+  //   emi            a level instalment that pays the balance down to nothing
+  //   interest-only  interest each period, principal returned at the end
+  //
+  // A gold loan is the second. Forcing it into the first would understate the
+  // payment and, far worse, show nothing left owing when the whole principal
+  // still is.
+  function periodRate(l) {
+    return (Number(l.rate) || 0) / 100 * (every(l) / 12);
+  }
+  function calcPayment(l) {
+    var P = Number(l.principal) || 0;
+    var n = Math.round(Number(l.months) || 0);
+    var r = periodRate(l);
+    if (!P) return 0;
+    if (l.repay === 'interest-only') return Math.round(P * r * 100) / 100;
+    if (!n) return 0;
+    if (!r) return Math.round(P / n * 100) / 100;   // interest free: just split it
+    var f = Math.pow(1 + r, n);
+    return Math.round(P * r * f / (f - 1) * 100) / 100;
   }
   function has(arr, m) { return (arr || []).indexOf(m) !== -1; }
   function toggle(arr, m, on) {
@@ -111,25 +145,58 @@
     arr.sort();
   }
 
-  // What a month costs: recorded spending, plus the bills that apply and were
-  // not skipped, plus the EMIs due. Bills and EMIs count whether or not they
-  // have been ticked as paid — an unpaid bill is still that month's cost.
+  // Everything that falls due in one month, bills and instalments together.
+  // ONE function, used by the month list, the twelve-month outlook and the
+  // reminders — three places that must never disagree about what is due.
+  function dueItems(D, m) {
+    var rows = [];
+    (D.bills || []).forEach(function (b) {
+      if (!billIn(b, m)) return;
+      rows.push({
+        kind: 'bill', id: b.id, name: b.name || 'Untitled bill',
+        what: (b.category || 'Bill') + (every(b) > 1 ? ' · ' + cadence(b) : ''),
+        amount: b.amount, when: dueDate(m, b.dueDay),
+        paid: has(b.paid, m), skipped: has(b.skip, m),
+        venture: b.venture, home: !!b.home,
+      });
+    });
+    (D.loans || []).forEach(function (l) {
+      var i = loanInstalment(l, m);
+      if (i < 0) return;
+      rows.push({
+        kind: 'loan', id: l.id, name: l.lender || 'Untitled loan',
+        what: (l.repay === 'interest-only' ? 'Interest ' : 'EMI ') + (i + 1) +
+              (l.months ? ' of ' + l.months : '') +
+              (every(l) > 1 ? ' · ' + cadence(l) : ''),
+        amount: l.emi, when: dueDate(m, l.dueDay),
+        paid: has(l.paid, m), skipped: false,
+        venture: l.venture, home: false,
+      });
+    });
+    rows.sort(function (a, b) { return a.when.localeCompare(b.when); });
+    return rows;
+  }
+
+  // What a month costs: recorded spending, plus whatever falls due in it.
+  // Bills and instalments count whether or not they have been ticked paid —
+  // an unpaid bill is still that month's cost.
+  //
+  // The house and the business are added up separately as well as together.
+  // One number covering both is a number that answers neither question.
   function monthTotals(D, month) {
-    var out = { spent: 0, bills: 0, emi: 0, byCat: {}, count: 0 };
-    function add(cat, amt) {
+    var out = { spent: 0, bills: 0, emi: 0, byCat: {}, count: 0, home: 0, business: 0 };
+    function add(cat, amt, home) {
       out.byCat[cat || 'Uncategorised'] = (out.byCat[cat || 'Uncategorised'] || 0) + amt;
+      if (home) out.home += amt; else out.business += amt;
     }
-    D.entries.forEach(function (e) {
+    (D.entries || []).forEach(function (e) {
       if (e.date.slice(0, 7) !== month) return;
-      out.spent += e.amount; out.count++; add(e.category, e.amount);
+      out.spent += e.amount; out.count++; add(e.category, e.amount, e.home);
     });
-    D.bills.forEach(function (b) {
-      if (!billIn(b, month) || has(b.skip, month)) return;
-      out.bills += b.amount; add(b.category, b.amount);
-    });
-    D.loans.forEach(function (l) {
-      if (loanInstalment(l, month) < 0) return;
-      out.emi += l.emi; add('Loan EMI', l.emi);
+    dueItems(D, month).forEach(function (r) {
+      if (r.skipped) return;
+      if (r.kind === 'bill') { out.bills += r.amount; add(r.what.split(' · ')[0], r.amount, r.home); }
+      else { out.emi += r.amount; add('Loan EMI', r.amount, false); }
     });
     out.total = out.spent + out.bills + out.emi;
     return out;
@@ -141,7 +208,12 @@
   // would overstate what a bank would accept to close the loan.
   function left(l) {
     if (!l.months) return 0;
-    return Math.max(0, l.months - l.paid.length) * l.emi;
+    var owing = Math.max(0, l.months - l.paid.length) * l.emi;
+    // Interest-only: the payments are interest, and the principal is still
+    // there at the end. Leaving it out would say a gold loan was nearly
+    // settled when none of it has been repaid at all.
+    if (l.repay === 'interest-only') owing += Number(l.principal) || 0;
+    return owing;
   }
   // What has actually reached the account, as against what was agreed. A
   // sanction is a promise; a release is money.
@@ -173,17 +245,58 @@
   }
   // NOT `years`: that name is already the year -> entries cache below, and a
   // var declaration would quietly overwrite this function.
-  function termYears(months) {
-    if (!months) return '';
-    return months % 12 === 0 ? (months / 12) + (months === 12 ? ' year' : ' years')
-                             : (months / 12).toFixed(1) + ' years';
+  // The term in years, which is instalments x months-between, NOT the number of
+  // instalments. Twelve quarterly payments is three years, not one.
+  function termYears(l) {
+    var n = Math.round(Number(l && l.months) || 0);
+    if (!n) return '';
+    var m = n * every(l);
+    return m % 12 === 0 ? (m / 12) + (m === 12 ? ' year' : ' years')
+                        : (m / 12).toFixed(1) + ' years';
+  }
+  // "every 3 months" / "monthly", for saying out loud.
+  function cadence(x) {
+    var n = every(x);
+    return n === 1 ? 'monthly' : n === 12 ? 'once a year' : 'every ' + n + ' months';
   }
 
   function nextDue(l) {
     if (!l.from) return '';
     var i = l.paid.length;
     if (l.months && i >= l.months) return '';
-    return dueDate(shiftMonth(l.from, i), l.dueDay);
+    // i instalments in, each `every` months apart.
+    return dueDate(shiftMonth(l.from, i * every(l)), l.dueDay);
+  }
+
+  // Anything unpaid whose date has passed, or is within the reminder window.
+  // Looks across THREE months — last, this and next — because a bill due on
+  // the 2nd needs flagging in the last week of the month before.
+  function dueSoon(D, days) {
+    var now = today();
+    var edge = addDays(now, days);
+    var out = [];
+    [shiftMonth(thisMonth(), -1), thisMonth(), shiftMonth(thisMonth(), 1)].forEach(function (m) {
+      dueItems(D, m).forEach(function (r) {
+        if (r.paid || r.skipped) return;
+        if (r.when > edge) return;
+        out.push({ item: r, late: r.when < now, days: daysBetween(now, r.when) });
+      });
+    });
+    out.sort(function (a, b) { return a.item.when.localeCompare(b.item.when); });
+    return out;
+  }
+  function addDays(iso, n) {
+    var d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+  function daysBetween(a, b) {
+    return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+  }
+  function inDays(n) {
+    return n === 0 ? 'today' : n === 1 ? 'tomorrow'
+         : n < 0 ? (-n) + (n === -1 ? ' day late' : ' days late')
+         : 'in ' + n + ' days';
   }
 
   // ---- state ---------------------------------------------------------------
@@ -200,6 +313,13 @@
   // no longer read at a glance.
   //   { kind: 'entry'|'loan'|'bill', id, draft, isNew }
   var edit = null;
+
+  // Reminder settings, and whether the twelve-month outlook is showing. The
+  // outlook is a view of the same data, not a page — opening it should not
+  // lose the month you were looking at.
+  var settings = { remindDays: 5, notify: false };
+  var showCal = false;
+  var notified = false;   // one notification a visit, not one a render
 
   function ventures() {
     return (window.KMS_VISIBLE || window.KMS_VENTURES || []).filter(function (v) { return !v.hidden; });
@@ -265,6 +385,39 @@
     return '';
   });
 
+  function saveSettings() {
+    fetch(API + '/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(settings),
+    }).catch(function () {
+      setStatus('Could not save the reminder setting.', true);
+    });
+  }
+
+  // One notification a visit, naming the nearest payment and how many others
+  // there are. Firing one per item would be a wall of boxes.
+  function maybeNotify() {
+    if (!settings.notify || notified) return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    var soon = dueSoon(D, settings.remindDays);
+    if (!soon.length) return;
+    notified = true;
+    var first = soon[0];
+    var rest = soon.length - 1;
+    try {
+      new Notification(
+        soon.filter(function (x) { return x.late; }).length ? 'A payment is overdue' : 'A payment is coming up',
+        {
+          body: first.item.name + ' — ' + rupees(first.item.amount) + ', ' + inDays(first.days) +
+                (rest ? '\nand ' + rest + ' more' : ''),
+          tag: 'kms-money',
+        }
+      );
+    } catch (e) {}
+  }
+
   // ---- loading -------------------------------------------------------------
 
   function load(y, then) {
@@ -290,9 +443,11 @@
         D.bills = j.bills || [];
         D.loans = j.loans || [];
         D.categories = j.categories || [];
+        if (j.settings) settings = j.settings;
         ready = true;
         setStatus('');
         paintTiles();
+        maybeNotify();
         if (then) then();
       })
       .catch(function (err) {
@@ -309,7 +464,12 @@
   function paintTiles() {
     var t = monthTotals(D, month);
     var m = el('moTileMeta');
-    if (m) m.textContent = rupees(t.total) + ' this month';
+    if (m) {
+      var late = dueSoon(D, settings.remindDays).filter(function (x) { return x.late; }).length;
+      m.textContent = late
+        ? late + (late === 1 ? ' payment overdue' : ' payments overdue')
+        : rupees(t.total) + ' this month';
+    }
     var mm = el('moMonthMeta');
     if (mm) mm.textContent = t.count + (t.count === 1 ? ' entry' : ' entries');
     var lm = el('moLoanMeta');
@@ -344,6 +504,24 @@
         return '<option value="' + esc(v.slug) + '"' + (v.slug === value ? ' selected' : '') + '>' +
                esc(v.num + ' · ' + n) + '</option>';
       }).join('') + '</select>';
+  }
+
+  // Months between one charge and the next. A dropdown, not a free number: the
+  // useful values are few and named, and "every 2 months" said in words is
+  // harder to misread than a bare 2 in a box.
+  var EVERY_LABELS = { 1: 'Every month', 2: 'Every 2 months', 3: 'Every 3 months (quarterly)',
+                       4: 'Every 4 months', 6: 'Every 6 months (half yearly)', 12: 'Once a year' };
+  var LOAN_KINDS = ['Term loan', 'Gold loan', 'Vehicle loan', 'Overdraft', 'Hand loan', 'Other'];
+  function kindOptions(v) {
+    return LOAN_KINDS.map(function (k) {
+      return '<option value="' + esc(k) + '"' + (k === v ? ' selected' : '') + '>' + esc(k) + '</option>';
+    }).join('');
+  }
+
+  function everyOptions(v) {
+    return [1, 2, 3, 4, 6, 12].map(function (n) {
+      return '<option value="' + n + '"' + (n === v ? ' selected' : '') + '>' + EVERY_LABELS[n] + '</option>';
+    }).join('');
   }
 
   function statusBar() { return '<p class="mo-status" id="moStatus"></p>'; }
@@ -407,11 +585,19 @@
         '<input type="month" id="moPick" value="' + month + '">' +
         '<button type="button" class="mo-nav" id="moNext" aria-label="Next month">›</button>' +
         '<button type="button" class="mo-nav mo-today" id="moNow">This month</button>' +
+        '<button type="button" class="mo-nav mo-today' + (showCal ? ' mo-onnow' : '') + '" id="moCal">' +
+          (showCal ? '✕ Close calendar' : '▦ Calendar — next 12 months') + '</button>' +
       '</div>' +
+      (showCal ? renderCalendar() : '') +
+      renderRemind() +
 
       '<div class="mo-cards">' +
         '<div class="mo-card mo-big"><span class="k">Total for ' + esc(monthName(month)) + '</span>' +
           '<strong>' + rupees(t.total) + '</strong><span class="c">' + change + '</span></div>' +
+        '<div class="mo-card"><span class="k">Business</span><strong>' + rupees(t.business) + '</strong>' +
+          '<span class="c">' + (t.total ? Math.round(t.business / t.total * 100) : 0) + '% of the month</span></div>' +
+        '<div class="mo-card"><span class="k">Home</span><strong>' + rupees(t.home) + '</strong>' +
+          '<span class="c">' + (t.total ? Math.round(t.home / t.total * 100) : 0) + '% of the month</span></div>' +
         '<div class="mo-card"><span class="k">Spent</span><strong>' + rupees(t.spent) + '</strong>' +
           '<span class="c">' + t.count + (t.count === 1 ? ' entry' : ' entries') + '</span></div>' +
         '<div class="mo-card"><span class="k">Repeating bills</span><strong>' + rupees(t.bills) + '</strong>' +
@@ -445,6 +631,70 @@
 
   // The list. Plain rows you can read down, with one row swapped for a form
   // when it is being edited.
+  // Twelve months at a glance, so a future amount can be checked without
+  // walking forward a month at a time. Only bills and instalments — a future
+  // month has no recorded spending in it yet, and showing a total that mixed
+  // the two would make this month look bigger than the ones after it.
+  function renderCalendar() {
+    var start = thisMonth();
+    var cells = [], grand = 0;
+    for (var i = 0; i < 12; i++) {
+      var m = shiftMonth(start, i);
+      var rows = dueItems(D, m).filter(function (r) { return !r.skipped; });
+      var sum = rows.reduce(function (a, r) { return a + r.amount; }, 0);
+      grand += sum;
+      var unpaid = rows.filter(function (r) { return !r.paid; }).length;
+      cells.push(
+        '<button type="button" class="mo-cal' + (m === month ? ' on' : '') +
+          (sum ? '' : ' quiet') + '" data-m="' + m + '">' +
+          '<span class="mo-calm">' + esc(MONTH_NAMES[Number(m.slice(5, 7)) - 1].slice(0, 3)) +
+            ' <i>' + m.slice(2, 4) + '</i></span>' +
+          '<span class="mo-calv">' + (sum ? rupees(sum) : '—') + '</span>' +
+          '<span class="mo-caln">' + (rows.length
+            ? rows.length + (rows.length === 1 ? ' due' : ' due') +
+              (unpaid && i === 0 ? ' · ' + unpaid + ' unpaid' : '')
+            : 'nothing') + '</span>' +
+        '</button>');
+    }
+    return '<div class="mo-calwrap">' +
+      '<p class="mo-calhead"><b>' + rupees(grand) + '</b> falls due over the next twelve months — ' +
+        'repeating bills and loan instalments only, not day-to-day spending. Tap a month to open it.</p>' +
+      '<div class="mo-calgrid">' + cells.join('') + '</div></div>';
+  }
+
+  // What is about to be due, and what is already late.
+  function renderRemind() {
+    var soon = dueSoon(D, settings.remindDays);
+    var late = soon.filter(function (x) { return x.late; });
+    var opts = [0, 3, 5, 10, 15].map(function (n) {
+      return '<option value="' + n + '"' + (n === settings.remindDays ? ' selected' : '') + '>' +
+        (n === 0 ? 'On the day' : n + ' days before') + '</option>';
+    }).join('');
+
+    return '<div class="mo-remind' + (late.length ? ' bad' : (soon.length ? ' warn' : '')) + '">' +
+      '<div class="mo-remhead">' +
+        '<b>' + (late.length
+          ? late.length + (late.length === 1 ? ' payment is overdue' : ' payments are overdue')
+          : (soon.length ? soon.length + (soon.length === 1 ? ' payment is coming up' : ' payments are coming up')
+                         : 'Nothing due in the next ' + settings.remindDays + ' days')) + '</b>' +
+        '<span class="mo-remset">Remind me <select id="moRemDays">' + opts + '</select>' +
+          '<label class="mo-tick"><input type="checkbox" id="moNotify"' +
+            (settings.notify ? ' checked' : '') + '> browser alert</label></span>' +
+      '</div>' +
+      (soon.length
+        ? '<ul class="mo-remlist">' + soon.map(function (x) {
+            return '<li' + (x.late ? ' class="late"' : '') + '>' +
+              '<span>' + esc(x.item.name) + '<span class="mo-sub">' + esc(x.item.what) + '</span></span>' +
+              '<span>' + rupees(x.item.amount) + '</span>' +
+              '<span>' + esc(prettyDate(x.item.when)) + ' · <b>' + esc(inDays(x.days)) + '</b></span>' +
+            '</li>';
+          }).join('') + '</ul>'
+        : '') +
+      '<p class="mo-remnote">A browser alert only appears while this page is open on this device. ' +
+        'It cannot reach you by email, SMS or on your phone when the page is closed.</p>' +
+    '</div>';
+  }
+
   function renderEntryList() {
     var rows = D.entries.filter(function (e) { return e.date.slice(0, 7) === month; });
     if (!rows.length && !(edit && edit.kind === 'entry')) {
@@ -455,8 +705,9 @@
       return '<li class="mo-li" data-id="' + esc(e.id) + '">' +
         '<span class="mo-when">' + esc(prettyDate(e.date)) + '</span>' +
         '<span class="mo-what"><b>' + esc(e.category || 'Uncategorised') + '</b>' +
+          (e.home ? '<span class="mo-tag">home</span>' : '') +
           (e.note ? '<span class="mo-sub">' + esc(e.note) + '</span>' : '') + '</span>' +
-        '<span class="mo-for">' + esc(ventureName(e.venture) || '—') + '</span>' +
+        '<span class="mo-for">' + esc(e.home ? 'House' : (ventureName(e.venture) || '—')) + '</span>' +
         '<span class="mo-amt">' + rupees(e.amount) + '</span>' +
         '<span class="mo-acts">' +
           '<button type="button" class="mo-x f-edit">Edit</button>' +
@@ -473,6 +724,10 @@
         '<label>Amount<input type="text" inputmode="decimal" class="f-amt" value="' + (e.amount || '') + '" placeholder="0"></label>' +
         '<label>Category<input type="text" list="moCats" class="f-cat" value="' + esc(e.category) + '" placeholder="Fuel"></label>' +
         '<label>Venture' + ventureSelect(e.venture, 'f-ven') + '</label>' +
+        '<label>Whose<select class="f-home">' +
+          '<option value=""' + (e.home ? '' : ' selected') + '>Business</option>' +
+          '<option value="1"' + (e.home ? ' selected' : '') + '>Home</option>' +
+        '</select></label>' +
         '<label class="wide">What was it for<input type="text" class="f-note" value="' + esc(e.note) + '" placeholder="optional"></label>' +
       '</div>' +
       saveRow(isNew ? 'Save this expense' : 'Save changes') +
@@ -483,29 +738,8 @@
   // change available here — the amount belongs to the rule, not to the month,
   // so editing it here would change every month at once without saying so.
   function renderDueList(m) {
-    var rows = [];
-    D.bills.forEach(function (b) {
-      if (!billIn(b, m)) return;
-      rows.push({
-        kind: 'bill', id: b.id, name: b.name || 'Untitled bill',
-        what: b.category || 'Bill', amount: b.amount,
-        when: dueDate(m, b.dueDay), paid: has(b.paid, m), skipped: has(b.skip, m),
-        venture: b.venture,
-      });
-    });
-    D.loans.forEach(function (l) {
-      var i = loanInstalment(l, m);
-      if (i < 0) return;
-      rows.push({
-        kind: 'loan', id: l.id, name: l.lender || 'Untitled loan',
-        what: 'EMI ' + (i + 1) + (l.months ? ' of ' + l.months : ''),
-        amount: l.emi, when: dueDate(m, l.dueDay), paid: has(l.paid, m), skipped: false,
-        venture: l.venture,
-      });
-    });
-    if (!rows.length) return emptyNote('No repeating bills or EMIs fall in this month.');
-    rows.sort(function (a, b) { return a.when.localeCompare(b.when); });
-
+    var rows = dueItems(D, m);
+    if (!rows.length) return emptyNote('No repeating bills or instalments fall in this month.');
     var now = today();
     return '<ul class="mo-list">' + rows.map(function (r) {
       var late = !r.paid && !r.skipped && r.when < now;
@@ -513,8 +747,10 @@
              '" data-kind="' + r.kind + '" data-id="' + esc(r.id) + '">' +
         '<span class="mo-when">' + esc(prettyDate(r.when)) +
           (late ? '<span class="mo-late">overdue</span>' : '') + '</span>' +
-        '<span class="mo-what"><b>' + esc(r.name) + '</b><span class="mo-sub">' + esc(r.what) + '</span></span>' +
-        '<span class="mo-for">' + esc(ventureName(r.venture) || '—') + '</span>' +
+        '<span class="mo-what"><b>' + esc(r.name) + '</b>' +
+          (r.home ? '<span class="mo-tag">home</span>' : '') +
+          '<span class="mo-sub">' + esc(r.what) + '</span></span>' +
+        '<span class="mo-for">' + esc(r.home ? 'House' : (ventureName(r.venture) || '—')) + '</span>' +
         '<span class="mo-amt">' + rupees(r.amount) + '</span>' +
         '<span class="mo-acts">' +
           '<label class="mo-tick"><input type="checkbox" class="f-paid"' +
@@ -549,11 +785,50 @@
     el('moPick').onchange = function () {
       if (/^\d{4}-\d{2}$/.test(this.value)) goTo(this.value);
     };
+    el('moCal').onclick = function () { showCal = !showCal; renderMonth(); };
+    host.querySelectorAll('.mo-cal').forEach(function (b) {
+      b.onclick = function () { goTo(b.getAttribute('data-m')); };
+    });
+
+    // ---- the reminder setting ----
+    var days = el('moRemDays');
+    if (days) days.onchange = function () {
+      settings.remindDays = Math.max(0, Math.min(60, Number(this.value) || 0));
+      saveSettings();
+      renderMonth();
+    };
+    var notify = el('moNotify');
+    if (notify) notify.onchange = function () {
+      var want = this.checked;
+      if (!want) { settings.notify = false; saveSettings(); return; }
+      // Turning it on has to actually get permission, and has to say plainly
+      // when it did not — a reminder someone believes in and never receives is
+      // worse than no reminder at all.
+      if (!('Notification' in window)) {
+        this.checked = false;
+        setStatus('This browser cannot show notifications.', true);
+        return;
+      }
+      var self = this;
+      Promise.resolve(Notification.requestPermission()).then(function (p) {
+        if (p !== 'granted') {
+          self.checked = false;
+          settings.notify = false;
+          setStatus('The browser refused notifications. Allow them for this site and try again.', true);
+        } else {
+          settings.notify = true;
+          notified = false;
+          setStatus('Browser alerts on — while this page is open.');
+          maybeNotify();
+        }
+        saveSettings();
+      });
+    };
 
     el('moAddEntry').onclick = function () {
       if (!leaveEdit()) return;
       var d = (thisMonth() === month) ? today() : dueDate(month, 1);
-      var e = { id: uid('e'), date: d, amount: 0, category: '', venture: '', note: '' };
+      var e = { id: uid('e'), date: d, amount: 0, category: '', venture: '', home: false, note: '' };
       D.entries.unshift(e);
       years[D.year] = D.entries;
       edit = { kind: 'entry', id: e.id, draft: copy(e), isNew: true };
@@ -615,6 +890,7 @@
       d.amount = num(box.querySelector('.f-amt').value);
       d.category = box.querySelector('.f-cat').value.trim();
       d.venture = box.querySelector('.f-ven').value;
+      d.home = !!box.querySelector('.f-home').value;
       d.note = box.querySelector('.f-note').value.trim();
     }
     box.querySelector('.f-save').onclick = function () {
@@ -683,7 +959,11 @@
           ' not paying an EMI yet</span></div>' : '') +
       '</div>' +
       '<p class="mo-caveat">These are the figures you enter. Nothing here is taken from a bank — ' +
-        'check a statement before relying on it for a payment.</p>' +
+        'check a statement before relying on it for a payment.' +
+        (D.loans.some(function (l) { return l.repay === 'interest-only'; })
+          ? ' <b>*</b> On an interest-only loan, “left to pay” includes the principal ' +
+            'returned at the end, not just the interest payments.'
+          : '') + '</p>' +
       '<div class="mo-head"><h3 class="mo-h">Loans</h3>' +
         '<button type="button" class="mo-btn" id="moAddLoan">Add a loan</button></div>' +
       statusBar() +
@@ -721,9 +1001,13 @@
 
     return '<li class="mo-li mo-tall" data-id="' + esc(l.id) + '">' +
       '<span class="mo-what"><b>' + esc(l.lender || 'Untitled loan') + '</b>' +
+        '<span class="mo-tag mo-kind">' + esc(l.kind || 'Term loan') + '</span>' +
         '<span class="mo-sub">' + esc(l.purpose || 'no purpose set') +
         (ventureName(l.venture) ? ' · ' + esc(ventureName(l.venture)) : '') +
-        (l.months ? ' · ' + esc(termYears(l.months)) + ' (' + l.months + ' EMIs)' : '') + '</span>' +
+        (l.months ? ' · ' + esc(termYears(l)) + ' (' + l.months + ' × ' + esc(cadence(l)) + ')' : '') + '</span>' +
+        (l.repay === 'interest-only'
+          ? '<span class="mo-sub mo-hol">Interest only — ' + rupees(l.principal) +
+            ' principal still due at the end</span>' : '') +
         releaseLine +
         (holiday
           ? '<span class="mo-sub mo-hol">In moratorium until ' + esc(monthName(end)) +
@@ -734,8 +1018,10 @@
           'next ' + (n ? esc(prettyDate(n)) : 'nothing outstanding') +
           (late ? ' <span class="mo-late">overdue</span>' : '') + '</span>' +
       '</span>' +
-      '<span class="mo-amt"><b>' + rupees(l.emi) + '</b><span class="mo-sub">a month</span>' +
-        '<span class="mo-sub">' + rupees(left(l)) + ' left</span>' +
+      '<span class="mo-amt"><b>' + rupees(l.emi) + '</b>' +
+        '<span class="mo-sub">' + esc(cadence(l)) + '</span>' +
+        '<span class="mo-sub">' + rupees(left(l)) + ' left' +
+          (l.repay === 'interest-only' ? ' *' : '') + '</span>' +
         (holiday && moratoriumInterest(l)
           ? '<span class="mo-sub">~' + rupees(moratoriumInterest(l)) + ' interest</span>' : '') +
       '</span>' +
@@ -752,25 +1038,37 @@
     return '<li class="mo-li mo-open" data-id="' + esc(l.id) + '">' +
       '<div class="mo-grid">' +
         '<label>Lender<input type="text" class="f-lender" value="' + esc(l.lender) + '" placeholder="Kerala Financial Corporation"></label>' +
+        '<label>Kind<select class="f-kind">' + kindOptions(l.kind) + '</select></label>' +
         '<label>What for<input type="text" class="f-purpose" value="' + esc(l.purpose) + '" placeholder="Boat yard"></label>' +
         '<label>Venture' + ventureSelect(l.venture, 'f-ven') + '</label>' +
         '<label>Amount sanctioned<input type="text" inputmode="decimal" class="f-principal" value="' + (l.principal || '') + '" placeholder="0"></label>' +
-        '<label>EMI a month<input type="text" inputmode="decimal" class="f-emi" value="' + (l.emi || '') + '" placeholder="0"></label>' +
-        '<label>Interest %<input type="text" inputmode="decimal" class="f-rate" value="' + (l.rate || '') + '" placeholder="0"></label>' +
+        '<label>Interest %, a year<input type="text" inputmode="decimal" class="f-rate" value="' + (l.rate || '') + '" placeholder="0"></label>' +
       '</div>' +
 
       // ---- the term ----
-      '<h4 class="mo-sech">Term and moratorium</h4>' +
+      '<h4 class="mo-sech">Term, moratorium and how it repays</h4>' +
       '<div class="mo-grid">' +
+        '<label>Repayment<select class="f-repay">' +
+          '<option value="emi"' + (l.repay === 'interest-only' ? '' : ' selected') + '>EMI — pays the balance down</option>' +
+          '<option value="interest-only"' + (l.repay === 'interest-only' ? ' selected' : '') + '>Interest only — principal at the end</option>' +
+        '</select></label>' +
+        '<label>Instalment falls<select class="f-every">' + everyOptions(every(l)) + '</select></label>' +
         '<label>Loan starts<input type="month" class="f-start" value="' + esc(l.start || '') + '"></label>' +
         '<label>Moratorium, months<input type="number" min="0" max="120" class="f-mor" value="' + (l.moratorium || '') + '" placeholder="0"></label>' +
-        '<label>Term, years<input type="number" min="0" max="50" step="0.5" class="f-years" value="' +
-          (l.months && l.months % 6 === 0 ? (l.months / 12) : '') + '" placeholder="e.g. 7"></label>' +
-        '<label>Or number of EMIs<input type="number" min="0" max="600" class="f-months" value="' + (l.months || '') + '" placeholder="e.g. 84"></label>' +
+        '<label>Term, years<input type="number" min="0" max="50" step="0.5" class="f-years" value="" placeholder="e.g. 7"></label>' +
+        '<label>Or number of instalments<input type="number" min="0" max="600" class="f-months" value="' + (l.months || '') + '" placeholder="e.g. 84"></label>' +
         '<label>Due on day<input type="number" min="1" max="31" class="f-day" value="' + l.dueDay + '"></label>' +
-        '<label class="' + (l.start ? 'mo-derived' : '') + '">First EMI month' +
+        '<label class="' + (l.start ? 'mo-derived' : '') + '">First instalment month' +
           '<input type="month" class="f-from" value="' + esc(l.from) + '"' + (l.start ? ' readonly' : '') + '></label>' +
       '</div>' +
+
+      // ---- the payment ----
+      '<h4 class="mo-sech">The instalment</h4>' +
+      '<div class="mo-grid">' +
+        '<label>Amount each time<input type="text" inputmode="decimal" class="f-emi" value="' + (l.emi || '') + '" placeholder="0"></label>' +
+      '</div>' +
+      '<div class="mo-row"><button type="button" class="mo-x" id="moCalcEmi">Work it out for me</button>' +
+        '<span class="mo-facts"><span id="moCalcHint"></span></span></div>' +
       '<p class="mo-facts" id="moTermSum"></p>' +
 
       // ---- what has actually arrived ----
@@ -808,7 +1106,8 @@
       if (!leaveEdit()) return;
       var l = {
         id: uid('l'), lender: '', purpose: '', principal: 0, emi: 0, rate: 0,
-        dueDay: 5, start: '', moratorium: 0, from: thisMonth(), months: 0,
+        dueDay: 5, kind: 'Term loan', repay: 'emi', every: 1,
+        start: '', moratorium: 0, from: thisMonth(), months: 0,
         releases: [], venture: '', paid: [], note: '',
       };
       D.loans.unshift(l);
@@ -869,6 +1168,9 @@
 
     function read() {
       d.lender = box.querySelector('.f-lender').value.trim();
+      d.kind = box.querySelector('.f-kind').value;
+      d.repay = box.querySelector('.f-repay').value === 'interest-only' ? 'interest-only' : 'emi';
+      d.every = Math.max(1, Math.min(12, Number(box.querySelector('.f-every').value) || 1));
       d.purpose = box.querySelector('.f-purpose').value.trim();
       d.venture = box.querySelector('.f-ven').value;
       d.principal = num(box.querySelector('.f-principal').value);
@@ -894,15 +1196,29 @@
       var sum = box.querySelector('#moTermSum');
       if (sum) {
         var bits = [];
-        if (d.months) bits.push('<span><b>' + esc(termYears(d.months)) + '</b> · ' + d.months + ' EMIs of ' + rupees(d.emi) + '</span>');
+        var word = d.repay === 'interest-only' ? 'interest payments' : 'instalments';
+        if (d.months) {
+          bits.push('<span><b>' + esc(termYears(d)) + '</b> · ' + d.months + ' ' + word +
+                    ' of ' + rupees(d.emi) + ', ' + esc(cadence(d)) + '</span>');
+        }
         if (d.start && d.moratorium) {
           bits.push('<span>Moratorium ' + esc(monthName(d.start)) + ' to ' +
-                    esc(monthName(moratoriumEnds(d))) + ' — <b>' + d.moratorium + ' months</b> with no EMI</span>');
+                    esc(monthName(moratoriumEnds(d))) + ' — <b>' + d.moratorium +
+                    ' months</b> with nothing to pay</span>');
         }
         if (d.from) {
-          var last = d.months ? shiftMonth(d.from, d.months - 1) : '';
-          bits.push('<span>First EMI <b>' + esc(monthName(d.from)) + '</b>' +
+          var last = d.months ? shiftMonth(d.from, (d.months - 1) * every(d)) : '';
+          bits.push('<span>First <b>' + esc(monthName(d.from)) + '</b>' +
                     (last ? ', last <b>' + esc(monthName(last)) + '</b>' : '') + '</span>');
+        }
+        if (d.repay === 'interest-only' && d.principal) {
+          bits.push('<span class="mo-hol">The principal, <b>' + rupees(d.principal) +
+                    '</b>, is still due at the end — it is counted in "left to pay"</span>');
+        }
+        if (d.months && d.emi && d.repay !== 'interest-only' && d.principal) {
+          var paidOut = d.months * d.emi;
+          bits.push('<span>Repaid in all <b>' + rupees(paidOut) + '</b> — ' +
+                    rupees(Math.max(0, paidOut - d.principal)) + ' of it interest</span>');
         }
         if (d.start && d.moratorium && d.rate && released(d)) {
           bits.push('<span>Roughly <b>' + rupees(moratoriumInterest(d)) +
@@ -910,6 +1226,19 @@
                     'released, not a bank figure</span>');
         }
         sum.innerHTML = bits.join('');
+      }
+      // What the calculator would say, offered but never applied on its own.
+      var hint = box.querySelector('#moCalcHint');
+      if (hint) {
+        var want = calcPayment(d);
+        hint.innerHTML = !want
+          ? esc(d.repay === 'interest-only'
+              ? 'Needs the amount and the rate.'
+              : 'Needs the amount, the rate and the number of instalments.')
+          : ('Works out at <b>' + rupees(want) + '</b> ' + esc(cadence(d)) +
+             (d.emi && Math.abs(d.emi - want) > 1
+               ? ' — you have ' + rupees(d.emi) + '. Keep yours if that is what the bank says.'
+               : ''));
       }
       var rs = box.querySelector('#moRelSum');
       if (rs) {
@@ -931,20 +1260,54 @@
     // other. Typing 7 in one shows 84 in the other, and nobody has to multiply.
     var yearsField = box.querySelector('.f-years');
     var monthsField = box.querySelector('.f-months');
-    yearsField.oninput = function () {
-      var y = Number(this.value);
-      if (isFinite(y) && y > 0) monthsField.value = Math.round(y * 12);
+    // Years and instalments say the same thing, but only once you know how far
+    // apart the instalments are: 7 years quarterly is 28 payments, not 84.
+    function syncFromYears() {
+      var y = Number(yearsField.value);
+      var n = every(readEvery());
+      if (isFinite(y) && y > 0) monthsField.value = Math.round(y * 12 / n);
       summarise();
-    };
-    monthsField.oninput = function () {
-      var m = Math.round(Number(this.value) || 0);
-      yearsField.value = m && m % 6 === 0 ? (m / 12) : '';
+    }
+    function syncFromMonths() {
+      var m = Math.round(Number(monthsField.value) || 0);
+      var n = every(readEvery());
+      var yrs = m * n / 12;
+      yearsField.value = m && (m * n) % 6 === 0 ? yrs : '';
       summarise();
-    };
-    ['.f-start', '.f-mor', '.f-emi', '.f-rate', '.f-principal', '.f-from', '.f-day'].forEach(function (sel) {
+    }
+    function readEvery() {
+      return { every: Number(box.querySelector('.f-every').value) || 1 };
+    }
+    yearsField.oninput = syncFromYears;
+    monthsField.oninput = syncFromMonths;
+    syncFromMonths();   // fill the years box from whatever was stored
+
+    ['.f-start', '.f-mor', '.f-emi', '.f-rate', '.f-principal', '.f-from', '.f-day',
+     '.f-kind', '.f-repay'].forEach(function (sel) {
       var n = box.querySelector(sel);
-      if (n) n.oninput = summarise;
+      if (n) { n.oninput = summarise; n.onchange = summarise; }
     });
+    // Changing the interval changes what the term means, so the years box has
+    // to follow rather than quietly become wrong.
+    box.querySelector('.f-every').onchange = syncFromMonths;
+
+    // The calculator FILLS the field, it does not own it. The bank's figure is
+    // the one that gets paid, and rounding rules differ between lenders — so
+    // this is a starting point you can type over, not a lock.
+    box.querySelector('#moCalcEmi').onclick = function () {
+      read();
+      var want = calcPayment(d);
+      if (!want) {
+        setStatus(d.repay === 'interest-only'
+          ? 'Enter the amount and the interest rate first.'
+          : 'Enter the amount, the interest rate and the number of instalments first.', true);
+        return;
+      }
+      box.querySelector('.f-emi').value = want;
+      summarise();
+      setStatus('Worked out ' + rupees(want) + ' ' + cadence(d) +
+                '. Change it if the bank says otherwise.');
+    };
 
     function bindReleaseRows() {
       box.querySelectorAll('.mo-relrow').forEach(function (row) {
@@ -1025,14 +1388,25 @@
     var now = thisMonth();
     var live = D.bills.filter(function (b) { return billIn(b, now) && !has(b.skip, now); });
     var per = live.reduce(function (a, b) { return a + b.amount; }, 0);
+    var homeNow = live.reduce(function (a, b) { return a + (b.home ? b.amount : 0); }, 0);
+    // A year is NOT this month twelve times over — a bill every two months
+    // lands six times, not twelve. Each bill contributes 12/every.
+    var perYear = D.bills.reduce(function (a, b) {
+      var running = !b.to || b.to >= now;
+      return a + (running ? b.amount * 12 / every(b) : 0);
+    }, 0);
 
     host.innerHTML =
       '<div class="mo-cards">' +
-        '<div class="mo-card mo-big"><span class="k">Repeating bills this month</span>' +
+        '<div class="mo-card mo-big"><span class="k">Falling due in ' + esc(monthName(now)) + '</span>' +
           '<strong>' + rupees(per) + '</strong><span class="c">' + live.length + ' of ' +
-          D.bills.length + ' running</span></div>' +
-        '<div class="mo-card"><span class="k">A year of them</span><strong>' + rupees(per * 12) +
-          '</strong><span class="c">at this month’s rate</span></div>' +
+          D.bills.length + ' bills</span></div>' +
+        '<div class="mo-card"><span class="k">A year of them</span><strong>' + rupees(perYear) +
+          '</strong><span class="c">each bill at its own interval</span></div>' +
+        '<div class="mo-card"><span class="k">Business</span><strong>' + rupees(per - homeNow) +
+          '</strong><span class="c">this month</span></div>' +
+        '<div class="mo-card"><span class="k">Home</span><strong>' + rupees(homeNow) +
+          '</strong><span class="c">this month</span></div>' +
       '</div>' +
       '<p class="mo-caveat">A bill entered here counts in every month between its first and its last, ' +
         'without being typed again. Leave the last month empty while it is still running.</p>' +
@@ -1059,14 +1433,19 @@
     var on = billIn(b, now) && !has(b.skip, now);
     return '<li class="mo-li mo-tall' + (on ? '' : ' mo-skipped') + '" data-id="' + esc(b.id) + '">' +
       '<span class="mo-what"><b>' + esc(b.name || 'Untitled bill') + '</b>' +
+        (b.home ? '<span class="mo-tag">home</span>' : '') +
         '<span class="mo-sub">' + esc(b.category || 'no category') +
-          (ventureName(b.venture) ? ' · ' + esc(ventureName(b.venture)) : '') + '</span>' +
+          (b.home ? ' · the house' : (ventureName(b.venture) ? ' · ' + esc(ventureName(b.venture)) : '')) +
+          ' · <b>' + esc(cadence(b)) + '</b></span>' +
         '<span class="mo-sub">' + esc(state) + ' · due on the ' + b.dueDay + '</span>' +
         (b.paid.length || b.skip.length
           ? '<span class="mo-sub">' + b.paid.length + ' months ticked paid' +
             (b.skip.length ? ', ' + b.skip.length + ' skipped' : '') + '</span>' : '') +
       '</span>' +
-      '<span class="mo-amt"><b>' + rupees(b.amount) + '</b><span class="mo-sub">a month</span></span>' +
+      '<span class="mo-amt"><b>' + rupees(b.amount) + '</b>' +
+        '<span class="mo-sub">' + (every(b) === 1 ? 'a month' : 'each time') + '</span>' +
+        (every(b) > 1 ? '<span class="mo-sub">' + rupees(b.amount * 12 / every(b)) + ' a year</span>' : '') +
+      '</span>' +
       '<span class="mo-acts">' +
         '<button type="button" class="mo-x f-edit">Edit</button>' +
         '<button type="button" class="mo-x f-del">Delete</button>' +
@@ -1082,9 +1461,15 @@
         '<label>Category<input type="text" list="moCats" class="f-cat" value="' + esc(b.category) + '" placeholder="Rent"></label>' +
         '<label>Venture' + ventureSelect(b.venture, 'f-ven') + '</label>' +
         '<label>Due on day<input type="number" min="1" max="31" class="f-day" value="' + b.dueDay + '"></label>' +
+        '<label>Comes<select class="f-every">' + everyOptions(every(b)) + '</select></label>' +
+        '<label>Whose<select class="f-home">' +
+          '<option value=""' + (b.home ? '' : ' selected') + '>Business</option>' +
+          '<option value="1"' + (b.home ? ' selected' : '') + '>Home</option>' +
+        '</select></label>' +
         '<label>First month<input type="month" class="f-from" value="' + esc(b.from) + '"></label>' +
         '<label>Last month<input type="month" class="f-to" value="' + esc(b.to) + '"></label>' +
       '</div>' +
+      '<p class="mo-facts" id="moBillSum"></p>' +
       '<p class="mo-facts"><span>Leave the last month empty while the bill is still running.</span></p>' +
       saveRow(isNew ? 'Save this bill' : 'Save changes') +
     '</li>';
@@ -1097,7 +1482,8 @@
       if (!leaveEdit()) return;
       var b = {
         id: uid('b'), name: '', amount: 0, category: '', venture: '',
-        dueDay: 1, from: thisMonth(), to: '', paid: [], skip: [], note: '',
+        dueDay: 1, every: 1, home: false, from: thisMonth(), to: '',
+        paid: [], skip: [], note: '',
       };
       D.bills.unshift(b);
       edit = { kind: 'bill', id: b.id, draft: copy(b), isNew: true };
@@ -1136,11 +1522,41 @@
       d.category = box.querySelector('.f-cat').value.trim();
       d.venture = box.querySelector('.f-ven').value;
       d.dueDay = Math.min(31, Math.max(1, Number(box.querySelector('.f-day').value) || 1));
+      d.every = Math.max(1, Math.min(12, Number(box.querySelector('.f-every').value) || 1));
+      d.home = !!box.querySelector('.f-home').value;
       var f = box.querySelector('.f-from').value;
       var t = box.querySelector('.f-to').value;
       d.from = /^\d{4}-\d{2}$/.test(f) ? f : '';
       d.to = /^\d{4}-\d{2}$/.test(t) ? t : '';
     }
+
+    // Which months it will actually land in, spelled out. "Every 2 months from
+    // March" is easy to agree to and hard to picture; the next three dates are
+    // not.
+    function summarise() {
+      read();
+      var n = box.querySelector('#moBillSum');
+      if (!n) return;
+      if (!d.from) { n.innerHTML = '<span>Set the first month to see when it falls due.</span>'; return; }
+      var when = [], m = d.from, guard = 0;
+      while (when.length < 3 && guard++ < 60) {
+        if (billIn(d, m)) when.push(monthName(m));
+        m = shiftMonth(m, 1);
+        if (d.to && m > d.to) break;
+      }
+      n.innerHTML =
+        '<span><b>' + esc(rupees(d.amount)) + '</b> ' + esc(cadence(d)) +
+          (every(d) > 1 ? ' — ' + esc(rupees(d.amount * 12 / every(d))) + ' a year' : '') + '</span>' +
+        (when.length ? '<span>Falls due in ' + esc(when.join(', ')) +
+          (when.length === 3 ? '…' : '') + '</span>' : '') +
+        '<span>' + (d.home ? 'Counted as the <b>house</b>' : 'Counted as the <b>business</b>') + '</span>';
+    }
+    ['.f-amt', '.f-every', '.f-home', '.f-from', '.f-to', '.f-day'].forEach(function (sel) {
+      var n = box.querySelector(sel);
+      if (n) { n.oninput = summarise; n.onchange = summarise; }
+    });
+    summarise();
+
     box.querySelector('.f-save').onclick = function () {
       read();
       if (!d.name) { setStatus('What is the bill for?', true); box.querySelector('.f-name').focus(); return; }
@@ -1253,6 +1669,12 @@
     '.mo-derived input{background:var(--color-surface);color:var(--color-neutral-700);' +
     '  border-style:dashed;cursor:default}' +
     '.mo-hol{color:var(--color-accent-700);font-weight:700}' +
+    '.mo-tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.07em;' +
+    '  text-transform:uppercase;padding:1px 7px;margin:3px 0 0;' +
+    '  background:var(--color-surface);color:var(--color-neutral-700);' +
+    '  border:1px solid var(--color-neutral-300)}' +
+    '.mo-kind{background:var(--color-accent-100);color:var(--color-accent-700);' +
+    '  border-color:var(--color-accent)}' +
     '.mo-relrow{display:grid;grid-template-columns:150px 130px minmax(0,1fr) auto;gap:8px;' +
     '  align-items:center;margin-bottom:8px}' +
     '.mo-relrow input{font:inherit;font-size:13px;padding:8px 10px;width:100%;' +
@@ -1270,6 +1692,46 @@
     '.mo-srow .b i{display:block;height:100%;background:var(--color-accent);opacity:.75}' +
     '.mo-srow .v{text-align:right;font-weight:700}' +
     '.mo-srow .p{text-align:right;color:var(--color-neutral-700);font-size:12px}' +
+
+    // ---- the twelve-month outlook ----
+    '.mo-onnow{border-color:var(--color-accent);background:var(--color-accent-100);' +
+    '  color:var(--color-accent-700)}' +
+    '.mo-calwrap{border:2px solid var(--color-divider);padding:16px 18px;margin-top:14px;' +
+    '  background:var(--color-bg)}' +
+    '.mo-calhead{font-size:12.5px;color:var(--color-neutral-700);margin:0 0 14px;max-width:70ch}' +
+    '.mo-calgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px}' +
+    '.mo-cal{display:flex;flex-direction:column;gap:3px;text-align:left;font:inherit;cursor:pointer;' +
+    '  border:2px solid var(--color-divider);background:var(--color-bg);padding:10px 11px;' +
+    '  color:var(--color-text)}' +
+    '.mo-cal:hover{border-color:var(--color-accent)}' +
+    '.mo-cal.on{border-color:var(--color-accent);background:var(--color-accent-100)}' +
+    '.mo-cal.quiet{opacity:.55}' +
+    '.mo-calm{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;' +
+    '  color:var(--color-neutral-500)}' +
+    '.mo-calm i{font-style:normal;opacity:.7}' +
+    '.mo-calv{font-family:var(--font-heading);font-weight:800;font-size:14px;letter-spacing:-0.01em}' +
+    '.mo-caln{font-size:10.5px;color:var(--color-neutral-700)}' +
+
+    // ---- reminders ----
+    '.mo-remind{border:2px solid var(--color-divider);border-left-width:5px;padding:14px 16px;' +
+    '  margin-top:14px;background:var(--color-bg)}' +
+    '.mo-remind.warn{border-left-color:var(--color-accent)}' +
+    '.mo-remind.bad{border-left-color:var(--color-accent-700);background:var(--color-accent-100)}' +
+    '.mo-remhead{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}' +
+    '.mo-remhead b{font-family:var(--font-heading);font-weight:800;font-size:14px}' +
+    '.mo-remset{display:flex;align-items:center;gap:12px;font-size:12.5px;' +
+    '  color:var(--color-neutral-700);flex-wrap:wrap}' +
+    '.mo-remset select{font:inherit;font-size:12.5px;padding:5px 8px;' +
+    '  border:2px solid var(--color-divider);background:var(--color-bg);color:var(--color-text)}' +
+    'ul.mo-remlist{list-style:none;margin:12px 0 0;padding:0}' +
+    'ul.mo-remlist li{display:grid;grid-template-columns:minmax(0,1fr) 120px 180px;gap:12px;' +
+    '  align-items:center;padding:7px 0;border-top:1px solid var(--color-divider);font-size:13px}' +
+    'ul.mo-remlist li span:nth-child(2){text-align:right;font-weight:700}' +
+    'ul.mo-remlist li span:nth-child(3){text-align:right;color:var(--color-neutral-700);font-size:12px}' +
+    'ul.mo-remlist li.late span:nth-child(3){color:var(--color-accent-700)}' +
+    '.mo-remnote{font-size:11.5px;color:var(--color-neutral-700);margin:12px 0 0;max-width:64ch}' +
+    '@media(max-width:700px){ul.mo-remlist li{grid-template-columns:1fr auto}' +
+    '  ul.mo-remlist li span:nth-child(3){grid-column:1/-1;text-align:left}}' +
 
     '.mo-status{font-size:12.5px;color:var(--color-neutral-700);margin:12px 0 0;min-height:1.2em}' +
     '.mo-status.bad{color:var(--color-accent-700);font-weight:700}' +
@@ -1330,9 +1792,12 @@
       left: left, nextDue: nextDue, shiftMonth: shiftMonth, dueDate: dueDate,
       rupees: rupees, monthDiff: monthDiff, num: num,
       released: released, firstEmi: firstEmi, moratoriumEnds: moratoriumEnds,
-      inMoratorium: inMoratorium, moratoriumInterest: moratoriumInterest, years: termYears,
+      inMoratorium: inMoratorium, moratoriumInterest: moratoriumInterest, termYears: termYears,
+      every: every, calcPayment: calcPayment, periodRate: periodRate, cadence: cadence,
+      dueItems: dueItems, dueSoon: dueSoon, addDays: addDays, daysBetween: daysBetween, inDays: inDays,
     },
     _state: D,
+    _settings: function () { return settings; },
   };
 
   // Load once at boot so the tile on the front screen can show this month's
