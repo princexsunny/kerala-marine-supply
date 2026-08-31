@@ -84,6 +84,9 @@
   .page-body section{padding:0;border-bottom:none}
   a.tile{text-decoration:none}
   /* --- Roadmaps --------------------------------------------------------- */
+  .printonly{display:none}
+  .rmdirty{color:var(--color-accent-700);font-weight:700;font-size:12px;
+           letter-spacing:.06em;text-transform:uppercase}
   .rmhead{margin:22px 0 18px}
   .rmtitle{width:100%;font-family:var(--font-heading);font-weight:800;font-size:26px;
            letter-spacing:-0.02em;border:none;border-bottom:2px solid var(--color-divider);
@@ -201,6 +204,11 @@
     .page:not(.on),.noprint,#rmList,header,footer,.page-head .page-back,
     .tiles,main.pad,.docbar,.uptray{display:none !important}
     .page-box{max-width:none;padding:0}
+    .printonly{display:flex !important;justify-content:space-between;align-items:baseline;
+               border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:14px;
+               font-size:10pt;letter-spacing:.04em}
+    .ph-org{font-weight:700;text-transform:uppercase}
+    .ph-when{color:#444}
     .scroll{overflow:visible !important}
     /* Both views print: the table for the detail, the diagram for the shape. */
     #rmListView,#rmDiagView{display:block !important}
@@ -593,10 +601,20 @@
         <div id="rmOpen" hidden>
           <div class="docbar noprint">
             <a class="page-back" href="admin.html?p=roadmap" id="rmToList">← All roadmaps</a>
-            <button type="button" class="btn btn-ghost" id="rmView">Road map diagram</button>
+            <button type="button" class="btn btn-ghost" id="rmSaveBtn" disabled>Saved</button>
             <button type="button" class="btn btn-ghost" id="rmPrint">Print</button>
+            <button type="button" class="btn btn-ghost" id="rmView">Road map diagram</button>
             <button type="button" class="btn btn-ghost del" id="rmDelete">Delete roadmap</button>
+            <span class="note rmdirty" id="rmDirty"></span>
             <span class="note" id="rmOpenNote"></span>
+          </div>
+
+          <!-- Only on paper. A printed page leaves the screen behind: without
+               this it says nothing about whose roadmap it is or when it was
+               printed, and a sheet like that is worthless a month later. -->
+          <div class="printonly" id="rmPrintHead">
+            <span class="ph-org">Kerala Marine Supply · Shalom</span>
+            <span class="ph-when" id="rmPrintWhen"></span>
           </div>
 
           <div class="rmhead">
@@ -1457,7 +1475,7 @@
   // hundreds of requests, and a half-saved idea is worse than a late one.
   var rmAll = [];
   var rm = null;            // the roadmap being edited
-  var rmTimer = null, rmSaving = false, rmAgain = false;
+  var rmSaving = false, rmAgain = false;
   var RM_STATUS = [['not-started','Not started'],['pending','Pending'],
                    ['in-progress','In progress'],['expecting','Expecting'],['done','Done']];
   function rmLabel(v){
@@ -1472,36 +1490,85 @@
 
   function openRoadmap(){ return new URLSearchParams(location.search).get('r') || ''; }
   function goRoadmap(id){
+    // Moving away from a roadmap with unsaved work would lose it silently.
+    if(rmDirty && !confirm('This roadmap has changes that are not saved. Leave and lose them?')) return;
+    rmDirty = false;
     history.pushState({}, '', 'admin.html?p=roadmap' + (id ? '&r=' + encodeURIComponent(id) : ''));
     renderRoadmap();
     window.scrollTo(0, 0);
   }
 
-  function rmSave(){
+  // A roadmap is edited in place — you type into the step, you pick a status.
+  // It used to save every keystroke on a timer, which meant a half-typed step
+  // was briefly the record and there was no moment where you could say "that
+  // is what I meant". Now a change marks the roadmap UNSAVED and the Save
+  // button does the saving.
+  //
+  // The exceptions are the things that have already touched the server or
+  // cannot be taken back: attaching a file, removing one, deleting a step.
+  // Those save at once, because leaving them unsaved would put the record out
+  // of step with the document library.
+  var rmDirty = false;
+
+  function rmTouch(){
     if(!rm) return;
-    clearTimeout(rmTimer);
-    rmTimer = setTimeout(rmPush, 900);
-    setNote('rmOpenNote', 'Saving…');
+    rmDirty = true;
+    rmSaveState();
   }
+  function rmSaveState(){
+    var b = document.getElementById('rmSaveBtn');
+    if(b){
+      b.disabled = !rmDirty || rmSaving;
+      b.textContent = rmSaving ? 'Saving…' : (rmDirty ? 'Save changes' : 'Saved');
+      b.className = 'btn' + (rmDirty ? '' : ' btn-ghost');
+    }
+    var n = document.getElementById('rmDirty');
+    if(n) n.textContent = rmDirty ? 'Not saved yet' : '';
+  }
+
   function rmPush(){
-    if(!rm) return;
-    if(rmSaving){ rmAgain = true; return; }
+    if(!rm) return Promise.resolve();
+    if(rmSaving){ rmAgain = true; return Promise.resolve(); }
     rmSaving = true;
-    api('PUT', '/api/roadmaps/' + encodeURIComponent(rm.id),
+    rmSaveState();
+    return api('PUT', '/api/roadmaps/' + encodeURIComponent(rm.id),
         {title: rm.title, date: rm.date, status: rm.status, note: rm.note, steps: rm.steps})
       .then(function(saved){
         rm.updatedAt = saved.updatedAt;
-        setNote('rmOpenNote', 'Saved ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + '.');
+        rmDirty = false;
+        setNote('rmOpenNote', 'Saved at ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + '.');
         rmMetaLine();
       })
-      .catch(function(err){ setNote('rmOpenNote', 'NOT saved — ' + err.message); })
+      .catch(function(err){
+        // The typing is still on screen and still in memory. Saying what went
+        // wrong beats reverting under the reader and losing the work.
+        setNote('rmOpenNote', 'NOT saved — ' + err.message + ' Nothing was lost; press Save again.');
+      })
       .then(function(){
         rmSaving = false;
-        if(rmAgain){ rmAgain = false; rmSave(); }
+        rmSaveState();
+        if(rmAgain){ rmAgain = false; return rmPush(); }
       });
   }
 
+  // Leaving with unsaved work is the one thing the browser can stop in time.
+  window.addEventListener('beforeunload', function(e){
+    if(!rmDirty) return;
+    e.preventDefault();
+    e.returnValue = '';
+    return '';
+  });
+
+  // Keep the button honest whenever the meta line is redrawn — that happens on
+  // open, on save and on every structural change.
   function rmMetaLine(){
+    rmSaveState();
+    var pw = document.getElementById('rmPrintWhen');
+    if(pw){
+      pw.textContent = 'Printed ' + new Date().toLocaleDateString('en-GB',
+        {day:'2-digit', month:'long', year:'numeric'}) +
+        (rm && rm.updatedAt ? ' · last changed ' + new Date(rm.updatedAt).toLocaleDateString('en-GB') : '');
+    }
     var el = document.getElementById('rmMeta');
     if(!el || !rm) return;
     var n = rm.steps.length;
@@ -1601,7 +1668,7 @@
       if(p[0] === get()) o.selected = true;
       sel.appendChild(o);
     });
-    sel.addEventListener('change', function(){ set(sel.value); rmSave(); renderSteps(); });
+    sel.addEventListener('change', function(){ set(sel.value); rmTouch(); renderSteps(); });
     wrap.appendChild(dot); wrap.appendChild(sel);
     td.appendChild(wrap);
     return td;
@@ -1624,7 +1691,7 @@
         // Off the row, not out of storage: the same file may be referenced
         // elsewhere, and losing it silently would be worse than an unused
         // entry in the library.
-        holder.files.shift(); rmSave(); renderSteps();
+        holder.files.shift(); rmDirty = true; rmPush(); renderSteps();
       });
       box.appendChild(x);
     }else{
@@ -1642,7 +1709,7 @@
     var d = document.createElement('input');
     d.type = 'date'; d.value = holder.date || '';
     d.setAttribute('aria-label', 'Expecting date');
-    d.addEventListener('change', function(){ holder.date = d.value; rmSave(); renderSteps(); });
+    d.addEventListener('change', function(){ holder.date = d.value; rmTouch(); renderSteps(); });
     td.appendChild(d);
     return td;
   }
@@ -1677,13 +1744,13 @@
       tw.textContent = step.open ? '⌄' : '›';
       tw.setAttribute('aria-expanded', String(!!step.open));
       tw.setAttribute('aria-label', (step.open ? 'Hide' : 'Show') + ' sub steps of ' + (step.title || ('step ' + (i+1))));
-      tw.addEventListener('click', function(){ step.open = !step.open; rmSave(); renderSteps(); });
+      tw.addEventListener('click', function(){ step.open = !step.open; renderSteps(); });
       nm.appendChild(tw);
       nm.appendChild(Object.assign(document.createElement('span'), {className:'stepno', textContent:(i+1) + '.'}));
       var ti = document.createElement('input');
       ti.type = 'text'; ti.value = step.title; ti.placeholder = 'Name this step';
       ti.setAttribute('aria-label', 'Step ' + (i+1));
-      ti.addEventListener('input', function(){ step.title = ti.value; rmSave(); });
+      ti.addEventListener('input', function(){ step.title = ti.value; rmTouch(); });
       nm.appendChild(ti);
       td.appendChild(nm);
       tr.appendChild(td);
@@ -1694,7 +1761,7 @@
       tr.appendChild(actionCell(function(){
         if(!confirm('Remove step "' + (step.title || (i+1)) + '"' +
                     (step.subs.length ? ' and its ' + step.subs.length + ' sub steps' : '') + '?')) return;
-        rm.steps.splice(i,1); rmSave(); renderSteps(); rmMetaLine();
+        rm.steps.splice(i,1); rmDirty = true; rmPush(); renderSteps(); rmMetaLine();
       }, 'this step'));
       body.appendChild(tr);
 
@@ -1718,7 +1785,7 @@
         var si = document.createElement('input');
         si.type = 'text'; si.value = sub.title; si.placeholder = 'Name this sub step';
         si.setAttribute('aria-label', 'Sub step ' + (i+1) + '.' + (j+1));
-        si.addEventListener('input', function(){ sub.title = si.value; rmSave(); });
+        si.addEventListener('input', function(){ sub.title = si.value; rmTouch(); });
         snm.appendChild(si);
         std.appendChild(snm);
         str2.appendChild(std);
@@ -1727,7 +1794,7 @@
         str2.appendChild(fileCell(sub));
         str2.appendChild(dateCell(sub));
         str2.appendChild(actionCell(function(){
-          step.subs.splice(j,1); rmSave(); renderSteps();
+          step.subs.splice(j,1); rmDirty = true; rmPush(); renderSteps();
         }, 'this sub step'));
         body.appendChild(str2);
       });
@@ -1740,7 +1807,7 @@
       ab.type = 'button'; ab.className = 'addrow addsub'; ab.textContent = '+ Add sub step';
       ab.addEventListener('click', function(){
         step.subs.push({id:'b'+Date.now(), title:'', status:'not-started', date:'', files:[]});
-        step.open = true; rmSave(); renderSteps();
+        step.open = true; rmTouch(); renderSteps();
         var ins = document.querySelectorAll('tr.subr .stepname input[type=text]');
         if(ins.length) ins[ins.length-1].focus();
       });
@@ -1876,7 +1943,7 @@
     files = files.slice(0, 1);   // one file per row
     var i = 0;
     (function next(){
-      if(i >= files.length){ rmSave(); renderSteps(); setNote('rmOpenNote', files.length + ' file(s) attached.'); return; }
+      if(i >= files.length){ rmDirty = true; rmPush(); renderSteps(); setNote('rmOpenNote', files.length + ' file(s) attached.'); return; }
       var f = files[i];
       setNote('rmOpenNote', 'Uploading ' + f.name + ' (' + (i+1) + ' of ' + files.length + ')…');
       var fd = new FormData();
@@ -1925,15 +1992,18 @@
   });
   document.getElementById('rmToList').addEventListener('click', function(e){
     e.preventDefault();
-    clearTimeout(rmTimer); rmPush();   // do not leave a pending edit behind
+    // goRoadmap asks first if there is unsaved work, and does nothing if the
+    // answer is no. It used to save on the way out, which is the one thing an
+    // explicit Save button exists to stop.
+    var before = openRoadmap();
     goRoadmap('');
-    loadRoadmaps();
+    if(openRoadmap() !== before) loadRoadmaps();
   });
   document.getElementById('rmAddStep').addEventListener('click', function(){
     if(!rm) return;
     rm.steps.push({id:'t'+Date.now(), title:'', status:'not-started', date:'',
                    note:'', files:[], subs:[], open:false});
-    rmSave(); renderSteps(); rmMetaLine();
+    rmTouch(); renderSteps(); rmMetaLine();
     var ins = document.querySelectorAll('tr.stepr .stepname input[type=text]');
     if(ins.length) ins[ins.length-1].focus();
   });
@@ -1957,9 +2027,27 @@
     history.pushState({}, '', 'admin.html?p=roadmap&r=' + encodeURIComponent(id) + to);
     applyRmView();
   });
+  document.getElementById('rmSaveBtn').addEventListener('click', function(){
+    if(!rm || !rmDirty) return;
+    rmPush();
+  });
+
+  // Print what is SAVED, not what is half-typed. If there is unsaved work the
+  // save goes first and the print waits for it — printing a roadmap that does
+  // not match the one stored is how two versions of a plan start circulating.
   document.getElementById('rmPrint').addEventListener('click', function(){
-    clearTimeout(rmTimer); rmPush();
-    window.print();
+    if(!rm){ window.print(); return; }
+    if(!rmDirty){ window.print(); return; }
+    setNote('rmOpenNote', 'Saving before printing…');
+    rmPush().then(function(){
+      if(rmDirty){
+        // The save failed. rmPush has already said why; do not print a
+        // document that claims to be the record when it is not.
+        setNote('rmOpenNote', 'Not printed — the roadmap could not be saved first.');
+        return;
+      }
+      window.print();
+    });
   });
   document.getElementById('rmDelete').addEventListener('click', function(){
     if(!rm) return;
@@ -1973,15 +2061,15 @@
     if(!rm) return;
     rm.title = this.value;
     document.getElementById('rmHead').textContent = rm.title;
-    rmSave();
+    rmTouch();
   });
   document.getElementById('rmSummary').addEventListener('input', function(){
     if(!rm) return;
-    rm.note = this.value; rmSave();
+    rm.note = this.value; rmTouch();
   });
   document.getElementById('rmDate').addEventListener('change', function(){
     if(!rm) return;
-    rm.date = this.value; rmSave();
+    rm.date = this.value; rmTouch();
   });
   document.getElementById('rmStatus').addEventListener('change', function(){
     if(!rm) return;
@@ -1989,7 +2077,7 @@
     var tag = document.getElementById('rmStatusTag');
     tag.className = 'st ' + rm.status;
     tag.textContent = rmLabel(rm.status);
-    rmSave();
+    rmTouch();
   });
 
   // ---- Applications ----
