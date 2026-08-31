@@ -161,6 +161,21 @@
       });
     });
     (D.loans || []).forEach(function (l) {
+      // Interest through the moratorium. A real payment with a real date, in
+      // the list beside the bills — not a footnote. It is what the bank takes
+      // every month while no instalment is running.
+      if (inMoratorium(l, m)) {
+        var due = monthInterest(l, m);
+        if (due > 0) {
+          rows.push({
+            kind: 'interest', id: l.id, name: (l.lender || 'Untitled loan') + ' — moratorium interest',
+            what: 'On ' + rupees(releasedBy(l, m)) + ' released',
+            amount: due, when: dueDate(m, l.dueDay),
+            paid: has(l.intPaid || [], m), skipped: false,
+            venture: l.venture, home: false,
+          });
+        }
+      }
       var i = loanInstalment(l, m);
       if (i < 0) return;
       rows.push({
@@ -196,6 +211,7 @@
     dueItems(D, month).forEach(function (r) {
       if (r.skipped) return;
       if (r.kind === 'bill') { out.bills += r.amount; add(r.what.split(' · ')[0], r.amount, r.home); }
+      else if (r.kind === 'interest') { out.emi += r.amount; add('Loan interest', r.amount, false); }
       else { out.emi += r.amount; add('Loan EMI', r.amount, false); }
     });
     out.total = out.spent + out.bills + out.emi;
@@ -236,12 +252,63 @@
     var end = moratoriumEnds(l);
     return !!end && m >= l.start && m <= end;
   }
-  // Interest is usually payable through a moratorium even though no EMI is.
-  // This is simple interest on what has been released — a figure to budget
-  // with, not a bank's number, and it is labelled that way wherever it shows.
-  function moratoriumInterest(l) {
-    if (!l.rate) return 0;
-    return Math.round(released(l) * (l.rate / 100) / 12 * 100) / 100;
+  // ---- interest through the moratorium --------------------------------------
+  //
+  // A moratorium is a holiday from the INSTALMENT, not from the interest. The
+  // interest still has to be paid every month, and it is charged on what has
+  // actually been released — not on the sanction, because money that has not
+  // arrived cannot cost anything.
+  //
+  // Worked on the daily product, which is how the bank does it: each tranche
+  // earns from the day it lands, for the days it is outstanding in that month,
+  // at rate/365. A tranche released on the 20th earns for eleven days of that
+  // month, not a whole one and not none.
+  //
+  // 365, not 360 or 366: it is what Indian lenders quote against, and being
+  // consistent matters more here than the fourth decimal place.
+  function monthInterest(l, m) {
+    if (!l || !l.rate || !m) return 0;
+    var from = m + '-01';
+    var toEx = shiftMonth(m, 1) + '-01';       // first day of the next month
+    var total = 0;
+    (l.releases || []).forEach(function (r) {
+      if (!r || !r.date || !r.amount) return;
+      var since = r.date > from ? r.date : from;
+      if (since >= toEx) return;               // released after this month ended
+      var days = daysBetween(since, toEx);
+      total += Number(r.amount) * (Number(l.rate) / 100) * days / 365;
+    });
+    return Math.round(total * 100) / 100;
+  }
+
+  // Every month of the moratorium, with what the interest comes to in it and
+  // how much had been released by then. This is the answer to "how is it going
+  // now" — the running cost of money already drawn.
+  function moratoriumSchedule(l) {
+    var end = moratoriumEnds(l);
+    if (!l.start || !end) return [];
+    var out = [], m = l.start, guard = 0;
+    while (m <= end && guard++ < 130) {
+      out.push({
+        month: m,
+        released: releasedBy(l, m),
+        interest: monthInterest(l, m),
+        paid: has(l.intPaid || [], m),
+        due: dueDate(m, l.dueDay),
+      });
+      m = shiftMonth(m, 1);
+    }
+    return out;
+  }
+  // What had reached the account by the end of a given month.
+  function releasedBy(l, m) {
+    var toEx = shiftMonth(m, 1) + '-01';
+    return (l.releases || []).reduce(function (a, r) {
+      return a + ((r && r.date && r.date < toEx) ? (Number(r.amount) || 0) : 0);
+    }, 0);
+  }
+  function moratoriumTotal(l) {
+    return Math.round(moratoriumSchedule(l).reduce(function (a, r) { return a + r.interest; }, 0) * 100) / 100;
   }
   // NOT `years`: that name is already the year -> entries cache below, and a
   // var declaration would quietly overwrite this function.
@@ -861,14 +928,23 @@
         return;
       }
 
-      // A bill or an EMI: the ticks only, and they save at once.
+      // A bill, an instalment, or moratorium interest: the ticks only, and they
+      // save at once.
       var list = kind === 'bill' ? D.bills : D.loans;
       var it = list.filter(function (x) { return x.id === id; })[0];
       if (!it) return;
       var paid = li.querySelector('.f-paid');
       if (paid) paid.onchange = function () {
-        toggle(it.paid, month, this.checked);
-        commit(kind === 'bill' ? 'bills' : 'loans').catch(function () {});
+        // Interest keeps its own list. Ticking it against `paid` would make
+        // the first instalment look settled because the interest before it was.
+        if (kind === 'interest') {
+          if (!Array.isArray(it.intPaid)) it.intPaid = [];
+          toggle(it.intPaid, month, this.checked);
+        } else {
+          toggle(it.paid, month, this.checked);
+        }
+        commit(kind === 'bill' ? 'bills' : 'loans')
+          .then(function () { renderMonth(); paintTiles(); }, function () {});
       };
       var skip = li.querySelector('.f-skip');
       if (skip) skip.onchange = function () {
@@ -1011,8 +1087,19 @@
         releaseLine +
         (holiday
           ? '<span class="mo-sub mo-hol">In moratorium until ' + esc(monthName(end)) +
-            ' · first EMI ' + esc(monthName(firstEmi(l))) + '</span>'
+            ' · no EMI yet, but interest is payable every month</span>'
           : (end ? '<span class="mo-sub">Moratorium ended ' + esc(monthName(end)) + '</span>' : '')) +
+        (end && moratoriumTotal(l)
+          ? '<span class="mo-sub">Moratorium interest <b>' + rupees(moratoriumTotal(l)) + '</b> in all · ' +
+            (function () {
+              var sch = moratoriumSchedule(l);
+              var owed = sch.filter(function (r) { return !r.paid; })
+                            .reduce(function (a, r) { return a + r.interest; }, 0);
+              return owed > 0.005
+                ? '<span class="mo-hol">' + rupees(owed) + ' of it still to pay</span>'
+                : 'all paid';
+            })() + '</span>'
+          : '') +
         '<span class="mo-meter"><i style="width:' + done + '%"></i></span>' +
         '<span class="mo-sub"><b>' + l.paid.length + '</b> of ' + (l.months || '—') + ' paid · ' +
           'next ' + (n ? esc(prettyDate(n)) : 'nothing outstanding') +
@@ -1022,8 +1109,8 @@
         '<span class="mo-sub">' + esc(cadence(l)) + '</span>' +
         '<span class="mo-sub">' + rupees(left(l)) + ' left' +
           (l.repay === 'interest-only' ? ' *' : '') + '</span>' +
-        (holiday && moratoriumInterest(l)
-          ? '<span class="mo-sub">~' + rupees(moratoriumInterest(l)) + ' interest</span>' : '') +
+        (holiday
+          ? '<span class="mo-sub">' + rupees(monthInterest(l, thisMonth())) + ' interest this month</span>' : '') +
       '</span>' +
       '<span class="mo-acts">' +
         '<button type="button" class="mo-x f-pay">Mark next EMI paid</button>' +
@@ -1068,7 +1155,11 @@
         '<label>Amount each time<input type="text" inputmode="decimal" class="f-emi" value="' + (l.emi || '') + '" placeholder="0"></label>' +
       '</div>' +
       '<div class="mo-row"><button type="button" class="mo-x" id="moCalcEmi">Work it out for me</button>' +
-        '<span class="mo-facts"><span id="moCalcHint"></span></span></div>' +
+        '<label class="mo-tick"><input type="radio" name="mo-on-' + esc(l.id) + '" value="sanction" checked> ' +
+          'on the sanction</label>' +
+        '<label class="mo-tick"><input type="radio" name="mo-on-' + esc(l.id) + '" value="released"> ' +
+          'on what has been released</label></div>' +
+      '<p class="mo-facts"><span id="moCalcHint"></span></p>' +
       '<p class="mo-facts" id="moTermSum"></p>' +
 
       // ---- what has actually arrived ----
@@ -1085,9 +1176,47 @@
           (l.principal ? rupees(got) + ' of ' + rupees(l.principal) : rupees(got)) +
         '</span></span></div>' +
 
+      '<div id="moIntSched">' + interestSchedule(l) + '</div>' +
       (l.paid.length ? '<p class="mo-facts"><span><b>' + l.paid.length + '</b> instalments are ticked paid on this loan</span></p>' : '') +
       saveRow(isNew ? 'Save this loan' : 'Save changes') +
     '</li>';
+  }
+
+  // Month by month through the moratorium: what had been released by then and
+  // what the interest on it came to. This is the running answer to "how is it
+  // going now" — and it is where the arithmetic can be checked rather than
+  // taken on trust.
+  function interestSchedule(l) {
+    var sch = moratoriumSchedule(l);
+    if (!sch.length) return '';
+    if (!l.rate) {
+      return '<h4 class="mo-sech">Interest through the moratorium</h4>' +
+        '<p class="mo-facts"><span>Enter the interest rate to see it.</span></p>';
+    }
+    var now = thisMonth();
+    var total = moratoriumTotal(l);
+    return '<h4 class="mo-sech">Interest through the moratorium</h4>' +
+      '<p class="mo-facts"><span>Charged on each release from the day it arrived, ' +
+        'at ' + esc(String(l.rate)) + '% a year over 365 days — the way the bank works it out. ' +
+        'Money not yet released costs nothing.</span></p>' +
+      '<div class="scroll"><table class="mo-tbl mo-sched"><thead><tr>' +
+        '<th>Month</th><th>Released by then</th><th>Interest</th><th>Due</th><th></th>' +
+      '</tr></thead><tbody>' +
+      sch.map(function (r) {
+        return '<tr' + (r.month === now ? ' class="on"' : '') + '>' +
+          '<td>' + esc(monthName(r.month)) + (r.month === now ? ' <b>· now</b>' : '') + '</td>' +
+          '<td>' + rupees(r.released) + '</td>' +
+          '<td><b>' + rupees(r.interest) + '</b></td>' +
+          '<td>' + esc(prettyDate(r.due)) + '</td>' +
+          '<td>' + (r.paid ? '<span class="mo-tag">paid</span>'
+                           : (r.interest ? '<span class="mo-sub">not yet</span>' : '')) + '</td>' +
+        '</tr>';
+      }).join('') +
+      '<tr class="tot"><td><b>Over the whole moratorium</b></td><td></td>' +
+        '<td><b>' + rupees(total) + '</b></td><td colspan="2"></td></tr>' +
+      '</tbody></table></div>' +
+      '<p class="mo-facts"><span>Tick these off month by month in <b>The month</b>, ' +
+        'where they appear beside the bills.</span></p>';
   }
 
   function releaseRow(r) {
@@ -1108,7 +1237,7 @@
         id: uid('l'), lender: '', purpose: '', principal: 0, emi: 0, rate: 0,
         dueDay: 5, kind: 'Term loan', repay: 'emi', every: 1,
         start: '', moratorium: 0, from: thisMonth(), months: 0,
-        releases: [], venture: '', paid: [], note: '',
+        releases: [], venture: '', paid: [], intPaid: [], note: '',
       };
       D.loans.unshift(l);
       edit = { kind: 'loan', id: l.id, draft: copy(l), isNew: true };
@@ -1220,26 +1349,35 @@
           bits.push('<span>Repaid in all <b>' + rupees(paidOut) + '</b> — ' +
                     rupees(Math.max(0, paidOut - d.principal)) + ' of it interest</span>');
         }
-        if (d.start && d.moratorium && d.rate && released(d)) {
-          bits.push('<span>Roughly <b>' + rupees(moratoriumInterest(d)) +
-                    '</b> interest a month through the moratorium — an estimate on what has been ' +
-                    'released, not a bank figure</span>');
+        if (d.start && d.moratorium && d.rate) {
+          var tot = moratoriumTotal(d);
+          bits.push(tot
+            ? '<span class="mo-hol">Interest is still payable through the moratorium — <b>' +
+              rupees(tot) + '</b> over the ' + d.moratorium + ' months, on what has been released</span>'
+            : '<span>Interest through the moratorium will show here once a release is entered — ' +
+              'it is charged on money that has actually arrived, not on the sanction</span>');
         }
         sum.innerHTML = bits.join('');
       }
       // What the calculator would say, offered but never applied on its own.
       var hint = box.querySelector('#moCalcHint');
       if (hint) {
-        var want = calcPayment(d);
+        var basis = calcBasis();
+        var on = basis === 'released' ? released(d) : d.principal;
+        var want = calcPayment(Object.assign({}, d, { principal: on }));
         hint.innerHTML = !want
           ? esc(d.repay === 'interest-only'
-              ? 'Needs the amount and the rate.'
-              : 'Needs the amount, the rate and the number of instalments.')
-          : ('Works out at <b>' + rupees(want) + '</b> ' + esc(cadence(d)) +
+              ? 'Needs an amount and the rate.'
+              : 'Needs an amount, the rate and the number of instalments.') +
+            (basis === 'released' && !on ? ' Nothing has been released yet.' : '')
+          : ('On ' + rupees(on) + (basis === 'released' ? ' released' : ' sanctioned') +
+             ', works out at <b>' + rupees(want) + '</b> ' + esc(cadence(d)) +
              (d.emi && Math.abs(d.emi - want) > 1
                ? ' — you have ' + rupees(d.emi) + '. Keep yours if that is what the bank says.'
                : ''));
       }
+      var sched = box.querySelector('#moIntSched');
+      if (sched) sched.innerHTML = interestSchedule(d);
       var rs = box.querySelector('#moRelSum');
       if (rs) {
         var got = released(d);
@@ -1294,9 +1432,28 @@
     // The calculator FILLS the field, it does not own it. The bank's figure is
     // the one that gets paid, and rounding rules differ between lenders — so
     // this is a starting point you can type over, not a lock.
+    // Which amount to work the instalment on. A KFC loan is usually released in
+    // stages, and until the last one lands the bank fixes the instalment on
+    // what has actually gone out — so "on the sanction" is the plan and "on
+    // what has been released" is how it is running now.
+    function calcBasis() {
+      var r = box.querySelector('input[name^="mo-on-"]:checked');
+      return r ? r.value : 'sanction';
+    }
+    box.querySelectorAll('input[name^="mo-on-"]').forEach(function (r) {
+      r.onchange = summarise;
+    });
+
     box.querySelector('#moCalcEmi').onclick = function () {
       read();
-      var want = calcPayment(d);
+      var basis = calcBasis();
+      var on = basis === 'released' ? released(d) : d.principal;
+      if (basis === 'released' && !on) {
+        setStatus('Nothing has been released yet, so there is nothing to work it out on. ' +
+                  'Add a release below, or work it out on the sanction.', true);
+        return;
+      }
+      var want = calcPayment(Object.assign({}, d, { principal: on }));
       if (!want) {
         setStatus(d.repay === 'interest-only'
           ? 'Enter the amount and the interest rate first.'
@@ -1305,7 +1462,8 @@
       }
       box.querySelector('.f-emi').value = want;
       summarise();
-      setStatus('Worked out ' + rupees(want) + ' ' + cadence(d) +
+      setStatus('Worked out ' + rupees(want) + ' ' + cadence(d) + ' on ' + rupees(on) +
+                (basis === 'released' ? ' released' : ' sanctioned') +
                 '. Change it if the bank says otherwise.');
     };
 
@@ -1669,6 +1827,10 @@
     '.mo-derived input{background:var(--color-surface);color:var(--color-neutral-700);' +
     '  border-style:dashed;cursor:default}' +
     '.mo-hol{color:var(--color-accent-700);font-weight:700}' +
+    'table.mo-sched{min-width:36rem}' +
+    'table.mo-sched tr.on{background:var(--color-accent-100)}' +
+    'table.mo-sched tr.tot td{border-top:2px solid var(--color-neutral-300);' +
+    '  border-bottom:none;padding-top:10px}' +
     '.mo-tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.07em;' +
     '  text-transform:uppercase;padding:1px 7px;margin:3px 0 0;' +
     '  background:var(--color-surface);color:var(--color-neutral-700);' +
@@ -1792,7 +1954,9 @@
       left: left, nextDue: nextDue, shiftMonth: shiftMonth, dueDate: dueDate,
       rupees: rupees, monthDiff: monthDiff, num: num,
       released: released, firstEmi: firstEmi, moratoriumEnds: moratoriumEnds,
-      inMoratorium: inMoratorium, moratoriumInterest: moratoriumInterest, termYears: termYears,
+      inMoratorium: inMoratorium, termYears: termYears,
+      monthInterest: monthInterest, moratoriumSchedule: moratoriumSchedule,
+      moratoriumTotal: moratoriumTotal, releasedBy: releasedBy,
       every: every, calcPayment: calcPayment, periodRate: periodRate, cadence: cadence,
       dueItems: dueItems, dueSoon: dueSoon, addDays: addDays, daysBetween: daysBetween, inDays: inDays,
     },

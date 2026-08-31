@@ -204,6 +204,10 @@ function cleanLoan(x) {
       .slice(0, 60).map(cleanRelease).filter((r) => r.amount || r.date),
     venture: str(x.venture, 60),
     paid: months(x.paid),
+    // Moratorium interest is a SEPARATE payment from an instalment, so it
+    // needs its own record of which months have been settled. Sharing `paid`
+    // would make the first EMI look paid because the interest before it was.
+    intPaid: months(x.intPaid),
     note: str(x.note, MAX_NOTE),
   };
 }
