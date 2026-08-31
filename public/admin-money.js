@@ -729,6 +729,125 @@
       '<div class="mo-calgrid">' + cells.join('') + '</div></div>';
   }
 
+  // ---- notifications --------------------------------------------------------
+  //
+  // A button rather than a tick-box, because turning this on is a decision with
+  // a permission prompt attached, not a preference you flip in passing.
+  //
+  // Four states, and each one says something different, because "off" covers
+  // three of them and helps with none: not supported by the browser at all,
+  // never asked, refused (which JavaScript cannot undo — only the reader can,
+  // in the site settings), and on.
+  function notifyState() {
+    if (typeof Notification === 'undefined') return 'unsupported';
+    if (Notification.permission === 'denied') return 'blocked';
+    if (Notification.permission !== 'granted') return 'ask';
+    return settings.notify ? 'on' : 'off';
+  }
+
+  function renderNotify() {
+    var st = notifyState();
+    var soon = ready ? dueSoon(D, settings.remindDays) : [];
+    var late = soon.filter(function (x) { return x.late; }).length;
+
+    var button, note;
+    if (st === 'unsupported') {
+      button = '<button type="button" class="mo-btn mo-quiet" disabled>Not available here</button>';
+      note = 'This browser cannot show notifications.';
+    } else if (st === 'blocked') {
+      button = '<button type="button" class="mo-btn mo-quiet" disabled>Blocked by the browser</button>';
+      // Being specific matters: a page cannot re-ask once refused, and saying
+      // "turn it on" without saying where is the same as saying nothing.
+      note = 'Notifications were refused for this site. Only you can undo that — ' +
+             'open the padlock beside the web address, find Notifications, and set it to Allow.';
+    } else if (st === 'on') {
+      button = '<button type="button" class="mo-btn" id="moNotifyOff">Notifications are on</button>' +
+               '<button type="button" class="mo-x" id="moNotifyTest">Send a test</button>';
+      note = 'You will get one alert a visit if something is due within ' +
+             settings.remindDays + ' days.';
+    } else {
+      button = '<button type="button" class="mo-btn" id="moNotifyOn">Turn on notifications</button>';
+      note = st === 'ask'
+        ? 'The browser will ask your permission first.'
+        : 'Off. Nothing will pop up.';
+    }
+
+    return '<div class="mo-notify' + (st === 'on' ? ' on' : '') + '">' +
+      '<div class="mo-nleft">' +
+        '<b>' + (st === 'on' ? 'Payment alerts are on' : 'Payment alerts') + '</b>' +
+        '<span class="mo-sub">' + esc(note) + '</span>' +
+        (ready && late
+          ? '<span class="mo-sub mo-hol">' + late +
+            (late === 1 ? ' payment is overdue right now' : ' payments are overdue right now') + '</span>'
+          : (ready && soon.length
+              ? '<span class="mo-sub">' + soon.length +
+                (soon.length === 1 ? ' payment is' : ' payments are') + ' coming up</span>'
+              : '')) +
+      '</div>' +
+      '<div class="mo-nright">' + button + '</div>' +
+      '<p class="mo-remnote">A browser alert only appears while this page is open on this device. ' +
+        'It cannot reach you by email, SMS, or on your phone when the page is closed.</p>' +
+    '</div>';
+  }
+
+  function bindNotify(host) {
+    if (!host) return;
+    var on = host.querySelector('#moNotifyOn');
+    if (on) on.onclick = function () {
+      if (typeof Notification === 'undefined') return;
+      var btn = this;
+      btn.disabled = true;
+      btn.textContent = 'Asking…';
+      Promise.resolve(Notification.requestPermission()).then(function (p) {
+        if (p === 'granted') {
+          settings.notify = true;
+          notified = false;
+          saveSettings();
+          redrawNotify();
+          maybeNotify();
+        } else {
+          settings.notify = false;
+          saveSettings();
+          redrawNotify();
+        }
+      }).catch(function () { redrawNotify(); });
+    };
+
+    var off = host.querySelector('#moNotifyOff');
+    if (off) off.onclick = function () {
+      settings.notify = false;
+      saveSettings();
+      redrawNotify();
+    };
+
+    // Proving it works matters more than promising it does. If the alert never
+    // appears, better to find that out here than to miss an EMI trusting it.
+    var test = host.querySelector('#moNotifyTest');
+    if (test) test.onclick = function () {
+      try {
+        new Notification('Kerala Marine Supply', {
+          body: 'This is a test. Payment alerts are working on this device.',
+          tag: 'kms-money-test',
+        });
+        setStatus('Test alert sent. If nothing appeared, check this device’s ' +
+                  'notification settings — the browser may be silenced.');
+      } catch (e) {
+        setStatus('The test alert could not be shown: ' + e.message, true);
+      }
+    };
+  }
+
+  // Both places that carry the control get redrawn together, so the two can
+  // never show different answers.
+  function redrawNotify() {
+    ['moNotifyBar', 'moNotifyPanel'].forEach(function (id) {
+      var host = el(id);
+      if (!host) return;
+      host.innerHTML = renderNotify();
+      bindNotify(host);
+    });
+  }
+
   // What is about to be due, and what is already late.
   function renderRemind() {
     var soon = dueSoon(D, settings.remindDays);
@@ -744,10 +863,9 @@
           ? late.length + (late.length === 1 ? ' payment is overdue' : ' payments are overdue')
           : (soon.length ? soon.length + (soon.length === 1 ? ' payment is coming up' : ' payments are coming up')
                          : 'Nothing due in the next ' + settings.remindDays + ' days')) + '</b>' +
-        '<span class="mo-remset">Remind me <select id="moRemDays">' + opts + '</select>' +
-          '<label class="mo-tick"><input type="checkbox" id="moNotify"' +
-            (settings.notify ? ' checked' : '') + '> browser alert</label></span>' +
+        '<span class="mo-remset">Remind me <select id="moRemDays">' + opts + '</select></span>' +
       '</div>' +
+      '<div id="moNotifyPanel"></div>' +
       (soon.length
         ? '<ul class="mo-remlist">' + soon.map(function (x) {
             return '<li' + (x.late ? ' class="late"' : '') + '>' +
@@ -757,8 +875,6 @@
             '</li>';
           }).join('') + '</ul>'
         : '') +
-      '<p class="mo-remnote">A browser alert only appears while this page is open on this device. ' +
-        'It cannot reach you by email, SMS or on your phone when the page is closed.</p>' +
     '</div>';
   }
 
@@ -862,35 +978,10 @@
     if (days) days.onchange = function () {
       settings.remindDays = Math.max(0, Math.min(60, Number(this.value) || 0));
       saveSettings();
+      notified = false;   // a wider window may bring something new into view
       renderMonth();
     };
-    var notify = el('moNotify');
-    if (notify) notify.onchange = function () {
-      var want = this.checked;
-      if (!want) { settings.notify = false; saveSettings(); return; }
-      // Turning it on has to actually get permission, and has to say plainly
-      // when it did not — a reminder someone believes in and never receives is
-      // worse than no reminder at all.
-      if (!('Notification' in window)) {
-        this.checked = false;
-        setStatus('This browser cannot show notifications.', true);
-        return;
-      }
-      var self = this;
-      Promise.resolve(Notification.requestPermission()).then(function (p) {
-        if (p !== 'granted') {
-          self.checked = false;
-          settings.notify = false;
-          setStatus('The browser refused notifications. Allow them for this site and try again.', true);
-        } else {
-          settings.notify = true;
-          notified = false;
-          setStatus('Browser alerts on — while this page is open.');
-          maybeNotify();
-        }
-        saveSettings();
-      });
-    };
+    redrawNotify();
 
     el('moAddEntry').onclick = function () {
       if (!leaveEdit()) return;
@@ -1874,6 +1965,19 @@
     '.mo-calv{font-family:var(--font-heading);font-weight:800;font-size:14px;letter-spacing:-0.01em}' +
     '.mo-caln{font-size:10.5px;color:var(--color-neutral-700)}' +
 
+    // ---- the notification button ----
+    '.mo-notify{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 20px;align-items:center;' +
+    '  border:2px solid var(--color-divider);border-left-width:5px;padding:14px 16px;' +
+    '  margin:0 0 20px;background:var(--color-bg)}' +
+    '.mo-notify.on{border-left-color:#2b7a4b}' +
+    '.mo-nleft b{display:block;font-family:var(--font-heading);font-weight:800;font-size:14px}' +
+    '.mo-nright{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}' +
+    '.mo-notify .mo-remnote{grid-column:1/-1;margin:0}' +
+    '.mo-notify .mo-btn:disabled{opacity:.55;cursor:default;background:none;' +
+    '  color:var(--color-neutral-700);border-color:var(--color-divider)}' +
+    '@media(max-width:620px){.mo-notify{grid-template-columns:1fr}' +
+    '  .mo-nright{justify-content:flex-start}}' +
+
     // ---- reminders ----
     '.mo-remind{border:2px solid var(--color-divider);border-left-width:5px;padding:14px 16px;' +
     '  margin-top:14px;background:var(--color-bg)}' +
@@ -1944,8 +2048,8 @@
       current = key;
       injectCss();
       var draw = PAGES[key] || function () {};
-      if (!ready) load(yearOf(month), function () { draw(); paintTiles(); });
-      else { draw(); paintTiles(); }
+      if (!ready) load(yearOf(month), function () { draw(); paintTiles(); redrawNotify(); });
+      else { draw(); paintTiles(); redrawNotify(); }
     },
     // Exposed for the tests, and for anything that wants the arithmetic
     // without the page around it.
@@ -1971,6 +2075,7 @@
     load(yearOf(month), function () {
       paintTiles();
       if (current && PAGES[current]) PAGES[current]();
+      redrawNotify();
     });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

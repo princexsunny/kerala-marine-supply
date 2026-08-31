@@ -423,6 +423,10 @@
     <div class="page-box" aria-label="Expenses">
       <div class="page-head"><h2>Expenses</h2><a class="page-back" href="admin.html">← All settings</a></div>
       <p style="max-width:64ch;color:var(--color-neutral-800);font-size:14px;margin:0 0 22px">Money going out. Pick one to open it.</p>
+      <!-- Drawn by admin-money.js. It sits here, on the way in, rather than
+           only inside the month page — a reminder setting nobody can find is a
+           reminder setting nobody has turned on. -->
+      <div id="moNotifyBar"></div>
       <div class="tiles">
         <a class="tile" href="admin.html?p=money-month">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>
@@ -678,7 +682,7 @@
   </div>
 
 <script src="ventures-data.js"></script>
-<script src="admin-money.js?v=5"></script>
+<script src="admin-money.js?v=6"></script>
 <script>
 (function(){
   var SLOTS = [
