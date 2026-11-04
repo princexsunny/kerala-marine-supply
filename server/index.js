@@ -22,6 +22,7 @@ const { router: recordRoutes } = require('./routes/records');
 const { router: roadmapRoutes } = require('./routes/roadmaps');
 const { router: expenseRoutes } = require('./routes/expenses');
 const applicationsRoutes = require('./routes/applications');
+const socialRoutes = require('./routes/social');
 
 const app = express();
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -93,6 +94,8 @@ app.use('/api', adminAuth, roadmapRoutes);
 // reason as the funding sheet: what the business spends and what it owes is
 // not public, and there is no half of this that could be.
 app.use('/api', adminAuth, expenseRoutes);
+// Social drafts, media, account connections and publishing are admin-only.
+app.use('/api', adminAuth, socialRoutes);
 
 // Admin.dc.html and admin-dashboard.html were removed — admin.html is the only
 // admin page now. Old bookmarks and stale tabs still point at those URLs, and a
@@ -111,7 +114,7 @@ app.get(['/Admin.dc.html', '/admin-dashboard.html'], (req, res) =>
 // anyone who asks, so a file dropped in there is on the open internet whether
 // or not anything links to it. Guarding the route is what actually keeps it
 // private; not linking to it is not a control.
-const PRIVATE_PAGES = ['admin.html', 'boat-yard-split.html', 'expense-calculator.html'];
+const PRIVATE_PAGES = ['admin.html', 'boat-yard-split.html', 'expense-calculator.html', 'social-publisher.html'];
 
 PRIVATE_PAGES.forEach((page) => {
   app.get('/' + page, adminAuth, (req, res) => {
