@@ -111,7 +111,7 @@ app.get(['/Admin.dc.html', '/admin-dashboard.html'], (req, res) =>
 // anyone who asks, so a file dropped in there is on the open internet whether
 // or not anything links to it. Guarding the route is what actually keeps it
 // private; not linking to it is not a control.
-const PRIVATE_PAGES = ['admin.html', 'boat-yard-split.html'];
+const PRIVATE_PAGES = ['admin.html', 'boat-yard-split.html', 'expense-calculator.html'];
 
 PRIVATE_PAGES.forEach((page) => {
   app.get('/' + page, adminAuth, (req, res) => {

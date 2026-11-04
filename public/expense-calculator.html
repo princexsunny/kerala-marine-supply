@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Expense Calculator — Admin — Kerala Marine Supply</title>
+<style>
+:root{font-family:Arial,Helvetica,sans-serif;color:#1b2b40;background:#f3f6fa;font-size:15px}
+*{box-sizing:border-box}body{margin:0;padding:24px 12px}.app{max-width:990px;margin:auto;background:#fff;border:1px solid #e1e8f1;border-radius:14px;padding:28px 32px;box-shadow:0 8px 28px #102e5710}
+h1{font-size:28px;letter-spacing:.4px;color:#16487c;margin:0 0 4px}.subtitle{font-size:13px;color:#718096;margin:0 0 24px}
+h2{font-size:17px;color:#204a75;margin:0 0 14px}.panel{border:1px solid #dce6f2;background:#f7faff;border-radius:10px;padding:18px;margin-bottom:20px}
+.grid{display:grid;gap:14px}.grid.two{grid-template-columns:2fr 1fr}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+label{display:block;font-weight:700;font-size:13px;margin-bottom:7px}input,select{width:100%;min-width:0;height:43px;border:1px solid #cbd6e3;border-radius:7px;background:#fff;padding:8px 10px;font:inherit;color:#1b2b40}input:focus,select:focus{outline:2px solid #a7caff;border-color:#3074bd}.hint{font-size:12px;color:#637489;line-height:1.5;margin:9px 0 0}
+.error{color:#a52727;font-size:12px;font-weight:700;margin-top:8px}.error[hidden]{display:none}
+.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin:16px 0 10px}button{border:0;border-radius:7px;padding:11px 16px;font-size:14px;font-weight:700;cursor:pointer}button:focus-visible{outline:3px solid #86b7ff;outline-offset:2px}.btn-main{background:#1769b5;color:white}.btn-main:hover{background:#10518e}.btn-soft{background:#e7eef7;color:#174778}.btn-soft:hover{background:#d9e6f4}.btn-danger{background:#fff1f1;color:#a12323;border:1px solid #f1cece}.btn-danger:hover{background:#ffe4e4}.btn-small{padding:7px 10px;font-size:12px}
+.table-scroll{width:100%;overflow-x:auto}table{border-collapse:collapse;width:100%;table-layout:fixed}th,td{padding:12px 9px;text-align:left;border-bottom:1px solid #e5ebf3;overflow-wrap:anywhere}th{background:#eef3f9;color:#355371;font-size:12px;text-transform:uppercase;letter-spacing:.03em}td{font-size:14px}.expense-table th:nth-child(1){width:7%}.expense-table th:nth-child(2){width:22%}.expense-table th:nth-child(3){width:40%}.expense-table th:nth-child(4){width:20%;text-align:right}.expense-table th:nth-child(5){width:11%;text-align:center}.expense-table td:nth-child(4){text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.expense-table td:nth-child(5){text-align:center}.empty{text-align:center;color:#7b8897;padding:24px}
+.money{font-variant-numeric:tabular-nums}.expense-total{display:flex;justify-content:flex-end;align-items:baseline;gap:20px;padding:20px 4px 6px;font-weight:800}.expense-total strong{font-size:26px;color:#185e9f}
+.summary{max-width:510px;margin:14px 0 8px auto;border:1px solid #dce6f2;border-radius:10px;padding:18px 20px}.summary-line{display:flex;justify-content:space-between;gap:15px;padding:8px 0}.summary-line span:last-child{font-weight:700;text-align:right;white-space:nowrap}.summary-line.strong{font-weight:800;border-top:1px solid #dce6f2;padding-top:13px;margin-top:5px}.summary-line.strong span:last-child{color:#145b98}.balance{font-size:17px}.tally{border-top:1px solid #dce6f2;margin-top:8px;padding-top:13px;font-size:13px;font-weight:700;color:#596c80}.tally.match{color:#177a4c}.tally.short{color:#b32932}.tally.left{color:#906116}
+.saved{background:#f7faff;border:1px solid #dce6f2;border-radius:9px;padding:16px;margin:12px 0}.saved .grid{grid-template-columns:1fr auto auto;align-items:end}.status{color:#417147;font-size:13px;font-weight:700;min-height:18px;margin:9px 0}.print-only{display:none}.footer-note{font-size:12px;color:#718096;line-height:1.5;margin-top:9px}.actions-bottom{border-top:1px solid #e2e8f1;padding-top:18px;margin-top:24px}
+
+.stage-table{min-width:805px;table-layout:fixed}
+.stage-table th,.stage-table td{padding:10px 7px;text-align:left;overflow-wrap:normal}
+.stage-table th:nth-child(1){width:20%;text-align:left}.stage-table th:nth-child(2){width:10%;text-align:right}
+.stage-table th:nth-child(3){width:18%;text-align:right}.stage-table th:nth-child(4){width:18%;text-align:left}
+.stage-table th:nth-child(5){width:17%;text-align:right}.stage-table th:nth-child(6){width:12%;text-align:left}.stage-table th:nth-child(7){width:5%;text-align:center}
+.stage-table td:nth-child(2),.stage-table td:nth-child(3),.stage-table td:nth-child(5){text-align:right;white-space:nowrap}
+.stage-table td:nth-child(4),.stage-table td:nth-child(6){text-align:left;white-space:normal}
+.stage-table td:nth-child(7){text-align:center}
+.stage-table input[type=number]{width:120px;height:37px;font-size:13px;text-align:right;padding:6px}
+.stage-table input[type=date]{width:132px;height:37px;font-size:12px;padding:6px}
+.stage-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:15px}
+.stage-metric{border:1px solid #dce6f2;border-radius:8px;background:#fff;padding:11px}
+.stage-metric .k{font-size:12px;color:#596b7e;line-height:1.5}.stage-metric .v{font-size:17px;font-weight:800;color:#185e9f;margin-top:3px;word-break:break-word}
+.stage-status{font-size:13px;font-weight:700;color:#627589;padding-top:10px}
+.stage-status.warn{color:#a52631}.stage-status.ok{color:#167449}
+.checkrow{display:flex;align-items:flex-start;gap:9px;margin-top:14px;font-size:13px;line-height:1.5;color:#39546d}
+.checkrow input{width:17px;min-width:17px;height:17px;margin:2px 0 0}.checkrow label{font-weight:400;margin:0;font-size:13px}
+.stage-panel{background:#f7faff;border:1px solid #dce6f2;border-radius:10px;padding:18px;margin:23px 0}
+.print-stage-intro{margin:7px 0 10px;font-size:12px}
+@media(max-width:760px){.stage-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:670px){body{padding:9px}.app{padding:21px 13px}h1{font-size:24px}.grid.two,.grid.three,.saved .grid{grid-template-columns:1fr}table{min-width:620px}.summary{max-width:none}.expense-total strong{font-size:22px}}
+@page{size:A4;margin:14mm}
+@media print{.stage-panel{background:#fff;border:0;border-top:1px solid #ccd9e6;border-radius:0;padding:14px 0;margin:15px 0}.stage-table{min-width:0;font-size:10px}.stage-table th,.stage-table td{padding:8px 4px;font-size:10px}.stage-table th:nth-child(1){width:21%}.stage-table th:nth-child(2){width:9%}.stage-table th:nth-child(3){width:18%}.stage-table th:nth-child(4){width:17%}.stage-table th:nth-child(5){width:18%}.stage-table th:nth-child(6){width:17%}.stage-table th:nth-child(7),.stage-table td:nth-child(7){display:none}.stage-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}.stage-metric{padding:7px;background:#fff}.stage-metric .v{font-size:13px}.stage-metric .k{font-size:10px}.stage-status{font-size:11px}html,:root{background:white}body{padding:0}.app{max-width:none;border:0;border-radius:0;padding:0;box-shadow:none}.no-print{display:none!important}.print-only{display:block}.subtitle{margin-bottom:16px}.topic-print{font-weight:700;font-size:16px;margin:0 0 12px}.print-info{font-size:12px;margin:0 0 10px;color:#374b60}table{min-width:0}.expense-table th:nth-child(1){width:8%}.expense-table th:nth-child(2){width:22%}.expense-table th:nth-child(3){width:44%}.expense-table th:nth-child(4){width:26%}.expense-table td,.expense-table th{padding:9px 6px}tr{break-inside:avoid}.expense-table th:nth-child(5),.expense-table td:nth-child(5){display:none}.summary,.expense-total{break-inside:avoid}.summary{max-width:none;padding:12px 15px;margin-top:12px}.summary-line{padding:5px 0}.tally{color:#24394d!important}h1{color:#16487c}}
+</style>
+</head>
+<body>
+<main class="app">
+  <nav class="no-print" aria-label="Admin navigation" style="margin-bottom:18px"><a href="admin.html" style="color:#16487c;font-weight:700">← Back to admin</a></nav>
+  <h1>EXPENSE CALCULATOR</h1>
+  <p class="subtitle">Bill-wise expenses, bank funding, contribution and contractor stage payments</p>
+  <p class="hint no-print" style="margin-bottom:20px">Drafts and saved reports stay in this browser on this device. Use Save as PDF to keep a separate copy.</p>
+  <div class="grid two no-print" style="margin-bottom:23px">
+    <div><label for="topic">Topic Name / Project</label><input id="topic" list="topic-list" maxlength="100" placeholder="Building, Machinery, etc."><datalist id="topic-list"><option value="Building"><option value="Machinery"><option value="Materials"><option value="Maintenance"><option value="Transport"><option value="Other"></datalist></div>
+    <div><label for="date">Report Date</label><input id="date" type="date"></div>
+  </div>
+  <p class="topic-print print-only">Topic: <span id="pdf-topic">—</span></p>
+  <p class="print-info print-only">Date: <span id="pdf-date"></span></p>
+
+  <section class="panel no-print">
+    <h2>Bank Amount &amp; Our Contribution</h2>
+    <div class="grid three">
+      <div><label for="bank">Bank Amount (₹)</label><input id="bank" type="number" min="0" max="999999999" step="0.01" inputmode="decimal" placeholder="0.00"></div>
+      <div><label for="own">Our Contribution (₹)</label><input id="own" type="number" min="0" max="999999999" step="0.01" inputmode="decimal" placeholder="0.00"></div>
+      <div><label for="percent">Our Contribution (%)</label><input id="percent" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="e.g. 20"></div>
+    </div>
+    <p class="hint">Enter our contribution as an <b>amount</b> or a <b>percentage of total project funds</b>. The other field calculates automatically. Example: Bank ₹8,00,000 + our contribution 20% = ₹2,00,000 from us, totaling ₹10,00,000.</p>
+    <p class="error" id="funding-error" role="alert" hidden></p>
+  </section>
+
+  <form id="expense-form" class="no-print">
+    <h2>Add Expense</h2>
+    <div class="grid three">
+      <div><label for="bill">Bill Number</label><input id="bill" required maxlength="80" placeholder="e.g. B001"></div>
+      <div><label for="detail">Expense Details</label><input id="detail" required maxlength="180" placeholder="e.g. Cement purchase"></div>
+      <div><label for="amount">Amount (₹)</label><input id="amount" type="number" min="0.01" max="999999999" step="0.01" inputmode="decimal" required placeholder="0.00"></div>
+    </div>
+    <div class="toolbar"><button class="btn-main" type="submit">+ Add Expense</button></div>
+  </form>
+
+  <div class="table-scroll">
+    <table class="expense-table" aria-label="Expense list">
+      <thead><tr><th>Sl.</th><th>Bill Number</th><th>Expense Details</th><th>Amount (₹)</th><th class="no-print">Action</th></tr></thead>
+      <tbody id="expense-rows"></tbody>
+    </table>
+  </div>
+  <div class="expense-total"><span>Grand Total</span><strong id="grand-total" class="money">₹0.00</strong></div>
+
+  <section class="stage-panel" aria-label="Contractor stage payments">
+    <h2>Contractor Stage Payments</h2>
+    <div class="grid two no-print">
+      <div><label for="contractor">Contractor Name (optional)</label><input id="contractor" maxlength="100" placeholder="Enter contractor name"></div>
+      <div><label for="contract-amount">Contractor Agreement Amount (₹)</label><input id="contract-amount" type="number" inputmode="decimal" min="0.01" max="999999999" step="0.01" placeholder="Leave blank to use total project funds"></div>
+    </div>
+    <p class="hint no-print">Stage percentages are calculated from the <b>contractor agreement amount</b>. If left empty, the calculator uses <b>total available project funds (Bank + Our Contribution)</b>.</p>
+    <p class="print-stage-intro">Contractor: <strong id="pdf-contractor">—</strong> &nbsp; | &nbsp; Calculation Base: <strong id="stage-base">₹0.00</strong><span id="stage-base-source"></span></p>
+    <form id="stage-form" class="no-print">
+      <div class="grid three" style="margin-top:12px;align-items:end">
+        <div><label for="stage-name">Stage Name</label><input id="stage-name" maxlength="90" placeholder="e.g. Foundation / Stage 1"></div>
+        <div><label for="stage-percent">Stage Percentage (%)</label><input id="stage-percent" required type="number" min="0.01" max="100" step="0.01" inputmode="decimal" placeholder="e.g. 30 or 40"></div>
+        <div><label>&nbsp;</label><button type="submit" class="btn-main" style="width:100%">+ Add Stage</button></div>
+      </div>
+      <p class="hint">Example: Add <b>30%</b> for Stage 1, <b>40%</b> for Stage 2 and <b>30%</b> for Stage 3. Enter the amount actually paid to the contractor in each row.</p>
+    </form>
+    <p id="stage-error" class="error" role="alert" hidden></p>
+    <div class="table-scroll">
+      <table class="stage-table" aria-label="Contractor payment stages">
+        <thead><tr><th>Stage</th><th>Share</th><th>Stage Amount</th><th>Paid (₹)</th><th>Still Due</th><th>Paid Date</th><th class="no-print">Action</th></tr></thead>
+        <tbody id="stage-rows"></tbody>
+      </table>
+    </div>
+    <div class="stage-metrics" aria-live="polite">
+      <div class="stage-metric"><div class="k">Stages Allocated</div><div class="v" id="stage-allocated">0.00%</div></div>
+      <div class="stage-metric"><div class="k">Scheduled Amount</div><div class="v money" id="stage-scheduled">₹0.00</div></div>
+      <div class="stage-metric"><div class="k">Paid to Contractor</div><div class="v money" id="stage-paid">₹0.00</div></div>
+      <div class="stage-metric"><div class="k">Remaining to Pay</div><div class="v money" id="stage-due">₹0.00</div></div>
+    </div>
+    <p id="stage-status" class="stage-status">Add a payment stage to start.</p>
+    <div class="checkrow no-print">
+      <input id="include-contractor" type="checkbox">
+      <label for="include-contractor"><b>Count contractor payments in the funding expense tally.</b> Tick this only if the same payments are <b>not already included</b> in the bill-wise expense list, to prevent double counting.</label>
+    </div>
+    <p class="print-only" style="font-size:11px" id="pdf-stage-included"></p>
+  </section>
+
+  <section class="summary" aria-live="polite">
+    <h2>Funding &amp; Expense Tally</h2>
+    <div class="summary-line"><span>Bank Amount</span><span id="bank-sum" class="money">₹0.00</span></div>
+    <div class="summary-line"><span>Our Contribution</span><span id="own-sum" class="money">₹0.00</span></div>
+    <div class="summary-line"><span>Contribution Percentage</span><span id="percent-sum">0.00%</span></div>
+    <div class="summary-line strong"><span>Total Available Funds</span><span id="funds-sum" class="money">₹0.00</span></div>
+    <div class="summary-line"><span>Bill-wise Expenses</span><span id="expenses-sum" class="money">₹0.00</span></div>
+    <div class="summary-line"><span>Contractor Paid (counted in tally)</span><span id="contractor-counted-sum" class="money">₹0.00</span></div>
+    <div class="summary-line strong"><span>Total Counted Expenses</span><span id="counted-expenses-sum" class="money">₹0.00</span></div>
+    <div class="summary-line strong balance"><span id="balance-heading">Remaining Balance</span><span id="balance-sum" class="money">₹0.00</span></div>
+    <div id="tally" class="tally">Enter funding details to check the tally.</div>
+  </section>
+
+  <div class="actions-bottom no-print">
+    <div class="toolbar">
+      <button type="button" id="save-report" class="btn-main">Save Report</button>
+      <button type="button" id="save-pdf" class="btn-soft">Save as PDF</button>
+      <button type="button" id="open-saved" class="btn-soft">Open Saved Reports</button>
+      <button type="button" id="new-report" class="btn-soft">New Report / Next</button>
+    </div>
+    <p id="notice" class="status" role="status"></p>
+    <div id="saved-panel" class="saved" hidden>
+      <h2>Saved Reports</h2>
+      <div class="grid">
+        <div><label for="saved-select">Select Report</label><select id="saved-select"></select></div>
+        <button type="button" class="btn-main" id="load-report">Open</button>
+        <button type="button" class="btn-danger" id="delete-report">Delete</button>
+      </div>
+      <p class="hint">Reports are saved in this browser on this device. Use “Save as PDF” to keep a separate copy.</p>
+    </div>
+    <p class="footer-note">PDF: Click “Save as PDF”, then choose the <b>Save as PDF</b> destination in the browser print dialog. The current report is automatically kept as a draft in your browser.</p>
+  </div>
+</main>
+<script>
+(function(){
+'use strict';
+const $ = id => document.getElementById(id);
+const DRAFT = 'expense_calc_v3_draft', ARCHIVE = 'expense_calc_v3_saved';
+const fmt = new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',minimumFractionDigits:2,maximumFractionDigits:2});
+const money = cents => fmt.format(cents/100);
+const today = () => {const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+const empty = () => ({id:null, date:today(),topic:'',bank:0,own:0,percent:0,mode:'amount',rows:[],contractor:'',contract:null,stages:[],includeContractor:false});
+const numeric = s => /^\d+(?:\.\d{1,2})?$/.test(s.trim());
+const readCents = value => {if(!value.trim())return 0;if(!numeric(value))return null;const x=Math.round(Number(value)*100);return Number.isSafeInteger(x)&&x>=0&&x<=99999999900?x:null;};
+const loadJSON = (key,fallback) => {try{const x=JSON.parse(localStorage.getItem(key));return x??fallback;}catch(e){return fallback;}};
+function clean(raw){
+  const e=empty();if(!raw||typeof raw!=='object')return e;
+  e.id=typeof raw.id==='string'?raw.id:null;
+  e.date=typeof raw.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(raw.date)?raw.date:today();
+  e.topic=typeof raw.topic==='string'?raw.topic.slice(0,100):'';
+  e.bank=Number.isSafeInteger(raw.bank)&&raw.bank>=0&&raw.bank<=99999999900?raw.bank:0;
+  e.own=Number.isSafeInteger(raw.own)&&raw.own>=0&&raw.own<=99999999900?raw.own:0;
+  e.percent=typeof raw.percent==='number'&&raw.percent>=0&&raw.percent<=100?raw.percent:0;
+  e.mode=raw.mode==='percent'?'percent':'amount';
+  e.rows=Array.isArray(raw.rows)?raw.rows.filter(r=>r&&typeof r.bill==='string'&&typeof r.detail==='string'&&Number.isSafeInteger(r.amount)&&r.amount>0&&r.amount<=99999999900).slice(0,5000).map(r=>({bill:r.bill.slice(0,80),detail:r.detail.slice(0,180),amount:r.amount})):[];
+  e.contractor=typeof raw.contractor==='string'?raw.contractor.slice(0,100):'';
+  e.contract=Number.isSafeInteger(raw.contract)&&raw.contract>0&&raw.contract<=99999999900?raw.contract:null;
+  e.stages=Array.isArray(raw.stages)?raw.stages.filter(st=>st&&typeof st.name==='string'&&typeof st.percent==='number'&&st.percent>0&&st.percent<=100).slice(0,100).map(st=>({
+    name:st.name.slice(0,90),percent:Math.round(st.percent*100)/100,
+    paid:Number.isSafeInteger(st.paid)&&st.paid>=0&&st.paid<=99999999900?st.paid:0,
+    paidDate:typeof st.paidDate==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(st.paidDate)?st.paidDate:''
+  })):[];
+  e.includeContractor=raw.includeContractor===true;
+  return e;
+}
+let report=clean(loadJSON(DRAFT,null));
+const saveDraft=()=>{try{localStorage.setItem(DRAFT,JSON.stringify(report));}catch(e){$('notice').textContent='Browser storage unavailable. Save your report as PDF.';}};
+const percentOfFunds = () => report.bank+report.own ? 100*report.own/(report.bank+report.own) : 0;
+const percentShown = () => report.mode==='percent' ? report.percent : percentOfFunds();
+function ownFromPercent(bank,p){
+  if(p===0)return 0;
+  if(p===100)return bank===0?0:null;
+  const n=Math.round(bank*p/(100-p));
+  return Number.isSafeInteger(n)&&n>=0&&n<=99999999900?n:null;
+}
+function setError(message){$('funding-error').hidden=!message;$('funding-error').textContent=message;}
+function populateInputs(){
+  $('topic').value=report.topic;$('date').value=report.date;
+  $('bank').value=report.bank?(report.bank/100).toFixed(2):'';
+  $('own').value=report.own?(report.own/100).toFixed(2):'';
+  $('percent').value=(report.bank||report.own||report.mode==='percent')?percentShown().toFixed(2):'';
+  $('contractor').value=report.contractor;
+  $('contract-amount').value=report.contract===null?'':(report.contract/100).toFixed(2);
+  $('include-contractor').checked=report.includeContractor;
+  setError('');setStageError('');
+}
+function expenseTotal(){return report.rows.reduce((sum,x)=>sum+x.amount,0);}
+function contractBase(){return report.contract===null?report.bank+report.own:report.contract;}
+function stageTotalPct(){return Math.round(report.stages.reduce((n,st)=>n+Math.round(st.percent*100),0))/100;}
+function stageAmounts(){
+  const base=contractBase();let pct=0,last=0;
+  return report.stages.map(st=>{
+    pct+=Math.round(st.percent*100);
+    const cumulative=Math.round(base*pct/10000);
+    const amount=cumulative-last;last=cumulative;
+    return amount;
+  });
+}
+function contractorPaid(){return report.stages.reduce((sum,st)=>sum+st.paid,0);}
+function setStageError(message){$('stage-error').hidden=!message;$('stage-error').textContent=message;}
+function recalc(){
+  const expenses=expenseTotal(),contractorCounted=report.includeContractor?contractorPaid():0;
+  const countedExpenses=expenses+contractorCounted;
+  const funds=report.bank+report.own,balance=funds-countedExpenses;
+  $('pdf-topic').textContent=report.topic.trim()||'Not specified';$('pdf-date').textContent=report.date;
+  $('grand-total').textContent=money(expenses);
+  $('bank-sum').textContent=money(report.bank);$('own-sum').textContent=money(report.own);
+  $('percent-sum').textContent=percentShown().toFixed(2)+'%';
+  $('funds-sum').textContent=money(funds);$('expenses-sum').textContent=money(expenses);
+  $('contractor-counted-sum').textContent=money(contractorCounted);
+  $('counted-expenses-sum').textContent=money(countedExpenses);
+  $('balance-heading').textContent=balance<0?'Amount Short / Needed':'Remaining Balance';
+  $('balance-sum').textContent=money(Math.abs(balance));
+  const el=$('tally');el.className='tally';
+  if(report.mode==='percent'&&report.percent>0&&report.bank===0&&report.own===0){el.textContent='Enter the bank amount to calculate the contribution.';}
+  else if(!funds){el.textContent='Enter bank funding and/or our contribution to check the tally.';}
+  else if(balance===0){el.textContent='TALLIED: Available funds exactly match the counted expenses.';el.classList.add('match');}
+  else if(balance<0){el.textContent='SHORTAGE: Counted expenses are higher than available funds.';el.classList.add('short');}
+  else{el.textContent='BALANCE AVAILABLE: Remaining amount after expenses.';el.classList.add('left');}
+}
+function renderRows(){
+  const body=$('expense-rows');body.replaceChildren();
+  if(!report.rows.length){const tr=body.insertRow(),td=tr.insertCell();td.colSpan=5;td.className='empty no-print';td.textContent='No expenses added yet.';}
+  report.rows.forEach((r,i)=>{
+    const tr=body.insertRow();
+    for(const v of [String(i+1),r.bill,r.detail]){const td=tr.insertCell();td.textContent=v;}
+    tr.insertCell().textContent=money(r.amount);
+    const action=tr.insertCell(),btn=document.createElement('button');btn.type='button';btn.className='btn-small btn-danger no-print';btn.textContent='Remove';btn.setAttribute('aria-label','Remove bill '+r.bill);
+    btn.addEventListener('click',()=>{report.rows.splice(i,1);saveDraft();renderRows();recalc();});action.append(btn);
+  });
+}
+
+function renderStageSummary(){
+  const amounts=stageAmounts(),planned=amounts.reduce((sum,a)=>sum+a,0),paid=contractorPaid(),totalPct=stageTotalPct(),due=planned-paid;
+  $('pdf-contractor').textContent=report.contractor.trim()||'Not specified';
+  $('stage-base').textContent=money(contractBase());
+  $('stage-base-source').textContent=report.contract===null?' (total available funds)':' (contractor agreement)';
+  $('stage-allocated').textContent=totalPct.toFixed(2)+'%';
+  $('stage-scheduled').textContent=money(planned);
+  $('stage-paid').textContent=money(paid);
+  $('stage-due').textContent=due>=0?money(due):'Overpaid '+money(-due);
+  $('pdf-stage-included').textContent=report.includeContractor?'Contractor payments counted in funding tally.':'Contractor payments shown separately (not counted again in the funding expense tally).';
+  const status=$('stage-status');status.className='stage-status';
+  if(!report.stages.length){status.textContent='Add a payment stage to start.';}
+  else if(totalPct<100){status.textContent='Unallocated contract percentage: '+(100-totalPct).toFixed(2)+'%. Add another stage to reach 100% if required.';}
+  else if(totalPct>100){status.textContent='Stage percentages exceed 100%. Please correct your schedule.';status.classList.add('warn');}
+  else{status.textContent='Stage percentages total 100% of the contractor amount.';status.classList.add('ok');}
+  if(due<0){status.textContent+=' Actual payments exceed the scheduled stage amounts.';status.classList.add('warn');}
+}
+function renderStages(){
+  const body=$('stage-rows');body.replaceChildren();
+  const amounts=stageAmounts();
+  if(!report.stages.length){const tr=body.insertRow(),td=tr.insertCell();td.colSpan=7;td.className='empty';td.textContent='No contractor stages added yet.';}
+  report.stages.forEach((st,i)=>{
+    const tr=body.insertRow();
+    tr.insertCell().textContent=st.name;
+    tr.insertCell().textContent=st.percent.toFixed(2)+'%';
+    tr.insertCell().textContent=money(amounts[i]);
+    const paidTd=tr.insertCell(),paidInput=document.createElement('input');
+    paidInput.type='number';paidInput.min='0';paidInput.max='999999999';paidInput.step='0.01';paidInput.inputMode='decimal';
+    paidInput.value=st.paid?(st.paid/100).toFixed(2):'';
+    paidInput.placeholder='0.00';paidInput.className='no-print';paidInput.setAttribute('aria-label','Amount paid for '+st.name);
+    const paidPrint=document.createElement('span');paidPrint.className='print-only';paidPrint.textContent=money(st.paid);
+    paidTd.append(paidInput,paidPrint);
+    const dueTd=tr.insertCell();
+    const updateDue=()=>{const due=amounts[i]-st.paid;dueTd.textContent=due<0?'Overpaid '+money(-due):money(due);paidPrint.textContent=money(st.paid);};
+    updateDue();
+    paidInput.addEventListener('input',()=>{
+      const n=readCents(paidInput.value);
+      if(n===null||!paidInput.validity.valid){paidInput.setCustomValidity('Enter a valid paid amount.');setStageError('Enter a valid paid amount for '+st.name+'.');return;}
+      paidInput.setCustomValidity('');setStageError('');st.paid=n;updateDue();saveDraft();renderStageSummary();recalc();
+    });
+    const dateTd=tr.insertCell(),dateInput=document.createElement('input');
+    dateInput.type='date';dateInput.value=st.paidDate;dateInput.className='no-print';dateInput.setAttribute('aria-label','Paid date for '+st.name);
+    const datePrint=document.createElement('span');datePrint.className='print-only';datePrint.textContent=st.paidDate||'—';
+    dateInput.addEventListener('change',()=>{st.paidDate=dateInput.value;datePrint.textContent=st.paidDate||'—';saveDraft();});
+    dateTd.append(dateInput,datePrint);
+    const act=tr.insertCell(),btn=document.createElement('button');btn.type='button';btn.className='btn-small btn-danger no-print';btn.textContent='×';btn.setAttribute('aria-label','Remove '+st.name);
+    btn.addEventListener('click',()=>{report.stages.splice(i,1);saveDraft();renderStages();recalc();});act.append(btn);
+  });
+  renderStageSummary();
+}
+$('contractor').addEventListener('input',()=>{report.contractor=$('contractor').value;saveDraft();renderStageSummary();});
+$('contract-amount').addEventListener('input',()=>{
+  const raw=$('contract-amount').value.trim();const n=readCents(raw);
+  if((raw&&(n===null||n===0))||!$('contract-amount').validity.valid){setStageError('Enter a valid positive contractor agreement amount or leave it blank.');return;}
+  report.contract=raw?n:null;setStageError('');saveDraft();renderStages();
+});
+$('include-contractor').addEventListener('change',()=>{
+  report.includeContractor=$('include-contractor').checked;saveDraft();renderStageSummary();recalc();
+});
+$('stage-form').addEventListener('submit',event=>{
+  event.preventDefault();if(!$('stage-form').reportValidity())return;
+  const raw=$('stage-percent').value,p=Number(raw),name=$('stage-name').value.trim()||'Stage '+(report.stages.length+1);
+  if(!numeric(raw)||!Number.isFinite(p)||p<=0||p>100){setStageError('Enter a valid percentage between 0.01% and 100%.');return;}
+  const hundredths=Math.round(p*100),allocated=Math.round(stageTotalPct()*100);
+  if(allocated+hundredths>10000){setStageError('Stages cannot total over 100%. You have '+(100-stageTotalPct()).toFixed(2)+'% available.');return;}
+  report.stages.push({name,percent:hundredths/100,paid:0,paidDate:''});
+  $('stage-form').reset();setStageError('');saveDraft();renderStages();recalc();$('stage-percent').focus();
+});
+
+function renderAll(){populateInputs();renderRows();renderStages();recalc();}
+function editFunding(which){
+  const input=$(which),amount=readCents(input.value);
+  if(amount===null||!input.validity.valid){setError('Please enter a valid amount (0 to ₹99,99,99,999 with up to 2 decimals).');return;}
+  if(which==='bank'){
+    const n=report.mode==='percent'?ownFromPercent(amount,report.percent):report.own;
+    if(n===null){setError('With a positive bank amount, contribution must be below 100%. Reduce the percentage.');return;}
+    report.bank=amount;report.own=n;
+    $('own').value=n?(n/100).toFixed(2):'';
+  }else{report.own=amount;report.mode='amount';}
+  $('percent').value=(report.bank||report.own||report.mode==='percent')?percentShown().toFixed(2):'';
+  setError('');saveDraft();renderStages();recalc();
+}
+$('bank').addEventListener('input',()=>editFunding('bank'));
+$('own').addEventListener('input',()=>editFunding('own'));
+$('percent').addEventListener('input',()=>{
+  const raw=$('percent').value;
+  if(!raw.trim()){
+    report.mode='amount';report.percent=0;setError('');saveDraft();renderStages();recalc();return;
+  }
+  if(!numeric(raw)||!$('percent').validity.valid){setError('Enter a percentage from 0 to 100, up to 2 decimal places.');return;}
+  const p=Number(raw),n=ownFromPercent(report.bank,p);
+  if(n===null){setError('100% contribution is not possible with a positive bank amount. Enter less than 100%.');return;}
+  report.percent=p;report.mode='percent';report.own=n;$('own').value=n?(n/100).toFixed(2):'';
+  setError('');saveDraft();renderStages();recalc();
+});
+$('topic').addEventListener('input',()=>{report.topic=$('topic').value;saveDraft();recalc();});
+$('date').addEventListener('input',()=>{report.date=$('date').value||today();saveDraft();recalc();});
+$('expense-form').addEventListener('submit',event=>{
+  event.preventDefault();if(!$('expense-form').reportValidity())return;
+  const bill=$('bill').value.trim(),detail=$('detail').value.trim(),amount=readCents($('amount').value);
+  if(!bill||!detail||amount===null||amount<=0){alert('Enter a bill number, expense details, and a valid positive amount.');return;}
+  report.rows.push({bill,detail,amount});saveDraft();renderRows();recalc();
+  $('expense-form').reset();$('bill').focus();$('notice').textContent='Expense added.';
+});
+function archives(){const a=loadJSON(ARCHIVE,[]);return Array.isArray(a)?a.filter(r=>r&&typeof r.id==='string'):[];}
+function storeArchives(a){try{localStorage.setItem(ARCHIVE,JSON.stringify(a));return true;}catch(e){$('notice').textContent='Could not save reports in this browser. Use Save as PDF for a copy.';return false;}}
+function updateSavedSelect(){
+  const a=archives(),s=$('saved-select');s.replaceChildren();
+  if(!a.length){const opt=new Option('No saved reports yet','');s.append(opt);return;}
+  a.sort((x,y)=>(y.savedAt||'').localeCompare(x.savedAt||''));
+  for(const x of a){const opt=new Option((x.topic||'General')+' | '+x.date+' | '+x.rows.length+' bills, '+(Array.isArray(x.stages)?x.stages.length:0)+' stages',x.id);s.append(opt);}
+}
+$('save-report').addEventListener('click',()=>{
+  if(!$('funding-error').hidden){alert('Correct the contribution details before saving.');return;}
+  if(!report.rows.length&&!report.stages.length){alert('Add at least one expense or contractor stage before saving.');return;}
+  const a=archives();if(!report.id)report.id='r'+Date.now()+'_'+Math.random().toString(36).slice(2,9);
+  const saved={...JSON.parse(JSON.stringify(report)),savedAt:new Date().toISOString()};
+  const i=a.findIndex(x=>x.id===report.id);if(i>=0)a[i]=saved;else a.push(saved);
+  if(storeArchives(a)){saveDraft();$('notice').textContent='Report saved on this device. You can open it again from Saved Reports.';updateSavedSelect();}
+});
+$('open-saved').addEventListener('click',()=>{const p=$('saved-panel');p.hidden=!p.hidden;if(!p.hidden)updateSavedSelect();});
+$('load-report').addEventListener('click',()=>{
+  const r=archives().find(x=>x.id===$('saved-select').value);
+  if(!r){alert('Please choose a saved report.');return;}
+  if(report.rows.length&&!confirm('Open this saved report? Unsaved changes to your current report will be replaced.'))return;
+  report=clean(r);saveDraft();renderAll();$('saved-panel').hidden=true;$('notice').textContent='Saved report opened.';
+});
+$('delete-report').addEventListener('click',()=>{
+  const id=$('saved-select').value,a=archives();if(!id)return;
+  if(!confirm('Permanently delete this saved report from this browser?'))return;
+  if(storeArchives(a.filter(x=>x.id!==id))){updateSavedSelect();$('notice').textContent='Saved report deleted.';}
+});
+$('save-pdf').addEventListener('click',()=>{
+  if(!$('funding-error').hidden){alert('Correct the contribution details before saving as PDF.');return;}
+  if(!report.rows.length&&!report.stages.length){alert('Add at least one expense or contractor stage before saving as PDF.');return;}
+  const previous=document.title;
+  const filename=(report.topic.trim()||'General').replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'').slice(0,45)||'General';
+  document.title='Expense_'+filename+'_'+report.date;
+  const restoreTitle=()=>{document.title=previous;window.removeEventListener('afterprint',restoreTitle);};
+  window.addEventListener('afterprint',restoreTitle);window.print();
+});
+$('new-report').addEventListener('click',()=>{
+  if((report.rows.length||report.stages.length||report.bank||report.own)&&!confirm('Start a new report? Save this report or its PDF first if you need a copy.'))return;
+  report=empty();saveDraft();renderAll();$('expense-form').reset();$('saved-panel').hidden=true;$('notice').textContent='New report ready.';$('topic').focus();
+});
+renderAll();
+})();
+</script>
+</body>
+</html>
