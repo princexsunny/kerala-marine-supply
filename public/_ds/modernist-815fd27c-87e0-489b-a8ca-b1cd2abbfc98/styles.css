@@ -52,9 +52,9 @@
   --space-6: 24.0px;
   --space-8: 32.0px;
 
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
 
   /* Elevation — derived from the ground: soft ink-tinted shadows on a
      light theme, a hairline edge + ambient darkness on a dark one. */
@@ -249,3 +249,13 @@ textarea.input { min-height: 90px; resize: vertical; }
 .dialog-body { font-size: 14px; opacity: 0.85; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
 
+
+/* Shared soft corners; spacing, colours and typography stay unchanged. */
+.tile,.folder,.drop,.pblock,.plan-logo { border-radius:var(--radius-lg); }
+button.del,button.edt,button.go { border-radius:var(--radius-md); }
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),select,textarea {
+  border-radius:var(--radius-md);
+}
+.blocks,.allgrid { border-radius:var(--radius-lg);overflow:hidden; }
+.allgrid a:focus-visible { outline-offset:-3px; }
+image-slot:not(#hero),.kms-stage { border-radius:var(--radius-lg);overflow:hidden; }
