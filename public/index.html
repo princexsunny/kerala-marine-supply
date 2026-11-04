@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="styles-modernist.css">
 <script src="image-slot.js"></script>
 <style>
+  /* Clip every hero slide to the same soft corner, including the video. */
+  image-slot#hero,[data-kms-slot="hero"]{border-radius:24px;overflow:hidden;isolation:isolate}
   body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)}
   a{color:var(--color-accent-700);text-decoration:none}
   a:hover{color:var(--color-accent-600)}
