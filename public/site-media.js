@@ -24,7 +24,7 @@
   // The payload is tiny and rarely changes, so it is kept in localStorage.
   // A repeat visit paints from that copy straight away and then quietly
   // refreshes in the background — so the wait happens once, not every load.
-  var CACHE_KEY = 'kms.media.v2';   // v2: entries now carry items[] as well as url
+  var CACHE_KEY = 'kms.media.v3';   // v3: retire the previous hero stills
 
   function readCache() {
     try {

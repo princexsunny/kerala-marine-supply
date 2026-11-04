@@ -51,6 +51,31 @@ const uploadVideo = multer({
   limits: { fileSize: MAX_VIDEO_BYTES },
 });
 
+// Replace the two retired hero stills with the new bundled image. Resolve this
+// while reading, so the admin preview and future edits see the same photos as
+// visitors. Original files remain in storage; the video is a separate record.
+const RETIRED_HERO_IDS = new Set(['hero-mtd7adnm-1', 'hero-mtd7clb9-1']);
+const HERO_IMAGE = {
+  id: 'hero-kerala-harbour-20261104',
+  url: '/images/hero-kerala-harbour-20261104.jpg',
+  storagePath: null,
+  contentType: 'image/jpeg',
+};
+
+function currentHeroItems(items) {
+  let inserted = false;
+  return items.reduce((out, item) => {
+    const id = item.id || idFor(item.storagePath);
+    if (RETIRED_HERO_IDS.has(id) || id === HERO_IMAGE.id) {
+      if (!inserted) out.push({ ...HERO_IMAGE });
+      inserted = true;
+    } else {
+      out.push(item);
+    }
+    return out;
+  }, []);
+}
+
 // ---- Slot shape ------------------------------------------------------------
 //
 // A media doc holds `items: [{ id, url, storagePath, contentType }]`.
@@ -64,15 +89,15 @@ const uploadVideo = multer({
 function readItems(data) {
   if (!data) return [];
   if (Array.isArray(data.items) && data.items.length) {
-    return data.items.filter(function (it) { return it && it.url; });
+    return currentHeroItems(data.items.filter(function (it) { return it && it.url; }));
   }
   if (data.url) {
-    return [{
+    return currentHeroItems([{
       id: idFor(data.storagePath),
       url: data.url,
       storagePath: data.storagePath || null,
       contentType: data.contentType || null,
-    }];
+    }]);
   }
   return [];
 }
