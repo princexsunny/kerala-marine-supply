@@ -659,5 +659,17 @@ const openDesign=document.createElement('button');openDesign.textContent='Open c
 let printDetails=[];window.addEventListener('beforeprint',()=>{printDetails=[...active().root.querySelectorAll('details')].map(d=>[d,d.open]);for(const [d] of printDetails)d.open=true});window.addEventListener('afterprint',()=>{for(const [d,on] of printDetails)d.open=on;printDetails=[]});
 sync();
 })();
-</script></body></html>
+</script><script>(()=>{'use strict';
+const $=id=>document.getElementById(id),copy=x=>JSON.parse(JSON.stringify(x));
+const baseline={keel:copy(keelDesigner.getState()),chine:copy(chineDesigner.getNodes()),top:copy(topAngleDesigner.getNodes()),frames:copy(frameDesigner.getProject())};
+const bar=document.createElement('div');bar.id='modelQuickBar';bar.className='toolbar';bar.setAttribute('aria-label','Starting model');
+bar.innerHTML='<strong>65 ft CAD baseline</strong><label style="display:flex;align-items:center;gap:6px">Vessel length <input id="modelLength" aria-label="Vessel length in feet" type="number" min="25" max="120" step="0.1" value="65" style="width:80px;padding:6px;border:1px solid #bdcdd5;border-radius:6px"> ft</label><button id="restoreDefaultModel" type="button">Restore default model</button><span id="modelFitSummary" role="status" style="font-size:12px;color:#365e6d"></span>';
+$('modeBar').before(bar);
+function summary(){const h=keelDesigner.getState().hull,st=frameDesigner.getStatus();$('modelLength').value=h;$('modelFitSummary').textContent=h.toFixed(1)+' ft · '+frameDesigner.getFrames().length+' frames'+(st.stale?' · frame fit needs update':st.issues.length?' · '+st.issues.length+' fit issues — see Connections':' · editable preview');}
+function showDefaultView(){$('modeVessel3D').click();document.querySelector('[data-camera="side"]').click();simpleWorkspace.open(null);$('v3Fit').click();summary();}
+$('modelLength').addEventListener('change',()=>{const input=$('modelLength');if(!input.reportValidity())return;$('hull').value=input.value;$('hull').dispatchEvent(new Event('change',{bubbles:true}));frameDesigner.generate(false);if(!$('vessel3DPanel').hidden){vessel3D.refresh();$('v3Fit').click()}summary();});
+$('restoreDefaultModel').onclick=()=>{if(!confirm('Restore the original 65 ft model and replace your current edits? Save your design first if you want to keep it.'))return;keelDesigner.setState(copy(baseline.keel));chineDesigner.setNodes(copy(baseline.chine));topAngleDesigner.setNodes(copy(baseline.top));frameDesigner.loadProject(copy(baseline.frames));frameDesigner.generate(false);for(const id of ['v3Keel','v3Chine','v3Top','v3Frames','v3Grid'])$(id).checked=true;$('v3Edit').checked=false;$('v3Edit').dispatchEvent(new Event('change'));showDefaultView();};
+for(const type of ['change','click','pointerup'])document.addEventListener(type,()=>queueMicrotask(summary));
+frameDesigner.generate(false);showDefaultView();
+})();</script></body></html>
 
