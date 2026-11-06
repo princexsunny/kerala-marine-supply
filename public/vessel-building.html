@@ -45,7 +45,12 @@ body>nav[aria-label="Website navigation"]{padding:5px 14px!important;font-size:1
 #simpleBottom{padding:4px 12px}#simpleBottom button{padding:4px 8px;font-size:11px}
 @media(max-width:650px){.simple-dock{width:min(280px,88vw);min-width:0}#modelQuickBar strong,#modelFitSummary{display:none}}
 }
-</style></head><body><nav aria-label="Website navigation" style="padding:12px 24px;background:#fff;border-bottom:1px solid #d5dfe3;display:flex;gap:18px;flex-wrap:wrap;font:14px Segoe UI,Arial,sans-serif"><a href="index.html#software" style="color:#193f4e">← Kerala Marine Supply</a><a href="venture.html?v=shipbuilding" style="color:#193f4e">Shalom Shipbuilding</a><span>Vessel Building Studio</span></nav>
+</style><style>@media screen{
+body.frame-workspace>.top,body.frame-workspace>nav[aria-label="Website navigation"]{display:none}
+body.drawing-expanded>.top,body.drawing-expanded>nav[aria-label="Website navigation"],body.drawing-expanded>#modelQuickBar,body.drawing-expanded>#modeBar{display:none!important}
+body.drawing-expanded .simple-dock{display:none!important}
+#expandDrawing{margin-left:auto}#simpleHide{margin-left:0}
+}</style></head><body><nav aria-label="Website navigation" style="padding:12px 24px;background:#fff;border-bottom:1px solid #d5dfe3;display:flex;gap:18px;flex-wrap:wrap;font:14px Segoe UI,Arial,sans-serif"><a href="index.html#software" style="color:#193f4e">← Kerala Marine Supply</a><a href="venture.html?v=shipbuilding" style="color:#193f4e">Shalom Shipbuilding</a><span>Vessel Building Studio</span></nav>
 
 <header class="top"><div><h1>Vessel Profile &amp; Frame Studio</h1><p>Shape the bow. Set the centre length. Keep the stern you approved.</p></div><div class="tag">65 FT MAIN-HULL BASELINE<br>EDITABLE CAD PROFILES</div></header>
 
@@ -609,7 +614,7 @@ window.vessel3D={pickFrameAt:(x,y)=>pickFrameAt(x,y),getFramePickSegments:()=>fr
 })();
 
 (()=>{
-function activate(mode){const three=mode==='vessel3d',frame=mode==='frames',top=mode==='topAngle',chine=mode==='chine',keel=!top&&!chine&&!frame&&!three;document.getElementById('vessel3DPanel').hidden=!three;document.getElementById('framePanel').hidden=!frame;document.getElementById('keelMain').hidden=!keel;document.getElementById('keelToolbar').hidden=!keel;document.getElementById('chinePanel').hidden=!chine;document.getElementById('topAnglePanel').hidden=!top;document.body.classList.toggle('chine-mode',chine);document.body.classList.toggle('top-angle-mode',top);for(const [id,on] of [['modeKeel',keel],['modeChine',chine],['modeTopAngle',top],['modeFrames',frame],['modeVessel3D',three]]){const b=document.getElementById(id);b.setAttribute('aria-pressed',String(on));b.classList.toggle('primary',on)}if(three)window.vessel3D.refresh();if(chine)window.chineDesigner.refresh();if(top)window.topAngleDesigner.refresh();if(frame)window.frameDesigner.refresh()}
+function activate(mode){const three=mode==='vessel3d',frame=mode==='frames',top=mode==='topAngle',chine=mode==='chine',keel=!top&&!chine&&!frame&&!three;document.getElementById('vessel3DPanel').hidden=!three;document.getElementById('framePanel').hidden=!frame;document.getElementById('keelMain').hidden=!keel;document.getElementById('keelToolbar').hidden=!keel;document.getElementById('chinePanel').hidden=!chine;document.getElementById('topAnglePanel').hidden=!top;document.body.classList.toggle('chine-mode',chine);document.body.classList.toggle('top-angle-mode',top);document.body.classList.toggle('frame-workspace',frame);for(const [id,on] of [['modeKeel',keel],['modeChine',chine],['modeTopAngle',top],['modeFrames',frame],['modeVessel3D',three]]){const b=document.getElementById(id);b.setAttribute('aria-pressed',String(on));b.classList.toggle('primary',on)}if(three)window.vessel3D.refresh();if(chine)window.chineDesigner.refresh();if(top)window.topAngleDesigner.refresh();if(frame)window.frameDesigner.refresh()}
 document.getElementById('modeVessel3D').onclick=()=>activate('vessel3d');document.getElementById('modeFrames').onclick=()=>activate('frames');window.frameDesigner.activate=()=>activate('frames');document.getElementById('modeKeel').onclick=()=>activate('keel');document.getElementById('modeChine').onclick=()=>activate('chine');document.getElementById('modeTopAngle').onclick=()=>activate('topAngle');window.chineDesigner.activate=(mode='chine')=>activate(mode);window.topAngleDesigner.activate=(mode='topAngle')=>activate(mode);
 })();
 
@@ -695,5 +700,8 @@ $('modelLength').addEventListener('change',()=>{const input=$('modelLength');if(
 $('restoreDefaultModel').onclick=()=>{if(!confirm('Restore the original 65 ft model and replace your current edits? Save your design first if you want to keep it.'))return;keelDesigner.setState(copy(baseline.keel));chineDesigner.setNodes(copy(baseline.chine));topAngleDesigner.setNodes(copy(baseline.top));frameDesigner.loadProject(copy(baseline.frames));frameDesigner.generate(false);for(const id of ['v3Keel','v3Chine','v3Top','v3Frames','v3Grid'])$(id).checked=true;$('v3Edit').checked=false;$('v3Edit').dispatchEvent(new Event('change'));showDefaultView();};
 for(const type of ['change','click','pointerup'])document.addEventListener(type,()=>queueMicrotask(summary));
 frameDesigner.generate(false);showDefaultView();
+})();</script><script>(()=>{
+const button=document.createElement('button');button.id='expandDrawing';button.type='button';button.textContent='Expand drawing';button.setAttribute('aria-pressed','false');document.getElementById('simpleHide').before(button);
+button.onclick=()=>{const expanded=document.body.classList.toggle('drawing-expanded');button.textContent=expanded?'Normal layout':'Expand drawing';button.setAttribute('aria-pressed',String(expanded));window.dispatchEvent(new Event('resize'));};
 })();</script></body></html>
 
