@@ -134,6 +134,7 @@ window.KMS_VENTURES = [
     roles: ['Production Manager', 'Naval Architect / Design Engineer', 'Boat Builder (FRP Technician)'],
     photo: 'venture6',
     name: 'Shalom Shipbuilding & Vessel Manufacturing',
+    link: { href: 'vessel-building.html', label: 'Open Vessel Building Studio' },
     status: 'Next',
     icon: 'ship',
     summary: 'Design and manufacture of fishing vessels and commercial boats — FRP, steel and wooden.',
