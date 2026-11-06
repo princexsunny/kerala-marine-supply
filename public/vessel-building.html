@@ -483,7 +483,7 @@ function draw(){if(!fitted)return;status();$('frError').hidden=!fitted.issues.le
 }
 function refresh(){if(!fitted)generate(false);else draw()}
 for(const id of ['frSpacing','frFirst','frAft','frDeck','frMainSeat','frSternSeat','frSection','frDepth','frWidth','frThickness'])$(id).onchange=()=>{status()};for(const id of ['frView','frUnits','frReferences'])$(id).onchange=draw;$('frSelect').onchange=()=>{chosen=$('frSelect').value;draw()};
-$('framePicker').onclick=e=>{const b=e.target.closest('button[data-frame]');if(b){chosen=b.dataset.frame;draw()}};
+$('framePicker').onclick=e=>{const b=e.target.closest('button[data-frame]');if(b){chosen=b.dataset.frame;$('frView').value='end';draw()}};
  for(const id of ['frameDrawing','frRows'])$(id).onclick=e=>{const f=e.target.closest('[data-frame]');if(f){chosen=f.dataset.frame;draw()}};
 $('frGenerate').onclick=()=>generate(true);$('frReset').onclick=()=>{setConfig({spacingFt:2,firstFt:2,aftFt:1,deckZ:400,mainInset:20,sternInset:8});$('frView').value='iso';$('frUnits').value='ft';chosen='F01';generate(false)};
 function download(name,text,type){if(!status())return;const u=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=u;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000)}
