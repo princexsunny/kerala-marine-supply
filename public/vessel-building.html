@@ -29,6 +29,22 @@ html,body{height:100%;overflow:hidden}body{display:flex;flex-direction:column}.t
 #framePicker button[aria-pressed="true"]{background:#193f4e;border-color:#193f4e;color:white;box-shadow:0 0 0 2px #c9e1e9}
 #framePicker button[data-fit-issue="true"]{border-style:dashed;border-color:#b95b38}
 @media print{.frame-picker{display:none!important}}
+</style><style>
+@media screen{
+body>nav[aria-label="Website navigation"]{padding:5px 14px!important;font-size:11px!important;gap:14px!important}
+.top{padding:6px 14px;min-height:40px}.top h1{font-size:17px}.top p{display:none}
+#modelQuickBar{padding:5px 14px;gap:10px;align-items:center;flex-shrink:0;font-size:12px}
+#modelQuickBar strong{font-size:12px}#modelQuickBar button{padding:5px 8px;font-size:11px}
+#modelLength{padding:3px 6px!important;font-size:12px;width:68px!important}
+#modeBar{padding:4px 14px}#modeBar button{padding:5px 9px;font-size:12px}
+#simpleToolBar{padding:4px 14px}#simpleToolBar button{padding:5px 8px;font-size:11px}
+.simple-area{padding:6px;gap:8px}.simple-dock{width:280px;min-width:280px}
+.frame-picker{padding:5px 10px;flex-shrink:0}.simple-stage .panel-head{padding:5px 10px}
+.simple-stage .panel-head h2{font-size:12px}.simple-stage .legend{font-size:10px;gap:6px}
+.simple-stage .projection-toggle{width:28px;height:28px;min-width:28px;padding:3px}.simple-stage .projection-toggle svg{width:21px;height:21px}
+#simpleBottom{padding:4px 12px}#simpleBottom button{padding:4px 8px;font-size:11px}
+@media(max-width:650px){.simple-dock{width:min(280px,88vw);min-width:0}#modelQuickBar strong,#modelFitSummary{display:none}}
+}
 </style></head><body><nav aria-label="Website navigation" style="padding:12px 24px;background:#fff;border-bottom:1px solid #d5dfe3;display:flex;gap:18px;flex-wrap:wrap;font:14px Segoe UI,Arial,sans-serif"><a href="index.html#software" style="color:#193f4e">← Kerala Marine Supply</a><a href="venture.html?v=shipbuilding" style="color:#193f4e">Shalom Shipbuilding</a><span>Vessel Building Studio</span></nav>
 
 <header class="top"><div><h1>Vessel Profile &amp; Frame Studio</h1><p>Shape the bow. Set the centre length. Keep the stern you approved.</p></div><div class="tag">65 FT MAIN-HULL BASELINE<br>EDITABLE CAD PROFILES</div></header>
@@ -475,11 +491,19 @@ function draw(){if(!fitted)return;status();$('frError').hidden=!fitted.issues.le
   svg+='</g><g transform="translate(65 65)" font-family="Arial" fill="#244451"><text y="0" font-size="12">Section · '+fitted.config.section+'</text><text y="22" font-size="12">Depth / Ø '+fitted.config.depth+' mm</text><text y="44" font-size="12">'+(['rod','chs'].includes(fitted.config.section)?'':('Width '+fitted.config.width+' mm'))+'</text><text y="66" font-size="12">'+(fitted.config.section==='rod'?'Solid section':'t = '+fitted.config.thickness+' mm')+'</text></g>';
 
  }
- svg+='<text x="45" y="560" font-size="11" fill="#607681">'+chosen+' · station '+(selected?.stationFt||0).toFixed(3)+' ft · guide paths only; final mitre, cope and weld detailing pending CAD review</text>';$('frameDrawing').innerHTML=svg;
+ svg+='<text x="45" y="560" font-size="11" fill="#607681">'+chosen+' · station '+(selected?.stationFt||0).toFixed(3)+' ft · guide paths only; final mitre, cope and weld detailing pending CAD review</text>';$('frameDrawing').innerHTML=svg;fitFrameDrawing();
  $('frHeading').textContent=view==='end'?chosen+' · symmetrical frame members':'Frame arrangement · '+fitted.hull.toFixed(3)+' ft main hull';$('frMemberHeading').textContent=chosen+' · separate A–H members';
  $('frMembers').innerHTML=(selected?.members||[]).map(m=>'<tr><td>'+m.id+'</td><td>'+m.name.replace('angle','member')+'<br><small>'+m.sectionLabel+'</small></td><td class="num">'+show(m.lengthMm)+' '+unit()+'</td><td class="num">'+m.inclinationDeg.toFixed(2)+'°<br><small>Start '+m.startTangentDeg.toFixed(2)+'° / end '+m.endTangentDeg.toFixed(2)+'°</small></td></tr>').join('');
  $('frConnections').innerHTML=selected?.error?'<tr><td>'+esc(selected.error)+'</td></tr>':[['Station',selected.stationFt.toFixed(3)+' ft'],['Keel upper edge height',show(selected.keelTopZ-D.soleZ)+' '+unit()],['Keel upper seat height',show(selected.keelSeatZ-D.soleZ)+' '+unit()],['Keel side faces','Y = -8 mm / +8 mm'],['Chine seats','12 mm rod · cope required'],['Top seats','L 50 x 50 x 6 · 0.25 mm fit allowance'],['Deck local lift',show(selected.deckLiftMm)+' '+unit()],['H / keel clearance',selected.hNeedsKeelCope?'Centre-web cope required':'No central overlap at reference level'],['Connection status','Reference fit; cut preparation pending']].map(r=>'<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>').join('');
  $('frRows').innerHTML=fitted.frames.map(f=>'<tr data-frame="'+f.id+'" style="cursor:pointer"><td>'+f.id+'</td><td class="num">'+f.stationFt.toFixed(3)+'</td><td class="num">'+(f.error?'—':show(2*f.chineHalfMm)+' '+unit())+'</td><td class="num">'+(f.error?'—':show(2*f.topHalfMm)+' '+unit())+'</td><td>'+esc(f.error||((f.warnings||[]).length?'Review short joint':'Reference fit'))+'</td></tr>').join('');
+}
+function fitFrameDrawing(){
+ const svg=$('frameDrawing');if($('framePanel').hidden)return;
+ const nodes=[...svg.querySelectorAll('[data-frame]')];
+ if($('frView').value==='end')nodes.push(...[...svg.querySelectorAll('text')].slice(1,-1),...svg.querySelectorAll('g rect'));
+ const boxes=nodes.map(n=>n.getBBox()).filter(b=>b.width||b.height);if(!boxes.length)return;
+ const pad=24,x=Math.min(...boxes.map(b=>b.x))-pad,y=Math.min(...boxes.map(b=>b.y))-pad;
+ svg.setAttribute('viewBox',[x,y,Math.max(...boxes.map(b=>b.x+b.width))-x+pad,Math.max(...boxes.map(b=>b.y+b.height))-y+pad].join(' '));
 }
 function refresh(){if(!fitted||stale())generate(false);else draw()}
 for(const id of ['frSpacing','frFirst','frAft','frDeck','frMainSeat','frSternSeat','frSection','frDepth','frWidth','frThickness'])$(id).onchange=()=>{status()};for(const id of ['frView','frUnits','frReferences'])$(id).onchange=draw;$('frSelect').onchange=()=>{chosen=$('frSelect').value;draw()};
