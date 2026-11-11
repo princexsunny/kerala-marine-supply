@@ -688,10 +688,10 @@
       <div class="page-body">
     <div class="eyebrow">Step 4 · Job applications</div>
     <h2>Applications received</h2>
-    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Everyone who has applied via the careers page.</p>
+    <p style="max-width:60ch;color:var(--color-neutral-800);font-size:14px">Everyone who has applied via the careers page. Use Reply to choose a ready message, edit it and send from princexsunny@gmail.com in Gmail.</p>
     <div class="row"><button class="btn btn-ghost" id="refreshApps">Refresh list</button><span class="note" id="appNote"></span></div>
     <table>
-      <thead><tr><th>Received</th><th>Name</th><th>Phone</th><th>Email</th><th>Role</th><th>Note</th><th style="text-align:right">Resume</th></tr></thead>
+      <thead><tr><th>Received</th><th>Name</th><th>Phone</th><th>Email</th><th>Role</th><th>Note</th><th style="text-align:right">Resume / reply</th></tr></thead>
       <tbody id="appRows"></tbody>
     </table>
     <p class="note" id="appsEmpty"></p>
@@ -701,6 +701,7 @@
 
 <script src="ventures-data.js"></script>
 <script src="admin-money.js?v=6"></script>
+<script src="application-replies.js?v=1"></script>
 <script>
 (function(){
   var SLOTS = [
@@ -2103,6 +2104,7 @@
   });
 
   // ---- Applications ----
+  var applicationReplyRecords = Object.create(null);
   document.getElementById('refreshApps').addEventListener('click', loadApps);
   function loadApps(){
     setNote('appNote', 'Loading…');
@@ -2110,13 +2112,16 @@
       setNote('appNote', '');
       var rows = document.getElementById('appRows');
       rows.innerHTML = '';
+      applicationReplyRecords = Object.create(null);
       (list||[]).forEach(function(a){
+        applicationReplyRecords[a.id] = a;
         var when = a.createdAt ? new Date(a.createdAt).toLocaleString() : '—';
         var tr = document.createElement('tr');
         tr.innerHTML = '<td>'+when+'</td><td style="font-weight:600">'+esc(a.name)+'</td><td>'+esc(a.phone)+'</td>' +
           '<td>'+esc(a.email||'')+'</td><td>'+esc(a.role)+'</td><td class="msg">'+esc(a.message||'')+'</td>' +
           '<td style="text-align:right;white-space:nowrap">' +
             '<a href="'+a.resumeUrl+'" target="_blank" rel="noopener">'+esc(a.resumeName||'Open')+'</a>' +
+            '<button class="btn btn-secondary app-reply" style="margin-left:10px;padding:5px 10px;font-size:12px" data-id="'+esc(a.id)+'"'+(a.email ? '' : ' disabled title="No email provided by this applicant"')+'>Reply</button>' +
             '<button class="del" data-id="'+esc(a.id)+'" data-name="'+esc(a.name)+'">Delete</button>' +
           '</td>';
         rows.appendChild(tr);
@@ -2124,6 +2129,11 @@
       document.getElementById('appsEmpty').textContent = (list && list.length) ? '' : 'No applications yet.';
     }).catch(function(err){ setNote('appNote', err.message); });
   }
+
+  document.getElementById('appRows').addEventListener('click', function(e){
+    var btn = e.target.closest && e.target.closest('button.app-reply');
+    if(btn && window.KMSApplicationReplies) window.KMSApplicationReplies.open(applicationReplyRecords[btn.dataset.id]);
+  });
 
   // Delegated so it keeps working after the table is re-rendered.
   document.getElementById('appRows').addEventListener('click', function(e){
