@@ -73,12 +73,30 @@ $('composer').onsubmit=async e=>{
 };
 function reset(){draftId=null;media=null;file=null;removeMedia=false;requestId=null;dirty=false;$('message').value='';$('title').value='';$('counter').textContent='0 characters';preview();updateTargets();note('Ready for a new post.');}
 $('new').onclick=()=>{if(!dirty||confirm('Start a new post? Save your draft first if you need it.'))reset();};
+function showSetup(platform){
+  let dialog=$('connection-setup-dialog');
+  if(!dialog){
+    dialog=node('dialog');dialog.id='connection-setup-dialog';dialog.setAttribute('aria-labelledby','connection-setup-title');
+    dialog.style.cssText='width:min(500px,calc(100vw - 32px));max-height:85vh;overflow:auto;border:1px solid #d5dfe3;border-radius:16px;padding:24px;color:#20323b';
+    const heading=node('h2');heading.id='connection-setup-title';
+    const explanation=node('p');explanation.id='connection-setup-explanation';
+    const steps=node('ol');steps.append(node('li','Configure the website’s publishing app for this platform.'),node('li','Add its app credentials securely to the website server.'),node('li','Return here and use Connect to sign in and authorise your Shalom Group account.'));
+    const reassurance=node('p','Your account is not connected yet. You can keep preparing and saving drafts. Do not enter passwords or app secrets into your post.');
+    const close=node('button','Understood','btn primary');close.type='button';close.onclick=()=>dialog.close();
+    dialog.append(heading,explanation,steps,reassurance,close);document.body.append(dialog);
+  }
+  $('connection-setup-title').textContent=(platform?platform.name+' connection':'Account connection')+' — setup required';
+  $('connection-setup-explanation').textContent='The website is not configured to connect '+(platform?platform.name:'these accounts')+' yet. This is why the setup button was returning you to the same page. A platform sign-in can only start after the one-time website setup is complete.';
+  $('setup').open=true;
+  dialog.showModal();
+}
 async function loadAccounts(){
   const status=await api('status');platforms=status.platforms;$('accounts').replaceChildren();
   for(const p of platforms){
     const row=node('div',undefined,'account'),icon=node('span',{facebook:'f',instagram:'IG',linkedin:'in',youtube:'▶',x:'X'}[p.id],'icon'),body=node('div',undefined,'account-body');
     body.append(node('div',p.name,'account-name'),node('div',p.connected?p.accountName:p.canConnect?'Ready to connect':'One-time setup needed','account-status'+(p.connected?' connected':'')));
     const button=node('a',p.connected?'Reconnect':p.canConnect?'Connect':'Set up','btn connect');button.href=p.connectUrl;
+    if(!p.canConnect){button.href='#setup';button.onclick=e=>{e.preventDefault();showSetup(p);};}
     row.append(icon,body,button);$('accounts').append(row);
   }
   if(platforms.some(p=>!p.canConnect))$('setup-note').textContent='The website’s social publishing apps still need one-time server setup. Once that is ready, use Connect beside each platform and choose your Shalom Group account. You can save drafts now.';
@@ -119,7 +137,7 @@ async function refresh(){await Promise.allSettled([loadAccounts().catch(e=>{note
 $('refresh').onclick=refresh;
 window.addEventListener('beforeunload',e=>{if(dirty||busy){e.preventDefault();e.returnValue='';}});
 const notice=new URLSearchParams(location.search).get('notice');
-if(notice==='setup'){$('setup').open=true;note('One-time server setup is needed to connect your Shalom Group accounts. You can save a draft now.');}
+if(notice==='setup'){showSetup();note('One-time website setup is needed before account sign-in can begin. You can save a draft now.');}
 if(notice==='connection-failed')note('The account connection did not finish. Check the platform permissions and try Connect again.',true);
 void refresh();void loadChoices().catch(e=>note(e.message,true));
 })();
