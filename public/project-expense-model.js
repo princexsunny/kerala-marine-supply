@@ -10,7 +10,7 @@
       bankRemaining:p.loan-bankReceived,bills,contractorPaid,spent:bills+contractorPaid,balance:received-bills-contractorPaid,
       bankAllocated:p.bankStages.reduce((n,s)=>n+stageAmount(s,p.loan),0)};
   }
-  function divisionFunding(d,p){const total=stageAmount(d,p.cost);if(!d.bankShare)return {total,bank:null,mine:null};const bank=stageAmount(d.bankShare,total);return {total,bank,mine:total-bank};}
+  function divisionFunding(d,p){const total=stageAmount(d,p.cost);if(!d.bankShare){const funding=p.loan+p.personal;if(!funding)return {total,bank:null,mine:null};const rows=p.bankDivisions||[],index=rows.findIndex(row=>row.id===d.id),before=index<0?0:rows.slice(0,index).reduce((n,row)=>n+stageAmount(row,p.cost),0),bank=Math.round((before+total)*p.loan/funding)-Math.round(before*p.loan/funding);return {total,bank,mine:total-bank};}const bank=stageAmount(d.bankShare,total);return {total,bank,mine:total-bank};}
   function validate(p){
     const error=m=>{throw new Error(m);};
     const text=(v,n,required=false)=>{if(typeof v!=='string'||v.length>n||(required&&!v.trim()))error('Check the name or note.');};
