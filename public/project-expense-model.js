@@ -6,10 +6,11 @@
     const bankReceived=sum(p.receipts.filter(r=>r.source==='bank'),'amount');
     const received=sum(p.receipts,'amount'),bills=sum(p.expenses,'amount');
     const contractorPaid=p.contractors.reduce((n,c)=>n+sum(c.payments,'amount'),0);
-    return {funding:p.loan+p.personal+p.company,gap:p.cost-p.loan-p.personal-p.company,received,bankReceived,
+    return {funding:p.loan+p.personal,gap:p.cost-p.loan-p.personal,received,bankReceived,
       bankRemaining:p.loan-bankReceived,bills,contractorPaid,spent:bills+contractorPaid,balance:received-bills-contractorPaid,
       bankAllocated:p.bankStages.reduce((n,s)=>n+stageAmount(s,p.loan),0)};
   }
+  function divisionFunding(d,p){const total=stageAmount(d,p.cost);if(!d.bankShare)return {total,bank:null,mine:null};const bank=stageAmount(d.bankShare,total);return {total,bank,mine:total-bank};}
   function validate(p){
     const error=m=>{throw new Error(m);};
     const text=(v,n,required=false)=>{if(typeof v!=='string'||v.length>n||(required&&!v.trim()))error('Check the name or note.');};
@@ -24,6 +25,9 @@
     text(p.name,100,true);['cost','loan','personal','company'].forEach(k=>money(p[k]));
     if(!['progress','bills','dates','mixed'].includes(p.bankMethod))error('Choose a bank release method.');
     if(p.bankDivisions!==undefined){list(p.bankDivisions);try{stages(p.bankDivisions.map(d=>({...d,date:'',condition:''})),p.cost);}catch(e){error('Total project cost division: '+e.message.replace('Agreed stages exceed the loan or contractor amount. Reduce a stage or increase the agreement amount.','Divisions exceed the total project cost. Reduce a division or increase the project cost.'));}}
+    let bankDivisionTotal=0;
+    for(const d of p.bankDivisions||[]){if(d.bankShare!==undefined){const share=d.bankShare;if(!share||!['fixed','percent'].includes(share.kind))error('Choose a bank contribution type.');if(share.kind==='fixed')money(share.value);else if(!Number.isFinite(share.value)||share.value<0||share.value>100||Math.abs(share.value*100-Math.round(share.value*100))>1e-6)error('Bank percentage must be between 0 and 100.');const split=divisionFunding(d,p);if(split.bank>split.total)error('Bank contribution cannot exceed the division cost.');bankDivisionTotal+=split.bank;}}
+    if(bankDivisionTotal>p.loan)error('Bank contributions across cost divisions exceed the sanctioned bank loan.');
     stages(p.bankStages,p.loan);transactions(p.receipts,p.bankStages);
     for(const r of p.receipts){if(!['bank','personal','company'].includes(r.source))error('Choose a funding source.');if(r.source!=='bank'&&r.stageId)error('Only bank receipts can refer to bank stages.');}
     unique(p.contractors);for(const c of p.contractors){text(c.name,100,true);text(c.work,200);money(c.amount);if(!['milestones','measured','dates','mixed'].includes(c.method))error('Choose a contractor payment method.');stages(c.stages,c.amount);transactions(c.payments,c.stages);}
@@ -31,5 +35,5 @@
     if(JSON.stringify(p).length>350000)error('This project is too large. Export a backup and start another project.');
     return p;
   }
-  const api={totals,stageAmount,validate};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ProjectExpenseModel=api;
+  const api={totals,stageAmount,divisionFunding,validate};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ProjectExpenseModel=api;
 })(typeof window!=='undefined'?window:globalThis);
