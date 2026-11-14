@@ -31,7 +31,7 @@ const metric=(label,value,sub='')=>'<div class="metric"><span>'+esc(label)+'</sp
 const field=(name,label,type='text',value='',required=false)=>'<label>'+esc(label)+'<input name="'+name+'" type="'+type+'" value="'+esc(value)+'"'+(required?' required':'')+(type==='number'?' min="0" max="999999999" step="0.01" inputmode="decimal"':'')+(type==='text'?' maxlength="200"':'')+'></label>';
 const amount=(name,label,value=0)=>field(name,label,'number',value?value/100:'');
 const select=(name,label,options,value)=>'<label>'+esc(label)+'<select name="'+name+'">'+Object.entries(options).map(([k,v])=>'<option value="'+esc(k)+'"'+(k===value?' selected':'')+'>'+esc(v)+'</option>').join('')+'</select></label>';
-function editor(title,fields,save){$('editor-title').textContent=title;$('editor-fields').innerHTML=fields;$('editor-error').textContent='';onSave=save;$('editor').showModal();}
+function editor(title,fields,save){$('editor-title').textContent=title;$('editor-fields').innerHTML=boldAmounts(fields);$('editor-error').textContent='';onSave=save;$('editor').showModal();}
 function formValues(form){return Object.fromEntries(new FormData(form));}
 function cents(v){const n=Number(String(v||'').replace(/,/g,''));if(!Number.isFinite(n)||n<0||Math.abs(n*100-Math.round(n*100))>0.00001)throw Error('Use positive amounts with up to two decimal places.');return Math.round(n*100);}
 function projectEditor(isNew){const p=isNew?{schema:1,name:'',cost:0,loan:0,personal:0,company:0,bankMethod:'progress',bankStages:[],receipts:[],contractors:[],expenses:[]}:clone(record.project);
@@ -57,13 +57,15 @@ function table(headers,rows){return rows.length?'<div class="table-wrap"><table>
 function stageTable(stages,base,transactions,owner=''){return table(['Stage / condition','Agreed','Received / paid','Balance','Due date',''],stages.map(s=>{const got=sum(transactions.filter(r=>r.stageId===s.id),'amount');return [esc(s.name)+(s.condition?'<br><small>'+esc(s.condition)+'</small>':''),'<span class="money">'+money(M.stageAmount(s,base))+'</span>'+(s.kind==='percent'?'<br><small>'+s.value+'%</small>':''),money(got),money(M.stageAmount(s,base)-got),date(s.date),button(owner?'contract-stage-edit':'bank-stage-edit','Edit',s.id,owner)];}));}
 function receiptTable(p){return table(['Date','Source','Stage / note','Received',''],p.receipts.map(r=>[date(r.date),esc(sources[r.source]),esc(p.bankStages.find(s=>s.id===r.stageId)?.name||r.note||'—'),money(r.amount),button('receipt-edit','Edit',r.id)]));}
 function paymentTable(c){return table(['Date','Stage / note','Paid',''],c.payments.map(r=>[date(r.date),esc(c.stages.find(s=>s.id===r.stageId)?.name||r.note||'Advance / no stage'),money(r.amount),button('payment-edit','Edit',r.id,c.id)]));}
+const boldAmounts=html=>html.replace(/(-?₹[\d,]+(?:\.\d{1,2})?)/g,'<b class="money">$1</b>');
 function render(){
+ document.body.classList.toggle('project-open',!!record);
  $('empty').hidden=!!record;$('workspace').hidden=!record;$('export').hidden=!record;if(!record)return;
  const p=record.project,t=M.totals(p);$('project-title').textContent=p.name;
  $('metrics').innerHTML=metric('Project cost',p.cost)+metric('Money received',t.received,'Bank + personal + company')+metric('Spent',t.spent,'Bills + contractor payments')+metric('Cash balance',t.balance,t.balance<0?'Spent more than received':'Received minus spent');
  const warnings=[];if(t.gap>0)warnings.push('Funding still to arrange: '+money(t.gap));if(t.gap<0)warnings.push('Planned funding exceeds project cost by '+money(-t.gap));if(t.spent>p.cost)warnings.push('Spending exceeds project cost by '+money(t.spent-p.cost));if(t.bankRemaining<0)warnings.push('Bank receipts exceed the sanctioned loan by '+money(-t.bankRemaining));
  for(const c of p.contractors)if(sum(c.payments,'amount')>c.amount)warnings.push(c.name+': paid above agreed amount.');
- $('warnings').innerHTML=warnings.map(s=>'<div class="notice warning">'+esc(s)+'</div>').join('');
+ $('warnings').innerHTML=warnings.map(s=>'<div class="notice warning">'+boldAmounts(esc(s))+'</div>').join('');
  for(const b of document.querySelectorAll('[data-tab]'))b.setAttribute('aria-selected',String(b.dataset.tab===tab));
  let html='';
  if(tab==='overview')html='<section class="card"><div class="head"><h2>Agreed funding</h2>'+button('receipt-add','+ Money received')+'</div>'+table(['Source','Agreed','Received'],[['Bank loan',money(p.loan),money(t.bankReceived)],['My contribution',money(p.personal),money(sum(p.receipts.filter(r=>r.source==='personal'),'amount'))],['Company contribution',money(p.company),money(sum(p.receipts.filter(r=>r.source==='company'),'amount'))]])+'<p class="muted">Agreed funding is a plan. Record money received to update the cash balance.</p></section><section class="card"><div class="head"><h2>Money received</h2></div>'+receiptTable(p)+'</section>';
@@ -74,7 +76,7 @@ function render(){
  else html=button('contractors-back','← All contractors')+'<section class="card"><div class="head"><div><h2>'+esc(c.name)+'</h2><small>'+esc(c.work)+' · '+esc(contractorMethods[c.method])+'</small></div>'+button('contractor-edit','Edit agreement',c.id)+'</div><p>Contract <b>'+money(c.amount)+'</b> · Paid '+money(sum(c.payments,'amount'))+' · Balance '+money(c.amount-sum(c.payments,'amount'))+'</p></section><section class="card"><div class="head"><h2>Payment agreement</h2>'+button('contract-stage-add','+ Payment stage','',c.id)+'</div>'+stageTable(c.stages,c.amount,c.payments,c.id)+'<p class="muted">Unallocated: '+money(c.amount-c.stages.reduce((n,s)=>n+M.stageAmount(s,c.amount),0))+'</p></section><section class="card"><div class="head"><h2>Actual payments</h2>'+button('payment-add','+ Record payment','',c.id)+'</div>'+paymentTable(c)+'<p class="muted">These payments already count as spending. Do not enter them again under Bills & expenses.</p></section>';
  }
  if(tab==='expenses')html='<section class="card"><div class="head"><h2>Bills & expenses</h2>'+button('expense-add','+ Add bill / expense')+'</div>'+table(['Date','Paid for','Bill no.','Amount',''],p.expenses.map(e=>[date(e.date),esc(e.note),esc(e.bill||'—'),money(e.amount),button('expense-edit','Edit',e.id)]))+'</section>';
- $('content').innerHTML=html;
+ $('content').innerHTML=boldAmounts(html);
 }
 $('editor-form').onsubmit=async event=>{event.preventDefault();if(saving)return;saving=true;$('save-editor').disabled=true;$('cancel-editor').disabled=true;$('editor-error').textContent='';try{await onSave(formValues(event.target));$('editor').close();}catch(e){$('editor-error').textContent=e.message;}finally{saving=false;$('save-editor').disabled=false;$('cancel-editor').disabled=false;}};
 $('cancel-editor').onclick=()=>$('editor').close();$('editor').addEventListener('cancel',e=>{if(saving)e.preventDefault();});
