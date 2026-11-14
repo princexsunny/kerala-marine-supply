@@ -90,6 +90,7 @@ app.use('/api', adminAuth, applicationsRoutes);
 app.use('/api', adminAuth, recordRoutes);
 app.use('/api', adminAuth, projectExpenseRoutes);
 app.use('/api', adminAuth, require('./routes/net-inventory'));
+app.use('/api', adminAuth, require('./routes/net-sales'));
 // Roadmaps — working notes and plans. Admin-only both ways; these are not
 // published pages and much of what goes in them is commercially sensitive.
 app.use('/api', adminAuth, roadmapRoutes);
