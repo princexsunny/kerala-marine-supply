@@ -15,11 +15,11 @@ async function api(path='',options={}){
  if(response.status===401){location.href='/login.html?next='+encodeURIComponent('/expense-calculator.html');throw Error('Please sign in again.');}
  const body=await response.json();if(!response.ok)throw Error(body.error||'Could not save. Try again.');return body;
 }
-function setBusy(value){busy=value;$('project-select').disabled=value||!list.length;$('new-project').disabled=value;$('reload').disabled=value;}
+function setBusy(value){busy=value;$('project-select').disabled=value||!list.length;$('new-project').disabled=value;$('reload').disabled=value;$('print-project').disabled=value;}
 function selection(){const select=$('project-select');select.innerHTML='<option value="">Select project…</option>'+list.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('');select.value=record?.id||'';select.disabled=busy||!list.length;}
 async function loadList(){setBusy(true);note('Loading projects…');try{list=await api();selection();note(list.length?'Choose a project.':'Ready. Add your first project.');}catch(e){note(e.message,true);$('empty').textContent='Projects could not be loaded. Use Refresh to try again.';throw e;}finally{setBusy(false);}}
 let loadSequence=0;
-async function loadProject(id){if(!id){record=null;render();return;}const sequence=++loadSequence;setBusy(true);note('Loading project…');try{const next=await api('/'+encodeURIComponent(id));if(sequence!==loadSequence)return;record=next;contractorId=null;render();note('Saved to your account.');history.replaceState({},'','?project='+encodeURIComponent(id));}catch(e){selection();note(e.message,true);}finally{if(sequence===loadSequence)setBusy(false);}}
+async function loadProject(id){if(!id){record=null;render();return;}const sequence=++loadSequence;setBusy(true);note('Loading project…');try{const next=await api('/'+encodeURIComponent(id));if(sequence!==loadSequence)return;record=next;contractorId=null;selection();render();note('Saved to your account.');history.replaceState({},'','?project='+encodeURIComponent(id));}catch(e){selection();note(e.message,true);}finally{if(sequence===loadSequence)setBusy(false);}}
 async function persist(project,isNew=false){
  M.validate(project);setBusy(true);note('Saving…');
  try{const saved=await api(isNew?'':'/'+encodeURIComponent(record.id),{method:isNew?'POST':'PUT',body:JSON.stringify({project,revision:isNew?undefined:record.revision})});record=saved;if(isNew){tab='overview';contractorId=null;}
@@ -87,6 +87,11 @@ document.querySelector('.tabs').onclick=e=>{const b=e.target.closest('[data-tab]
 $('content').onclick=e=>{const b=e.target.closest('[data-action]');if(!b||busy)return;const id=b.dataset.id,parent=b.dataset.parent;
  switch(b.dataset.action){case 'bank-stage-add':stageEditor();break;case 'bank-stage-edit':stageEditor('',id);break;case 'receipt-add':receiptEditor();break;case 'receipt-edit':receiptEditor(id);break;case 'contractor-add':contractorEditor();break;case 'contractor-edit':contractorEditor(id);break;case 'contractor-open':contractorId=id;render();break;case 'contractors-back':contractorId=null;render();break;case 'contract-stage-add':stageEditor(parent);break;case 'contract-stage-edit':stageEditor(parent,id);break;case 'payment-add':paymentEditor(parent);break;case 'payment-edit':paymentEditor(parent,id);break;case 'expense-add':expenseEditor();break;case 'expense-edit':expenseEditor(id);break;}
 };
+let originalPrintTitle=null;
+function preparePrint(){if(!record)return;$('project-print').innerHTML=window.ProjectExpensePrint.build(record);if(originalPrintTitle===null)originalPrintTitle=document.title;document.title=record.project.name+' — Project Expense Report';}
+window.addEventListener('beforeprint',preparePrint);
+window.addEventListener('afterprint',()=>{if(originalPrintTitle!==null){document.title=originalPrintTitle;originalPrintTitle=null;}});
+$('print-project').onclick=()=>{if(!record||busy)return;try{preparePrint();note('Choose your printer or “Save as PDF” in the print window.');window.print();}catch(e){note('Could not prepare the report: '+e.message,true);}};
 $('export').onclick=()=>{const blob=new Blob([JSON.stringify(record,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='project-'+record.id+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 window.addEventListener('beforeunload',e=>{if($('editor').open){e.preventDefault();e.returnValue='';}});
 void loadList().then(()=>{const id=new URLSearchParams(location.search).get('project');if(id&&list.some(p=>p.id===id))return loadProject(id);if(list.length===1)return loadProject(list[0].id);}).catch(()=>{});

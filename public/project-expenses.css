@@ -14,3 +14,14 @@
 .project-open .card{padding:12px 14px;margin:10px 0;border-radius:10px}.project-open h2{font-size:16px}.project-open h3{font-size:14px}.project-open p{margin:5px 0}
 .project-open td,.project-open th{padding:7px 8px}.project-open table{font-size:13px}.project-open .empty{padding:16px}.project-open footer{margin-top:12px}
 @media(max-width:700px){.project-open .app{padding:10px}.project-open .selector label{display:block;flex-basis:100%}.project-open .selector select{margin-top:4px;width:100%}.project-open .metric{padding:8px 10px}.project-open .metric strong{font-size:17px}.project-open .card{padding:10px}.project-open td,.project-open th{padding:7px 6px}}
+
+#project-print{display:none}
+@page{size:A4 portrait;margin:14mm}
+@media print{
+body.project-open .app,dialog{display:none!important}
+body.project-open #project-print{display:block!important;font:10pt/1.4 Arial,sans-serif;color:#172b39}
+#project-print h1{font-size:19pt;margin:4px 0}#project-print h2{font-size:13pt;margin:18px 0 8px;break-after:avoid}#project-print h3{font-size:12pt;margin:14px 0 6px;break-after:avoid}#project-print h4{font-size:10pt;margin:12px 0 5px;break-after:avoid}
+#project-print p{margin:6px 0}#project-print .report-heading{border-bottom:2px solid #20323b;padding-bottom:9px;margin-bottom:12px}#project-print .report-heading p{font-size:9pt}
+#project-print table{min-width:0!important;table-layout:fixed;width:100%;font-size:9pt;border-collapse:collapse}#project-print th,#project-print td{padding:7px 5px;overflow-wrap:anywhere;border-bottom:1px solid #ccd6de;vertical-align:top}#project-print th{font-size:8pt;color:#43596a;background:#f0f3f5}#project-print thead{display:table-header-group}#project-print tr{break-inside:avoid}
+#project-print .money{font-weight:750;white-space:normal}#project-print .report-warning{border-left:3px solid #945400;padding:5px 9px}#project-print .report-total{border-top:2px solid #20323b;padding-top:10px;margin-top:14px;break-inside:avoid}#project-print .report-footer{font-size:8pt;color:#607681;margin-top:16px}
+}
