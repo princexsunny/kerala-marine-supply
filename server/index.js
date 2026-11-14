@@ -89,6 +89,7 @@ app.use('/api', adminAuth, applicationsRoutes);
 // well as write; there is no public half of this one.
 app.use('/api', adminAuth, recordRoutes);
 app.use('/api', adminAuth, projectExpenseRoutes);
+app.use('/api', adminAuth, require('./routes/net-inventory'));
 // Roadmaps — working notes and plans. Admin-only both ways; these are not
 // published pages and much of what goes in them is commercially sensitive.
 app.use('/api', adminAuth, roadmapRoutes);
@@ -116,7 +117,7 @@ app.get(['/Admin.dc.html', '/admin-dashboard.html'], (req, res) =>
 // anyone who asks, so a file dropped in there is on the open internet whether
 // or not anything links to it. Guarding the route is what actually keeps it
 // private; not linking to it is not a control.
-const PRIVATE_PAGES = ['admin.html', 'boat-yard-split.html', 'expense-calculator.html', 'expense-calculator-legacy.html', 'social-publisher.html'];
+const PRIVATE_PAGES = ['admin.html', 'net-inventory.html', 'boat-yard-split.html', 'expense-calculator.html', 'expense-calculator-legacy.html', 'social-publisher.html'];
 
 PRIVATE_PAGES.forEach((page) => {
   app.get('/' + page, adminAuth, (req, res) => {
