@@ -31,7 +31,7 @@ const metric=(label,value,sub='')=>'<div class="metric"><span>'+esc(label)+'</sp
 const field=(name,label,type='text',value='',required=false)=>'<label>'+esc(label)+'<input name="'+name+'" type="'+type+'" value="'+esc(value)+'"'+(required?' required':'')+(type==='number'?' min="0" max="999999999" step="0.01" inputmode="decimal"':'')+(type==='text'?' maxlength="200"':'')+'></label>';
 const amount=(name,label,value=0)=>field(name,label,'number',value?value/100:'');
 const select=(name,label,options,value)=>'<label>'+esc(label)+'<select name="'+name+'">'+Object.entries(options).map(([k,v])=>'<option value="'+esc(k)+'"'+(k===value?' selected':'')+'>'+esc(v)+'</option>').join('')+'</select></label>';
-function editor(title,fields,save){$('editor-title').textContent=title;$('editor-fields').innerHTML=boldAmounts(fields);$('editor-error').textContent='';onSave=save;$('editor').showModal();}
+function editor(title,fields,save){$('editor-title').textContent=title;$('editor-fields').innerHTML=fields;$('editor-error').textContent='';onSave=save;$('editor').showModal();}
 function formValues(form){return Object.fromEntries(new FormData(form));}
 function cents(v){const n=Number(String(v||'').replace(/,/g,''));if(!Number.isFinite(n)||n<0||Math.abs(n*100-Math.round(n*100))>0.00001)throw Error('Use positive amounts with up to two decimal places.');return Math.round(n*100);}
 function projectEditor(isNew){const p=isNew?{schema:1,name:'',cost:0,loan:0,personal:0,company:0,bankMethod:'progress',bankStages:[],receipts:[],contractors:[],expenses:[]}:clone(record.project);
