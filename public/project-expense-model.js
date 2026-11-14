@@ -13,6 +13,12 @@
   function divisionFunding(d,p){const total=stageAmount(d,p.cost);if(!d.bankShare){const funding=p.loan+p.personal;if(!funding)return {total,bank:null,mine:null};const rows=p.bankDivisions||[],index=rows.findIndex(row=>row.id===d.id),before=index<0?0:rows.slice(0,index).reduce((n,row)=>n+stageAmount(row,p.cost),0),bank=Math.round((before+total)*p.loan/funding)-Math.round(before*p.loan/funding);return {total,bank,mine:total-bank};}const bank=stageAmount(d.bankShare,total);return {total,bank,mine:total-bank};}
   function spending(p){return [...p.expenses.map(e=>({...e,type:'expense',description:e.note})),...p.contractors.flatMap(c=>c.payments.map(r=>({...r,type:'payment',owner:c.id,description:c.name+(r.note?' · '+r.note:'')})))];}
   function fundingTotals(p){const rows=spending(p),result={};for(const source of ['personal','bank']){const received=sum(p.receipts.filter(r=>r.source===source),'amount'),spent=rows.reduce((n,r)=>n+(r.funding?.[source]||0),0);result[source]={received,spent,balance:received-spent};}result.unassigned=rows.filter(r=>!r.funding).reduce((n,r)=>n+r.amount,0);return result;}
+  function divisionTotals(p){
+    const rows=new Map(),make=name=>({name,bank:{budget:0,spent:0,balance:null},personal:{budget:0,spent:0,balance:null},planned:false});
+    for(const d of p.bankDivisions||[]){const r=rows.get(d.name)||make(d.name),split=divisionFunding(d,p);for(const [source,key] of [['bank','bank'],['personal','mine']])r[source].budget=r[source].budget===null||split[key]===null?null:r[source].budget+split[key];r.planned=true;rows.set(d.name,r);}
+    for(const e of spending(p)){const name=e.division||'Other',r=rows.get(name)||make(name);for(const source of ['personal','bank'])r[source].spent+=e.funding?.[source]||0;rows.set(name,r);}
+    return [...rows.values()].map(r=>{for(const source of ['personal','bank']){if(!r.planned)r[source].budget=null;r[source].balance=r[source].budget===null?null:r[source].budget-r[source].spent;}return r;});
+  }
   function validate(p){
     const error=m=>{throw new Error(m);};
     const text=(v,n,required=false)=>{if(typeof v!=='string'||v.length>n||(required&&!v.trim()))error('Check the name or note.');};
@@ -38,5 +44,5 @@
     if(JSON.stringify(p).length>350000)error('This project is too large. Export a backup and start another project.');
     return p;
   }
-  const api={totals,stageAmount,divisionFunding,spending,fundingTotals,validate};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ProjectExpenseModel=api;
+  const api={totals,stageAmount,divisionFunding,spending,fundingTotals,divisionTotals,validate};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ProjectExpenseModel=api;
 })(typeof window!=='undefined'?window:globalThis);
