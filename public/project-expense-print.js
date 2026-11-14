@@ -30,5 +30,14 @@
   html+='<p class="report-total">Bills: '+money(t.bills)+' · Contractor payments: '+money(t.contractorPaid)+' · Total spending: '+money(t.spent)+'</p><p class="report-footer">Private project record · '+esc(p.name)+'</p>';
   return html;
  }
- if(typeof module!=='undefined'&&module.exports)module.exports={build};else root.ProjectExpensePrint={build};
+ function buildSubdivision(record,division,subItemId,printedAt=new Date()){
+  const p=record.project;M.validate(p);const d=(p.bankDivisions||[]).find(d=>d.name===division),item=d?.subItems?.find(i=>i.id===subItemId);if(subItemId&&!item)throw Error('Sub-division not found.');const name=item?.name||'Not assigned to a sub-item',cash=M.subCash(p,division,subItemId),budget=M.subItemTotals(p,division).find(i=>i.id===subItemId),bank=budget?.bank.budget,personal=budget?.personal.budget,rows=item?.bankStages||[],base=bank||0;
+  let html='<div class="report-heading"><p>SHALOM GROUP · KERALA MARINE SUPPLY</p><h1>'+esc(p.name)+'</h1><h2>'+esc(division)+' / '+esc(name)+'</h2><p>Sub-division report · Printed: '+esc(printedAt.toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}))+' IST</p></div>';
+  html+='<h2>Summary</h2>'+table(['My money received','Bank money received','Total received','Total spent','Available balance'],[[money(cash.personal),money(cash.bank),money(cash.received),money(cash.spent),money(cash.balance)]])+'<p>Available balance = money actually received minus bills and contractor payments. Planned releases are not available cash.</p>';
+  html+='<h2>Agreed contributions</h2>'+table(['Source','Agreed','Received','Still to receive'],[['My contribution',personal,cash.personal],['Bank contribution',bank,cash.bank]].map(([source,planned,received])=>[source,planned==null?'Not set':money(planned),money(received),planned==null?'Not set':money(planned-received)]));
+  html+='<h2>Bank release plan</h2>'+stages(rows,base,cash.receipts.filter(r=>r.source==='bank').map(r=>({...r,stageId:r.subStageId||''})))+'<p>Planned '+money(rows.reduce((n,s)=>n+M.stageAmount(s,base),0))+' · Not planned '+(bank==null?'Not set':money(bank-rows.reduce((n,s)=>n+M.stageAmount(s,base),0)))+'</p>';
+  html+='<h2>Money received</h2>'+table(['Date','Source','Stage','Note','Amount'],cash.receipts.map(r=>[date(r.date),sources[r.source],esc(rows.find(s=>s.id===r.subStageId)?.name||'—'),esc(r.note||'—'),money(r.amount)]));
+  html+='<h2>Bills &amp; expenses</h2>'+table(['Date','Paid for','Bill no.','Amount'],cash.expenses.map(r=>[date(r.date),esc(r.description),esc(r.bill||'—'),money(r.amount)]))+'<p class="report-total">Total received '+money(cash.received)+' − Total spent '+money(cash.spent)+' = Available balance '+money(cash.balance)+'</p><p class="report-footer">Private sub-division record · '+esc(division)+' / '+esc(name)+'</p>';return html;
+ }
+ if(typeof module!=='undefined'&&module.exports)module.exports={build,buildSubdivision};else root.ProjectExpensePrint={build,buildSubdivision};
 })(typeof window!=='undefined'?window:globalThis);
