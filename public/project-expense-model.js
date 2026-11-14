@@ -23,6 +23,7 @@
     if(!p||typeof p!=='object'||Array.isArray(p)||p.schema!==1)error('Invalid project.');
     text(p.name,100,true);['cost','loan','personal','company'].forEach(k=>money(p[k]));
     if(!['progress','bills','dates','mixed'].includes(p.bankMethod))error('Choose a bank release method.');
+    if(p.bankDivisions!==undefined){list(p.bankDivisions);try{stages(p.bankDivisions.map(d=>({...d,date:'',condition:''})),p.loan);}catch(e){error('Bank loan division: '+e.message);}}
     stages(p.bankStages,p.loan);transactions(p.receipts,p.bankStages);
     for(const r of p.receipts){if(!['bank','personal','company'].includes(r.source))error('Choose a funding source.');if(r.source!=='bank'&&r.stageId)error('Only bank receipts can refer to bank stages.');}
     unique(p.contractors);for(const c of p.contractors){text(c.name,100,true);text(c.work,200);money(c.amount);if(!['milestones','measured','dates','mixed'].includes(c.method))error('Choose a contractor payment method.');stages(c.stages,c.amount);transactions(c.payments,c.stages);}

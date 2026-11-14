@@ -17,6 +17,7 @@
   if(t.gap)html+='<p class="report-warning">'+(t.gap>0?'Funding still to arrange: ':'Planned funding exceeds project cost by ')+money(Math.abs(t.gap))+'</p>';
   if(t.spent>p.cost)html+='<p class="report-warning">Spending exceeds project cost by '+money(t.spent-p.cost)+'</p>';
   html+='<h2>Agreed funding</h2>'+table(['Source','Agreed','Received','Still to receive'],[['bank',p.loan],['personal',p.personal],['company',p.company]].map(([source,planned])=>{const received=sum(p.receipts.filter(r=>r.source===source),'amount');return [sources[source],money(planned),money(received),money(planned-received)];}));
+  if((p.bankDivisions||[]).length)html+='<h2>Bank loan division</h2>'+table(['Division','Agreed as','Amount'],p.bankDivisions.map(d=>[esc(d.name),d.kind==='percent'?d.value+'%':'Fixed amount',money(M.stageAmount(d,p.loan))]));
   html+='<h2>Bank release agreement</h2><p>Release basis: '+esc(bankMethods[p.bankMethod])+'. Sanctioned: '+money(p.loan)+'. Unallocated: '+money(p.loan-t.bankAllocated)+'.</p>'+stages(p.bankStages,p.loan,p.receipts.filter(r=>r.source==='bank'));
   html+='<h2>Money received</h2>'+table(['Date','Source','Bank stage','Note','Amount'],p.receipts.map(r=>[date(r.date),sources[r.source],esc(p.bankStages.find(s=>s.id===r.stageId)?.name||'—'),esc(r.note||'—'),money(r.amount)]));
   html+='<h2>Contractors ('+p.contractors.length+')</h2>';
