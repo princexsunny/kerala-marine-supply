@@ -11,6 +11,8 @@
       bankAllocated:p.bankStages.reduce((n,s)=>n+stageAmount(s,p.loan),0)};
   }
   function divisionFunding(d,p){const total=stageAmount(d,p.cost);if(!d.bankShare){const funding=p.loan+p.personal;if(!funding)return {total,bank:null,mine:null};const rows=p.bankDivisions||[],index=rows.findIndex(row=>row.id===d.id),before=index<0?0:rows.slice(0,index).reduce((n,row)=>n+stageAmount(row,p.cost),0),bank=Math.round((before+total)*p.loan/funding)-Math.round(before*p.loan/funding);return {total,bank,mine:total-bank};}const bank=stageAmount(d.bankShare,total);return {total,bank,mine:total-bank};}
+  function spending(p){return [...p.expenses.map(e=>({...e,type:'expense',description:e.note})),...p.contractors.flatMap(c=>c.payments.map(r=>({...r,type:'payment',owner:c.id,description:c.name+(r.note?' · '+r.note:'')})))];}
+  function fundingTotals(p){const rows=spending(p),result={};for(const source of ['personal','bank']){const received=sum(p.receipts.filter(r=>r.source===source),'amount'),spent=rows.reduce((n,r)=>n+(r.funding?.[source]||0),0);result[source]={received,spent,balance:received-spent};}result.unassigned=rows.filter(r=>!r.funding).reduce((n,r)=>n+r.amount,0);return result;}
   function validate(p){
     const error=m=>{throw new Error(m);};
     const text=(v,n,required=false)=>{if(typeof v!=='string'||v.length>n||(required&&!v.trim()))error('Check the name or note.');};
@@ -32,8 +34,9 @@
     for(const r of p.receipts){if(!['bank','personal','company'].includes(r.source))error('Choose a funding source.');if(r.source!=='bank'&&r.stageId)error('Only bank receipts can refer to bank stages.');}
     unique(p.contractors);for(const c of p.contractors){text(c.name,100,true);text(c.work,200);money(c.amount);if(!['milestones','measured','dates','mixed'].includes(c.method))error('Choose a contractor payment method.');stages(c.stages,c.amount);transactions(c.payments,c.stages);}
     unique(p.expenses);for(const e of p.expenses){money(e.amount);if(!e.amount)error('Enter an expense amount.');date(e.date,true);text(e.bill,80);text(e.note,200,true);}
+    for(const row of spending(p)){if(row.division!==undefined)text(row.division,100);if(row.funding!==undefined){const f=row.funding;if(!f||typeof f!=='object'||Array.isArray(f))error('Choose the expense funding source.');money(f.bank);money(f.personal);if(f.bank+f.personal!==row.amount)error('Bank money and my money must add up to the expense amount.');}}
     if(JSON.stringify(p).length>350000)error('This project is too large. Export a backup and start another project.');
     return p;
   }
-  const api={totals,stageAmount,divisionFunding,validate};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ProjectExpenseModel=api;
+  const api={totals,stageAmount,divisionFunding,spending,fundingTotals,validate};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ProjectExpenseModel=api;
 })(typeof window!=='undefined'?window:globalThis);
