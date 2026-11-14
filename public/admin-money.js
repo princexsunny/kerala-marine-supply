@@ -674,7 +674,7 @@
       '</div>' +
 
       '<div class="mo-head"><h3 class="mo-h">Spent in ' + esc(monthName(month)) + '</h3>' +
-        '<button type="button" class="mo-btn" id="moAddEntry">Add an expense</button></div>' +
+        '<button type="button" class="mo-btn" id="moAddEntry">Add expense</button></div>' +
       statusBar() +
       '<datalist id="moCats">' + catOptions() + '</datalist>' +
       renderEntryList() +
@@ -904,17 +904,14 @@
     return '<li class="mo-li mo-open" data-id="' + esc(e.id) + '">' +
       '<div class="mo-grid">' +
         '<label>Date<input type="date" class="f-date" value="' + esc(e.date) + '"></label>' +
-        '<label>Amount<input type="text" inputmode="decimal" class="f-amt" value="' + (e.amount || '') + '" placeholder="0"></label>' +
-        '<label>Category<input type="text" list="moCats" class="f-cat" value="' + esc(e.category) + '" placeholder="Fuel"></label>' +
-        '<label>Venture' + ventureSelect(e.venture, 'f-ven') + '</label>' +
-        '<label>Whose<select class="f-home">' +
-          '<option value=""' + (e.home ? '' : ' selected') + '>Business</option>' +
-          '<option value="1"' + (e.home ? ' selected' : '') + '>Home</option>' +
-        '</select></label>' +
-        '<label class="wide">What was it for<input type="text" class="f-note" value="' + esc(e.note) + '" placeholder="optional"></label>' +
+        '<label>Amount (₹)<input type="text" inputmode="decimal" class="f-amt" value="' + (e.amount || '') + '" placeholder="0"></label>' +
+        '<label>Category<input type="text" list="moCats" class="f-cat" value="' + esc(e.category) + '" placeholder="e.g. Fuel"></label>' +
+        '<label>Note (optional)<input type="text" class="f-note" value="' + esc(e.note) + '" placeholder="What did you pay for?"></label>' +
       '</div>' +
-      saveRow(isNew ? 'Save this expense' : 'Save changes') +
-    '</li>';
+      '<details class="mo-options"><summary>More options' + (e.home ? ' · Home' : '') + (e.venture ? ' · ' + esc(ventureName(e.venture)) : '') + '</summary><div class="mo-grid">' +
+        '<label>Venture' + ventureSelect(e.venture, 'f-ven') + '</label>' +
+        '<label>Paid for<select class="f-home"><option value=""' + (e.home ? '' : ' selected') + '>Business</option><option value="1"' + (e.home ? ' selected' : '') + '>Home</option></select></label>' +
+      '</div></details>' + saveRow('Save') + '</li>';
   }
 
   // The bills and EMIs that fall in this month. Ticking one paid is the only
@@ -1657,10 +1654,9 @@
         '<div class="mo-card"><span class="k">Home</span><strong>' + rupees(homeNow) +
           '</strong><span class="c">this month</span></div>' +
       '</div>' +
-      '<p class="mo-caveat">A bill entered here counts in every month between its first and its last, ' +
-        'without being typed again. Leave the last month empty while it is still running.</p>' +
+      '<p class="mo-caveat">Enter once. Repeats automatically.</p>' +
       '<div class="mo-head"><h3 class="mo-h">Repeating bills</h3>' +
-        '<button type="button" class="mo-btn" id="moAddBill">Add a repeating bill</button></div>' +
+        '<button type="button" class="mo-btn" id="moAddBill">Add bill</button></div>' +
       '<datalist id="moCats">' + catOptions() + '</datalist>' +
       statusBar() +
       (D.bills.length
@@ -1704,24 +1700,22 @@
 
   function billForm(b, isNew) {
     return '<li class="mo-li mo-open" data-id="' + esc(b.id) + '">' +
+      (isNew ? '<div class="mo-presets" aria-label="Common bills">' + ['Rent','Salary','Electricity','Water','Internet'].map(function(name){return '<button type="button" class="mo-preset" data-bill-preset="'+name+'">'+name+'</button>';}).join('') + '</div>' : '') +
       '<div class="mo-grid">' +
-        '<label>What is it<input type="text" class="f-name" value="' + esc(b.name) + '" placeholder="Shop rent"></label>' +
-        '<label>Amount a month<input type="text" inputmode="decimal" class="f-amt" value="' + (b.amount || '') + '" placeholder="0"></label>' +
-        '<label>Category<input type="text" list="moCats" class="f-cat" value="' + esc(b.category) + '" placeholder="Rent"></label>' +
-        '<label>Venture' + ventureSelect(b.venture, 'f-ven') + '</label>' +
-        '<label>Due on day<input type="number" min="1" max="31" class="f-day" value="' + b.dueDay + '"></label>' +
-        '<label>Comes<select class="f-every">' + everyOptions(every(b)) + '</select></label>' +
-        '<label>Whose<select class="f-home">' +
-          '<option value=""' + (b.home ? '' : ' selected') + '>Business</option>' +
-          '<option value="1"' + (b.home ? ' selected' : '') + '>Home</option>' +
-        '</select></label>' +
-        '<label>First month<input type="month" class="f-from" value="' + esc(b.from) + '"></label>' +
-        '<label>Last month<input type="month" class="f-to" value="' + esc(b.to) + '"></label>' +
+        '<label>Bill name<input type="text" class="f-name" value="' + esc(b.name) + '" placeholder="e.g. Shop rent"></label>' +
+        '<label>Amount per bill (₹)<input type="text" inputmode="decimal" class="f-amt" value="' + (b.amount || '') + '" placeholder="0"></label>' +
+        '<label>Due day (1–31)<input type="number" min="1" max="31" class="f-day" value="' + b.dueDay + '"></label>' +
+        '<label>Repeat<select class="f-every">' + everyOptions(every(b)) + '</select></label>' +
+        '<label>Starts<input type="month" class="f-from" value="' + esc(b.from) + '"></label>' +
       '</div>' +
-      '<p class="mo-facts" id="moBillSum"></p>' +
-      '<p class="mo-facts"><span>Leave the last month empty while the bill is still running.</span></p>' +
-      saveRow(isNew ? 'Save this bill' : 'Save changes') +
-    '</li>';
+      '<details class="mo-options"><summary>More options' + (b.home ? ' · Home' : '') + (b.to ? ' · Ends ' + esc(monthName(b.to)) : '') + '</summary><div class="mo-grid">' +
+        '<label>Category<input type="text" list="moCats" class="f-cat" value="' + esc(b.category) + '" placeholder="e.g. Rent"></label>' +
+        '<label>Venture' + ventureSelect(b.venture, 'f-ven') + '</label>' +
+        '<label>Paid for<select class="f-home"><option value=""' + (b.home ? '' : ' selected') + '>Business</option><option value="1"' + (b.home ? ' selected' : '') + '>Home</option></select></label>' +
+        '<label>Ends (optional)<input type="month" class="f-to" value="' + esc(b.to) + '"></label>' +
+      '</div></details>' +
+      '<details class="mo-options"><summary>Payment schedule</summary><p class="mo-facts" id="moBillSum"></p></details>' +
+      saveRow('Save') + '</li>';
   }
 
   function bindBills() {
@@ -1765,6 +1759,13 @@
 
   function bindBillForm(box) {
     var d = edit.draft;
+    box.querySelectorAll('[data-bill-preset]').forEach(function(button){
+      button.onclick = function(){
+        box.querySelector('.f-name').value = button.dataset.billPreset;
+        box.querySelector('.f-cat').value = button.dataset.billPreset;
+        box.querySelector('.f-amt').focus();
+      };
+    });
     function read() {
       d.name = box.querySelector('.f-name').value.trim();
       d.amount = num(box.querySelector('.f-amt').value);
@@ -1809,7 +1810,7 @@
     box.querySelector('.f-save').onclick = function () {
       read();
       if (!d.name) { setStatus('What is the bill for?', true); box.querySelector('.f-name').focus(); return; }
-      if (!d.amount) { setStatus('How much is it each month?', true); box.querySelector('.f-amt').focus(); return; }
+      if (!d.amount) { setStatus('Enter the amount per bill.', true); box.querySelector('.f-amt').focus(); return; }
       if (!d.from) { setStatus('Which month does it start?', true); box.querySelector('.f-from').focus(); return; }
       // A bill ending before it starts appears in no month at all, which looks
       // exactly like a bill that failed to save.
@@ -1834,6 +1835,7 @@
   // ---- styles --------------------------------------------------------------
 
   var CSS =
+    '.mo-options{margin:12px 0;border:1px solid var(--color-divider);border-radius:10px;padding:10px 12px}.mo-options summary{cursor:pointer;font-size:13px;font-weight:600}.mo-options>.mo-grid{margin-top:12px}.mo-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}.mo-preset{font:inherit;font-size:13px;cursor:pointer;border:1px solid var(--color-divider);border-radius:20px;padding:7px 12px;background:var(--color-bg);color:var(--color-text)}.mo-preset:hover{border-color:var(--color-accent)}' +
     '.mo-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:20px 0 4px}' +
     '.mo-bar input[type=month]{font:inherit;font-size:14px;font-weight:700;padding:8px 10px;' +
     '  border:2px solid var(--color-divider);background:var(--color-bg);color:var(--color-text)}' +
